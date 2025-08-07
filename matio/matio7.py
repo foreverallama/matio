@@ -10,13 +10,15 @@ from scipy.io.matlab._mio_utils import (  # pylint: disable=no-name-in-module
 )
 from scipy.sparse import coo_matrix, csc_array, issparse
 
-from matio.subsystem import SubsystemReader
+from matio.subsystem import get_matio_context, load_opaque_object, set_file_wrapper
 
 
 class MatRead7:
     """Reads MAT-file version 7.3 (HDF5) files."""
 
-    def __init__(self, file_stream, raw_data=False, add_table_attrs=False, chars_as_strings=True):
+    def __init__(
+        self, file_stream, raw_data=False, add_table_attrs=False, chars_as_strings=True
+    ):
         """Initializes the MAT-file reader.
         Parameters
         ----------
@@ -26,7 +28,6 @@ class MatRead7:
             chars_as_strings : bool, optional
         """
         self.h5stream = file_stream
-        self.subsystem = None
         self.raw_data = raw_data
         self.add_table_attrs = add_table_attrs
         self.chars_as_strings = chars_as_strings
@@ -35,9 +36,9 @@ class MatRead7:
         """Initializes the subsystem for v7.3 MAT-files."""
 
         subsystem_arr = self.read_struct(self.h5stream["#subsystem#"])
-        subsystem = SubsystemReader(byte_order, raw_data, add_table_attrs)
-        subsystem.init_fields_v73(subsystem_arr)
-        return subsystem
+        if "MCOS" in subsystem_arr.dtype.names:
+            fwrap_data = subsystem_arr[0, 0]["MCOS"]
+            set_file_wrapper(fwrap_data, byte_order, raw_data, add_table_attrs)
 
     def read_int(self, obj, is_empty=0):
         """Reads MATLAB integer arrays from the v7.3 MAT-file."""
@@ -46,7 +47,8 @@ class MatRead7:
         if int_decode is not None:
             warnings.warn(
                 f"MATLAB_int_decode {int_decode} is not supported. "
-                "This may lead to unexpected behaviour.", UserWarning
+                "This may lead to unexpected behaviour.",
+                UserWarning,
             )
 
         if is_empty:
@@ -78,7 +80,7 @@ class MatRead7:
             warnings.warn(
                 f"MATLAB_int_decode {decode_type} not supported. "
                 "This may lead to unexpected behaviour",
-                UserWarning
+                UserWarning,
             )
             codec = "utf-8"
 
@@ -114,7 +116,7 @@ class MatRead7:
         field_order = obj.attrs.get("MATLAB_fields", None)
         if field_order is not None:
             # For maximum compatibility with scipy.io
-            fields = [''.join(x.astype(str)) for x in field_order]
+            fields = ["".join(x.astype(str)) for x in field_order]
 
         if self.is_struct_matrix(obj):
             is_scalar = False
@@ -150,13 +152,13 @@ class MatRead7:
     def read_sparse(self, obj, nrows):
         """Reads MATLAB sparse arrays from the v7.3 MAT-file."""
 
-        jc = obj['jc'][()]
+        jc = obj["jc"][()]
         ncols = jc.size - 1
 
-        if 'data' in obj:
+        if "data" in obj:
             # Exists only if sparse matrix contains non-zero elements
-            data = self.read_int(obj['data'])
-            ir = obj['ir'][()]
+            data = self.read_int(obj["data"])
+            ir = obj["ir"][()]
         else:
             data = np.array([], dtype=np.float64)
             ir = np.array([], dtype=np.int32)
@@ -215,15 +217,12 @@ class MatRead7:
         if is_empty:
             return np.empty(shape=obj[()], dtype=object)
 
-        if self.subsystem is None:
-            raise ValueError("Subsystem not initialized. Cannot read opaque objects.")
-
         type_system = self.get_type_system(class_name)
 
         # Check Enumeration Instances
         fields = obj.attrs.get("MATLAB_fields", None)
         if fields is not None:
-            fields = [''.join(x.astype(str)) for x in fields]
+            fields = ["".join(x.astype(str)) for x in fields]
 
             if "EnumerationInstanceTag" in fields:
                 metadata = self.read_struct(obj)
@@ -233,7 +232,7 @@ class MatRead7:
                 metadata = obj[()].T
         else:
             metadata = obj[()].T
-        return self.subsystem.read_mcos_object(metadata, type_system)
+        return load_opaque_object(metadata, class_name, type_system)
 
     def read_h5_data(self, obj):
         """Reads data from the HDF5 object."""
@@ -250,9 +249,16 @@ class MatRead7:
         elif matlab_class == b"logical":
             arr = obj[()].T.astype(np.bool_)
         elif matlab_class in (
-            b"int8", b"uint8", b"int16", b"uint16",
-            b"int32", b"uint32", b"int64", b"uint64",
-            b"single", b"double"
+            b"int8",
+            b"uint8",
+            b"int16",
+            b"uint16",
+            b"int32",
+            b"uint32",
+            b"int64",
+            b"uint64",
+            b"single",
+            b"double",
         ):
             arr = self.read_int(obj, is_empty)
         elif matlab_class == b"struct":
@@ -267,7 +273,8 @@ class MatRead7:
             arr = self.read_opaque(obj, object_decode, is_empty)
         else:
             raise NotImplementedError(
-                f"MATLAB class {matlab_class} not supported", UserWarning)
+                f"MATLAB class {matlab_class} not supported", UserWarning
+            )
 
         return arr
 
@@ -279,54 +286,61 @@ class MatRead7:
             variable_names = list(variable_names)
 
         mdict = {}
-        mdict['__globals__'] = []
+        mdict["__globals__"] = []
 
-        if '#subsystem#' in self.h5stream:
-            self.subsystem = self.initialize_v73_subsystem(byte_order, raw_data, add_table_attrs)
+        with get_matio_context():
 
-        for var in self.h5stream:
-            obj = self.h5stream[var]
-            if var in ('#refs#', '#subsystem#'):
-                continue
-            if variable_names is not None and var not in variable_names:
-                continue
-            try:
-                data = self.read_h5_data(obj)
-            except Exception as err:
-                raise ValueError(f"Error reading variable {var}: {err}") from err
-            mdict[var] = data
-            is_global = obj.attrs.get("MATLAB_global", 0)
-            if is_global:
-                mdict['__globals__'].append(var)
-            if variable_names is not None:
-                variable_names.remove(var)
-                if len(variable_names) == 0:
-                    break
+            if "#subsystem#" in self.h5stream:
+                self.initialize_v73_subsystem(byte_order, raw_data, add_table_attrs)
+
+            for var in self.h5stream:
+                obj = self.h5stream[var]
+                if var in ("#refs#", "#subsystem#"):
+                    continue
+                if variable_names is not None and var not in variable_names:
+                    continue
+                try:
+                    data = self.read_h5_data(obj)
+                except Exception as err:
+                    raise ValueError(f"Error reading variable {var}: {err}") from err
+                mdict[var] = data
+                is_global = obj.attrs.get("MATLAB_global", 0)
+                if is_global:
+                    mdict["__globals__"].append(var)
+                if variable_names is not None:
+                    variable_names.remove(var)
+                    if len(variable_names) == 0:
+                        break
+
         return mdict
+
 
 def read_file_header(file_path):
     """Reads the file header of the MAT-file."""
     with open(file_path, "rb") as f:
         f.seek(0)
         hdr = f.read(128)
-        v_major = hdr[125] if hdr[126] == b'I'[0] else hdr[124]
-        v_minor = hdr[124] if hdr[126] == b'I'[0] else hdr[125]
-        byte_order = "<" if hdr[126] == b'I'[0] else ">"
+        v_major = hdr[125] if hdr[126] == b"I"[0] else hdr[124]
+        v_minor = hdr[124] if hdr[126] == b"I"[0] else hdr[125]
+        byte_order = "<" if hdr[126] == b"I"[0] else ">"
 
         hdict = {}
-        hdict['__header__'] = hdr[0:116].decode('utf-8').strip(' \t\n\000')
-        hdict['__version__'] = f"{v_major}.{v_minor}"
+        hdict["__header__"] = hdr[0:116].decode("utf-8").strip(" \t\n\000")
+        hdict["__version__"] = f"{v_major}.{v_minor}"
     return hdict, byte_order
 
-def read_matfile7(file_path,
-                  raw_data=False,
-                  add_table_attrs=False,
-                  spmatrix=True,
-                  byte_order=None, # pylint: disable=unused-argument
-                  mat_dtype=False, # pylint: disable=unused-argument
-                  chars_as_strings=True,
-                  verify_compressed_data_integrity=True, # pylint: disable=unused-argument
-                  variable_names=None):
+
+def read_matfile7(
+    file_path,
+    raw_data=False,
+    add_table_attrs=False,
+    spmatrix=True,
+    byte_order=None,  # pylint: disable=unused-argument
+    mat_dtype=False,  # pylint: disable=unused-argument
+    chars_as_strings=True,
+    verify_compressed_data_integrity=True,  # pylint: disable=unused-argument
+    variable_names=None,
+):
     """Reads MAT-file version 7.3 (HDF5) files.
     Parameters
     ----------
@@ -341,13 +355,16 @@ def read_matfile7(file_path,
         chars_as_strings : bool, optional
             If True, converts character arrays to strings. Default is True.
         variable_names : list of str or str, optional
-            Names of variables to read from the MAT-file. Default is None (reads all variables)."""
+            Names of variables to read from the MAT-file. Default is None (reads all variables).
+    """
 
     matfile_dict, byte_order = read_file_header(file_path)
     f = h5py.File(file_path, "r")
     mat_reader = MatRead7(f, raw_data, add_table_attrs, chars_as_strings)
     try:
-        mdict = mat_reader.get_variables(variable_names, byte_order, raw_data, add_table_attrs)
+        mdict = mat_reader.get_variables(
+            variable_names, byte_order, raw_data, add_table_attrs
+        )
     finally:
         f.close()
 

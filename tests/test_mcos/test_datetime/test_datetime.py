@@ -36,6 +36,7 @@ params = [
     ),
 ]
 
+
 @pytest.mark.parametrize(
     "expected_array, var_name",
     params,
@@ -46,12 +47,13 @@ params = [
         "datetime-empty-v7",
     ],
 )
-def test_datetime_read_v7(expected_array, var_name):
+def test_datetime_load_v7(expected_array, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_datetime_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
     assert var_name in matdict
     np.testing.assert_array_equal(matdict[var_name], expected_array)
+
 
 @pytest.mark.parametrize(
     "expected_array, var_name",
@@ -63,7 +65,7 @@ def test_datetime_read_v7(expected_array, var_name):
         "datetime-empty-v7.3",
     ],
 )
-def test_datetime_read_v73(expected_array, var_name):
+def test_datetime_load_v73(expected_array, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_datetime_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
 

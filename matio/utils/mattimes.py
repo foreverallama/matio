@@ -8,12 +8,7 @@ import numpy as np
 
 
 def get_tz_offset(tz):
-    """Get timezone offset in milliseconds
-    Inputs:
-        1. tz (str): Timezone string
-    Returns:
-        1. offset (int): Timezone offset in milliseconds
-    """
+    """Get timezone offset in milliseconds (default UTC)"""
     try:
         tzinfo = ZoneInfo(tz)
         utc_offset = tzinfo.utcoffset(datetime.now())
@@ -30,19 +25,12 @@ def get_tz_offset(tz):
 
 
 def mat_to_datetime(props, **_kwargs):
-    """Convert MATLAB datetime to Python datetime
-    Datetime returned as numpy.datetime64[ms]
+    """Convert MATLAB datetime to Numpy datetime64 array"""
 
-    MATLAB datetimes objects are stored with the following properties:
-    1. data - complex number = real_part (ms) + i * imag_part (us)
-    2. fmt - Format | char array
-    3. tz - Timezone | char array
-    """
-
-    data = props[0, 0].get("data", np.array([]))
+    data = props.get("data", np.array([]))
     if data.size == 0:
         return np.array([], dtype="datetime64[ms]")
-    tz = props[0, 0].get("tz", None)
+    tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
         offset = get_tz_offset(tz.item())
     else:
@@ -54,19 +42,13 @@ def mat_to_datetime(props, **_kwargs):
 
 
 def mat_to_duration(props, **_kwargs):
-    """Convert MATLAB duration to Python timedelta
-    Duration returned as numpy.timedelta64
+    """Convert MATLAB duration to Numpy timedelta64 array"""
 
-    MATLAB datetimes objects are stored with the following properties:
-    1. millis - double
-    2. fmt - char array
-    """
-
-    millis = props[0, 0]["millis"]
+    millis = props["millis"]
     if millis.size == 0:
         return np.array([], dtype="timedelta64[ms]")
 
-    fmt = props[0, 0].get("fmt", None)
+    fmt = props.get("fmt", None)
     if fmt is None:
         return millis.astype("timedelta64[ms]")
 
@@ -94,19 +76,28 @@ def mat_to_duration(props, **_kwargs):
 
 
 def mat_to_calendarduration(props, **_kwargs):
-    """Convert MATLAB calendarDuration to Python timedelta
-    CalendarDuration returned as numpy.timedelta64
+    """Convert MATLAB calendarDuration to Dict of Python Timedeltas"""
 
-    MATLAB calendarDuration objects are stored with the following properties:
-    1. months - double
-    2. days - double
-    3. millis - double
-    """
+    comps = props.get("components", None)
+    if comps is None:
+        return props
 
-    months = props[0, 0]["components"][0, 0]["months"].astype("timedelta64[M]")
-    days = props[0, 0]["components"][0, 0]["days"].astype("timedelta64[D]")
-    millis = props[0, 0]["components"][0, 0]["millis"].astype("timedelta64[ms]")
+    months = comps[0, 0]["months"].astype("timedelta64[M]")
+    days = comps[0, 0]["days"].astype("timedelta64[D]")
+    millis = comps[0, 0]["millis"].astype("timedelta64[ms]")
 
-    cal = np.empty((1, 1), dtype=[("calendarDuration", object)])
-    cal[0, 0]["calendarDuration"] = (months, days, millis)
-    return cal
+    # Broadcast all components to the same shape
+    # MATLAB optimizes by only broadcasting particular components
+    months_bc, days_bc, millis_bc = np.broadcast_arrays(months, days, millis)
+
+    dtype = [
+        ("months", "timedelta64[M]"),
+        ("days", "timedelta64[D]"),
+        ("millis", "timedelta64[ms]"),
+    ]
+    result = np.empty(months_bc.shape, dtype=dtype)
+    result["months"] = months_bc.astype("timedelta64[M]")
+    result["days"] = days_bc.astype("timedelta64[D]")
+    result["millis"] = millis_bc.astype("timedelta64[ms]")
+
+    return result

@@ -5,16 +5,16 @@ import warnings
 import numpy as np
 import pandas as pd
 
-MAX_TABLE_VERSION = 4
-MIN_TABLE_VERSION = 1
-MAX_TIMETABLE_VERSION = 6
-MIN_TIMETABLE_VERSION = 2
+TABLE_VERSION = 4
+TIMETABLE_VERSION = 6
 
 
 def add_table_props(df, tab_props):
     """Add MATLAB table properties to pandas DataFrame
     These properties are mostly cell arrays of character vectors
     """
+
+    tab_props = tab_props[0, 0]
 
     df.attrs["Description"] = (
         tab_props["Description"].item() if tab_props["Description"].size > 0 else ""
@@ -85,31 +85,31 @@ def to_dataframe(data, nvars, varnames):
 def mat_to_table(props, add_table_attrs=False, **_kwargs):
     """Converts MATLAB table to pandas DataFrame"""
 
-    ver = int(props[0, 0]["props"][0, 0]["versionSavedFrom"].item())
-    if not MIN_TABLE_VERSION <= ver <= MAX_TABLE_VERSION:
+    table_attrs = props.get("props")
+    ver = int(table_attrs[0, 0]["versionSavedFrom"].item())
+    if ver > TABLE_VERSION:
         warnings.warn(
-            f"MATLAB table version {ver} is not supported. "
-            f"Minimum supported version is {MIN_TABLE_VERSION}.",
+            f"MATLAB table version {ver} is not supported.",
             UserWarning,
         )
+        return props
 
-    data = props[0, 0]["data"]
-    nvars = int(props[0, 0]["nvars"].item())
-    varnames = props[0, 0]["varnames"]
+    data = props.get("data")
+    nvars = int(props.get("nvars").item())
+    varnames = props.get("varnames")
     df = to_dataframe(data, nvars, varnames)
 
     # Add df.index
-    nrows = int(props[0, 0]["nrows"].item())
-    rownames = props[0, 0]["rownames"]
+    nrows = int(props.get("nrows").item())
+    rownames = props.get("rownames")
     if rownames.size > 0:
         rownames = [s.item() for s in rownames.ravel()]
         if len(rownames) == nrows:
             df.index = rownames
 
-    tab_props = props[0, 0]["props"][0, 0]
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
-        df = add_table_props(df, tab_props)
+        df = add_table_props(df, table_attrs)
 
     return df
 
@@ -131,15 +131,20 @@ def get_row_times(row_times, num_rows):
         fs = row_times[0, 0]["sampleRate"].item()
         step = np.timedelta64(int(1e9 / fs), "ns")
     else:
-        step = row_times[0, 0]["stepSize"]
-        if step.dtype.names is not None and "calendarDuration" in step.dtype.names:
-            comps = step[0, 0]["calendarDuration"]
-            step = comps[0] or comps[1] or comps[2]
-            # Only one of months, days, or millis is non-zero
+        comps = row_times[0, 0]["stepSize"]
+        if comps.dtype.names is not None:
+            # Only one of months, days, or millis is non-zero array
+            for key in ["months", "days", "millis"]:
+                arr = comps[0, 0][key]
+                if np.any(arr != 0):
+                    step = arr
+                    break
+            else:
+                step = comps[0, 0]["millis"]  # fallback if all are zero
             step_unit = np.datetime_data(step.dtype)[0]
             start = start.astype(f"datetime64[{step_unit}]")
         else:
-            step = step.astype("timedelta64[ns]")
+            step = comps.astype("timedelta64[ns]")
 
     return (start + step * np.arange(num_rows)).ravel()
 
@@ -147,29 +152,34 @@ def get_row_times(row_times, num_rows):
 def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
     """Converts MATLAB timetable to pandas DataFrame"""
 
-    ver = int(props[0, 0]["any"][0, 0]["versionSavedFrom"].item())
-    if not MIN_TIMETABLE_VERSION <= ver <= MAX_TIMETABLE_VERSION:
+    timetable_data = props.get("any", None)
+    if timetable_data is None:
+        return props
+
+    ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
+    min_compatible_ver = int(timetable_data[0, 0]["minCompatibleVersion"].item())
+    if ver > TIMETABLE_VERSION or ver < min_compatible_ver:
         warnings.warn(
-            f"MATLAB timetable version {ver} is not supported. "
-            f"Minimum supported version is {MIN_TIMETABLE_VERSION}.",
+            f"MATLAB timetable version {ver} is not supported.",
             UserWarning,
         )
+        return props
 
-    num_vars = int(props[0, 0]["any"][0, 0]["numVars"].item())
-    var_names = props[0, 0]["any"][0, 0]["varNames"]
-    data = props[0, 0]["any"][0, 0]["data"]
+    num_vars = int(timetable_data[0, 0]["numVars"].item())
+    var_names = timetable_data[0, 0]["varNames"]
+    data = timetable_data[0, 0]["data"]
     df = to_dataframe(data, num_vars, var_names)
 
-    row_times = props[0, 0]["any"][0, 0]["rowTimes"]
-    num_rows = int(props[0, 0]["any"][0, 0]["numRows"].item())
+    row_times = timetable_data[0, 0]["rowTimes"]
+    num_rows = int(timetable_data[0, 0]["numRows"].item())
 
     row_times = get_row_times(row_times, num_rows)
-    dim_names = props[0, 0]["any"][0, 0]["dimNames"]
+    dim_names = timetable_data[0, 0]["dimNames"]
     df.index = pd.Index(row_times, name=dim_names[0, 0].item())
 
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
-        df = add_timetable_props(df, props[0, 0]["any"][0, 0])
+        df = add_timetable_props(df, timetable_data[0, 0])
 
     return df
 
@@ -183,10 +193,10 @@ def mat_to_categorical(props, **_kwargs):
     4. isProtected - boolean indicating if the categorical is protected
     """
 
-    raw_names = props[0, 0]["categoryNames"]
+    raw_names = props.get("categoryNames")
     category_names = [name.item() for name in raw_names.ravel()]
 
     # MATLAB codes are 1-indexed as uint integers
-    codes = props[0, 0]["codes"].astype(int) - 1
-    ordered = bool(props[0, 0]["isOrdinal"].item())
+    codes = props.get("codes").astype(int) - 1
+    ordered = bool(props.get("isOrdinal").item())
     return pd.Categorical.from_codes(codes, categories=category_names, ordered=ordered)

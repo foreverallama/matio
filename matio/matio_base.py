@@ -5,14 +5,7 @@ from matio.matio7 import read_matfile7
 
 
 def get_matfile_version(byte_data):
-    """Reads subsystem MAT-file version and endianness
-    Inputs
-        1. ss_stream (BytesIO): Subsystem data stream
-    Returns:
-        1. v_major (int): Major version
-        2. v_minor (int): Minor version
-        3. byte_order (str): Endianness
-    """
+    """Reads subsystem MAT-file version and endianness from subsys byte stream"""
 
     maj_ind = int(byte_data[2] == b"I"[0])
     v_major = int(byte_data[maj_ind])
@@ -26,15 +19,13 @@ def get_matfile_version(byte_data):
 def load_from_mat(
     file_path,
     mdict=None,
-    raw_data=False,
+    raw_data=True,  #! Fix later
     add_table_attrs=False,
     *,
     spmatrix=True,
     **kwargs,
 ):
     """Loads variables from MAT-file
-    Calls scipy.io.loadmat to read the MAT-file and then processes the
-    "__function_workspace__" variable to extract subsystem data.
     Inputs
         1. file_path (str): Path to MAT-file
         2. mdict (dict): Dictionary to store loaded variables

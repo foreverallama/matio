@@ -12,6 +12,7 @@ def make_cell_entry(sub_arr):
     arr[:] = [sub_arr, sub_arr, sub_arr]
     return arr
 
+
 params_base = [
     (
         pd.DataFrame({"Var1": [1.1, 2.2, 3.3], "Var2": [4.4, 5.5, 6.6]}),
@@ -112,10 +113,7 @@ params_obj = [
                 ),
                 "Var2": make_cell_entry(
                     {
-                        "_Class": "MyObj",
-                        "_Props": np.array(
-                            [[{"Value": np.array([[42.0]])}]], dtype=object
-                        ),
+                        "Value": np.array([[42.0]]),
                     }
                 ),
             }
@@ -136,6 +134,7 @@ params_attrs = [
     ),
 ]
 
+
 @pytest.mark.parametrize(
     "expected_df, var_name",
     params_base,
@@ -150,12 +149,13 @@ params_attrs = [
         "table-with-multicolumn-var-v7",
     ],
 )
-def test_table_read_v7(expected_df, var_name):
+def test_table_load_v7(expected_df, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_table_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
     assert var_name in matdict
     pd.testing.assert_frame_equal(matdict[var_name], expected_df)
+
 
 @pytest.mark.parametrize(
     "expected_df, var_name",
@@ -171,7 +171,7 @@ def test_table_read_v7(expected_df, var_name):
         "table-with-multicolumn-var-v7.3",
     ],
 )
-def test_table_read_v73(expected_df, var_name):
+def test_table_load_v73(expected_df, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_table_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
 
@@ -184,29 +184,31 @@ def test_table_read_v73(expected_df, var_name):
     params_obj,
     ids=["table-with-struct-and-object-v7"],
 )
-def test_table_struct_and_object_read_v7(expected_df, var_name):
+def test_table_struct_and_object_load_v7(expected_df, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_table_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
     assert var_name in matdict
     pd.testing.assert_frame_equal(matdict[var_name], expected_df)
+
 
 @pytest.mark.parametrize(
     "expected_df, var_name",
     params_obj,
     ids=["table-with-struct-and-object-v7.3"],
 )
-def test_table_struct_and_object_read_v73(expected_df, var_name):
+def test_table_struct_and_object_load_v73(expected_df, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_table_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
     assert var_name in matdict
     pd.testing.assert_frame_equal(matdict[var_name], expected_df)
+
 
 @pytest.mark.parametrize(
     "expected_df, var_name",
     params_attrs,
     ids=["table-with-attrs-v7"],
 )
-def test_table_with_attrs_read_v7(expected_df, var_name):
+def test_table_with_attrs_load_v7(expected_df, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_table_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False, add_table_attrs=True)
     expected_df.attrs = {
@@ -232,12 +234,13 @@ def test_table_with_attrs_read_v7(expected_df, var_name):
         else:
             assert matdict[var_name].attrs[key] == value
 
+
 @pytest.mark.parametrize(
     "expected_df, var_name",
     params_attrs,
     ids=["table-with-attrs-v7.3"],
 )
-def test_table_with_attrs_read_v73(expected_df, var_name):
+def test_table_with_attrs_load_v73(expected_df, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_table_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False, add_table_attrs=True)
     expected_df.attrs = {
