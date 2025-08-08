@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 import numpy as np
 
-from matio.mat_opaque_tools import CLASS_TO_FUNCTION, MatOpaque, mat_to_enum
+from matio.mat_opaque_tools import CLASS_TO_FUNCTION, MatioOpaque, mat_to_enum
 
 FILEWRAPPER_INSTANCE = None
 OBJECT_CACHE = {}
@@ -189,7 +189,7 @@ class FileWrapper:
     def check_prop_for_mcos(self, prop):
         """Recursively check if a property value in FileWrapper__ contains MCOS objects"""
 
-        if not isinstance(prop, np.ndarray) or isinstance(prop, MatOpaque):
+        if not isinstance(prop, np.ndarray) or isinstance(prop, MatioOpaque):
             return prop
 
         if self.is_valid_mcos_object(prop):
@@ -328,7 +328,7 @@ class FileWrapper:
         for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
             dyn_obj_id = self.get_dyn_object_id(dyn_prop_id)
             classname = self.get_classname(dyn_obj_id)
-            obj = MatOpaque(classname, "MCOS")
+            obj = MatioOpaque(classname, "MCOS")
             obj.properties = self.get_properties(dyn_obj_id)
             dyn_prop_map[f"__dynamic_property__{i + 1}"] = obj
 
@@ -395,7 +395,7 @@ def load_mcos_enumeration(metadata, type_system):
     metadata[0, 0]["ValueIndices"] = value_idx
     metadata[0, 0]["Values"] = np.array(enum_vals).reshape(value_idx.shape, order="F")
 
-    return MatOpaque(classname, type_system, metadata)
+    return MatioOpaque(classname, type_system, metadata)
 
 
 def load_mcos_object(metadata, type_system):
@@ -421,12 +421,12 @@ def load_mcos_object(metadata, type_system):
         if object_id in object_cache:
             obj_arr[i] = object_cache[object_id]
         elif object_id == 0:
-            # Empty object, return empty MatOpaque
-            obj = MatOpaque(classname, type_system)
+            # Empty object, return empty MatioOpaque
+            obj = MatioOpaque(classname, type_system)
             obj.properties = {}
             obj_arr[i] = obj
         else:
-            obj = MatOpaque(classname, type_system)
+            obj = MatioOpaque(classname, type_system)
             object_cache[object_id] = obj
             obj.properties = file_wrapper.get_properties(object_id)
 
@@ -451,7 +451,7 @@ def load_opaque_object(metadata, classname, type_system):
 
     if type_system != "MCOS":
         # Return raw metadata for this case
-        obj = MatOpaque(classname, type_system)
+        obj = MatioOpaque(classname, type_system)
         obj.properties = metadata
         return obj
 

@@ -1,7 +1,7 @@
 import os
 
 from matio import load_from_mat
-from matio.mat_opaque_tools import MatOpaque
+from matio.mat_opaque_tools import MatioOpaque
 
 
 def test_handle_load_v7():
@@ -10,8 +10,8 @@ def test_handle_load_v7():
 
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
-    assert isinstance(matdict["obj1"], MatOpaque)
-    assert isinstance(matdict["obj2"], MatOpaque)
+    assert isinstance(matdict["obj1"], MatioOpaque)
+    assert isinstance(matdict["obj2"], MatioOpaque)
 
     assert matdict["obj1"].classname == "Node"
     assert matdict["obj2"].classname == "Node"
@@ -29,8 +29,8 @@ def test_handle_load_v73():
 
     matdict = load_from_mat(file_path_v73, raw_data=False)
 
-    assert isinstance(matdict["obj1"], MatOpaque)
-    assert isinstance(matdict["obj2"], MatOpaque)
+    assert isinstance(matdict["obj1"], MatioOpaque)
+    assert isinstance(matdict["obj2"], MatioOpaque)
 
     assert matdict["obj1"].classname == "Node"
     assert matdict["obj2"].classname == "Node"

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat
-from matio.mat_opaque_tools import MatOpaque
+from matio.mat_opaque_tools import MatioOpaque
 
 params_base = [
     (
@@ -74,7 +74,7 @@ def test_user_defined_load_v7(expected_array, var_name):
     matdict = load_from_mat(file_path, raw_data=False)
 
     assert var_name in matdict
-    if isinstance(matdict[var_name], MatOpaque):
+    if isinstance(matdict[var_name], MatioOpaque):
         for key, value in matdict[var_name].properties.items():
             np.testing.assert_array_equal(value, expected_array[key])
 
@@ -98,7 +98,7 @@ def test_user_defined_load_v73(expected_array, var_name):
     matdict = load_from_mat(file_path, raw_data=False)
 
     assert var_name in matdict
-    if isinstance(matdict[var_name], MatOpaque):
+    if isinstance(matdict[var_name], MatioOpaque):
         for key, value in matdict[var_name].properties.items():
             np.testing.assert_array_equal(value, expected_array[key])
 

@@ -19,7 +19,7 @@ def get_matfile_version(byte_data):
 def load_from_mat(
     file_path,
     mdict=None,
-    raw_data=True,  #! Fix later
+    raw_data=False,
     add_table_attrs=False,
     *,
     spmatrix=True,

@@ -29,7 +29,7 @@ CLASS_TO_FUNCTION = {
 }
 
 
-class MatOpaque:
+class MatioOpaque:
     """Represents a MATLAB opaque object"""
 
     def __init__(self, classname, type_system, properties=None):
@@ -38,10 +38,10 @@ class MatOpaque:
         self.properties = properties
 
     def __repr__(self):
-        return f"MatOpaque(classname={self.classname})"
+        return f"MatioOpaque(classname={self.classname})"
 
     def __eq__(self, other):
-        if isinstance(other, MatOpaque):
+        if isinstance(other, MatioOpaque):
             return self.properties == other.properties
         return self.properties == other
 

@@ -11,7 +11,7 @@ from matio.subsystem import get_matio_context, load_opaque_object, set_file_wrap
 
 
 def new_opaque_object(arr):
-    """Creates a new MatOpaque object in place of a MatlabOpaque array"""
+    """Creates a new MatioOpaque object in place of a MatlabOpaque array"""
 
     metadata = arr["_ObjectMetadata"].item()
     classname = arr["_Class"]
