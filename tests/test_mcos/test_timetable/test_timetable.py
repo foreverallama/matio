@@ -79,9 +79,7 @@ params_base = [
                 "data1": [1.0, 2.0, 3.0],
             },
             index=pd.Index(
-                np.array(
-                    [int(10e9), int(11e9), int(12e9)], dtype="timedelta64[ns]"
-                ),
+                np.array([int(10e9), int(11e9), int(12e9)], dtype="timedelta64[ns]"),
                 name="Time",
             ),
         ),
@@ -156,6 +154,7 @@ param_attrs = [
     ),
 ]
 
+
 @pytest.mark.parametrize(
     "expected_df, var_name",
     params_base,
@@ -171,12 +170,13 @@ param_attrs = [
         "timetable-calendarDuration-timestep-v7",
     ],
 )
-def test_timetable_read_v7(expected_df, var_name):
+def test_timetable_load_v7(expected_df, var_name):
     file_path = os.path.join(os.path.dirname(__file__), "test_timetable_v7.mat")
     matdict = load_from_mat(file_path, raw_data=False)
 
     assert var_name in matdict
     pd.testing.assert_frame_equal(matdict[var_name], expected_df)
+
 
 @pytest.mark.parametrize(
     "expected_df, var_name",
@@ -193,7 +193,7 @@ def test_timetable_read_v7(expected_df, var_name):
         "timetable-calendarDuration-timestep-v7.3",
     ],
 )
-def test_timetable_read_v73(expected_df, var_name):
+def test_timetable_load_v73(expected_df, var_name):
     file_path = os.path.join(os.path.dirname(__file__), "test_timetable_v73.mat")
     matdict = load_from_mat(file_path, raw_data=False)
 
@@ -206,7 +206,7 @@ def test_timetable_read_v73(expected_df, var_name):
     param_attrs,
     ids=["timetable-with-attrs-v7"],
 )
-def test_timetable_with_attrs_read_v7(expected_df, var_name):
+def test_timetable_with_attrs_load_v7(expected_df, var_name):
     file_path = os.path.join(os.path.dirname(__file__), "test_timetable_v7.mat")
     matdict = load_from_mat(file_path, raw_data=False, add_table_attrs=True)
     expected_df.attrs = {
@@ -228,12 +228,13 @@ def test_timetable_with_attrs_read_v7(expected_df, var_name):
         else:
             assert matdict[var_name].attrs[key] == value
 
+
 @pytest.mark.parametrize(
     "expected_df, var_name",
     param_attrs,
     ids=["timetable-with-attrs-v7.3"],
 )
-def test_timetable_with_attrs_read_v73(expected_df, var_name):
+def test_timetable_with_attrs_load_v73(expected_df, var_name):
     file_path = os.path.join(os.path.dirname(__file__), "test_timetable_v73.mat")
     matdict = load_from_mat(file_path, raw_data=False, add_table_attrs=True)
     expected_df.attrs = {

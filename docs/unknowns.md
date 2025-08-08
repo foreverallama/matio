@@ -46,3 +46,4 @@ This is a tricky question to answer. If you've noticed, all of the offset region
 - Maybe someone forgot to define the ranges of the `for` loop properly? This seems highly improbable.
 - They are using some kind of recursive method to write each object metadata to the file. The recursive loop ends when no more objects are available to write, resulting in a bunch of zeros.
 - Some kind of padding or something for compression maybe? Perhaps, but unlikely.
+- Its possibly used to identify and cache some kind of placeholder objects internally that can be re-written later

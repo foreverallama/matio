@@ -28,19 +28,20 @@ params = [
     params,
     ids=["simple-string-v7", "string-array-v7", "empty-string-v7"],
 )
-def test_string_read_v7(expected_array, var_name):
+def test_string_load_v7(expected_array, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_string_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
     assert var_name in matdict
     np.testing.assert_array_equal(matdict[var_name], expected_array)
 
+
 @pytest.mark.parametrize(
     "expected_array, var_name",
     params,
     ids=["simple-string-v7.3", "string-array-v7.3", "empty-string-v7.3"],
 )
-def test_string_read_v73(expected_array, var_name):
+def test_string_load_v73(expected_array, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_string_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
 

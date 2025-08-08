@@ -4,28 +4,22 @@ import warnings
 
 import numpy as np
 
+MAT_STRING_VERSION = 1
+
 
 def mat_to_string(props, byte_order, **_kwargs):
-    """Parse string data from MATLAB file
-    String objects are stored as "any" properties in MAT-files.
+    """Converts MATLAB string to numpy string array"""
 
-    Strings are stored within a uint64 array with the following format:
-        1. version
-        2. ndims
-        3. shape
-        4. char_counts
-        5. List of null-terminated strings as uint16 integers
-    """
-
-    data = props[0, 0].get("any", np.empty((0, 0), dtype=np.str_))
+    data = props.get("any", np.empty((0, 0), dtype=np.str_))
     if data.size == 0:
         return np.array([[]], dtype=np.str_)
 
-    if data[0, 0] != 1:
+    if data[0, 0] != MAT_STRING_VERSION:
         warnings.warn(
-            "String saved from a different MAT-file version. This may work unexpectedly",
+            "String saved from a different MAT-file version. Returning raw data",
             UserWarning,
         )
+        return props[0, 0].get("any")
 
     ndims = data[0, 1]
     shape = data[0, 2 : 2 + ndims]

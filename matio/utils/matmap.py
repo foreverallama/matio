@@ -2,16 +2,17 @@
 
 import warnings
 
+MAT_DICT_VERSION = 1
+
 
 def mat_to_containermap(props, **_kwargs):
-    """Converts the properties of a container map to a dictionary
-    MATLAB container.map:
-    - Property: serialization
-        - Value: struct array
-            - Fields: keys, values, uniformity, keyType, valueType (default= "any")
-    """
-    ks = props[0, 0]["serialization"][0, 0]["keys"]
-    vals = props[0, 0]["serialization"][0, 0]["values"]
+    """Converts MATLAB container.Map to Python dictionary"""
+    comps = props.get("serialization", None)
+    if comps is None:
+        return props
+
+    ks = comps[0, 0]["keys"]
+    vals = comps[0, 0]["values"]
 
     result = {}
     for i in range(ks.shape[1]):
@@ -23,21 +24,22 @@ def mat_to_containermap(props, **_kwargs):
 
 
 def mat_to_dictionary(props, **_kwargs):
-    """Converts the properties of a MATLAB dictionary to a dictionary
-    MATLAB dictionary:
-    - Property: data
-        - Value: struct array
-            - Fields: Version, IsKeyCombined, IsValueCombined, Key, Value
+    """Converts MATLAB dictionary to Python list of tuples"""
+    # List of tuples as Key-Value pairs can be any datatypes
 
-    Wrapped as tuple of (key, value) since keys can be of any type
-    """
-    ver = int(props[0, 0]["data"][0, 0]["Version"].item())
-    if ver != 1:
+    comps = props.get("data", None)
+    if comps is None:
+        return props
+
+    ver = int(comps[0, 0]["Version"].item())
+    if ver != MAT_DICT_VERSION:
         warnings.warn(
-            f"Only v1 MATLAB dictionaries are supported. Got v{ver}",
+            f"Only v{MAT_DICT_VERSION} MATLAB dictionaries are supported. Got v{ver}",
             UserWarning,
         )
+        return props
 
-    ks = props[0, 0]["data"][0, 0]["Key"].ravel()
-    vals = props[0, 0]["data"][0, 0]["Value"].ravel()
+    ks = comps[0, 0]["Key"].ravel()
+    vals = comps[0, 0]["Value"].ravel()
+
     return list(zip(ks, vals))

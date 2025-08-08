@@ -2,7 +2,7 @@
 
 The `mat-io` module provides tools for reading `.mat` files, particularly for extracting contents from user-defined objects or MATLAB datatypes such as `datetime`, `table` and `string`. It uses a wrapper built around `scipy.io` to extract raw subsystem data from MAT-files, which is then parsed and interpreted to extract object data. MAT-file versions `v7` to `v7.3` are supported.
 
-`mat-io` can read almost all types of objects from MAT-files, including user-defined objects. Additionally, it includes utilities to convert the following MATLAB datatypes into their respective _Pythonic_ objects:
+`mat-io` can read almost all types of objects from MAT-files, including user-defined objects and handle class objects. Additionally, it includes utilities to convert the following MATLAB datatypes into their respective _Pythonic_ objects:
 
 - `string`
 - `datetime`, `duration` and `calendarDuration`
@@ -11,7 +11,7 @@ The `mat-io` module provides tools for reading `.mat` files, particularly for ex
 - `categorical`
 - Enumeration Instance Arrays
 
-**Note**: `load_from_mat()` uses a modified fork of `scipy`. The fork currently contains a few minor changes to `scipy.io` to return variable names and object metadata for all objects in a MAT-file. This change is available [on Github](https://github.com/foreverallama/scipy/tree/readmat-scipy) and can be installed directly from the branch. You can also view the changes under `patches/scipy_changes.patch` and apply it manually. Note that you might need to rebuild as parts of the Cython code was modified. Follow the instruction on the [official SciPy documentation](https://scipy.github.io/devdocs/building/index.html#building-from-source).
+**Note**: `load_from_mat()` uses a modified fork of `scipy`. The fork currently contains a few minor changes to `scipy.io` to return variable names and object metadata for all objects in a MAT-file. You can view the changes under `patches/` and apply it manually. Note that you might need to rebuild as parts of the Cython code was modified. Follow the instruction on the [official SciPy documentation](https://scipy.github.io/devdocs/building/index.html#building-from-source).
 
 ## Usage
 
@@ -48,37 +48,28 @@ print(data)
 - **`mdict`**: `dict`, *optional*
   Dictionary into which MATLAB variables will be inserted. If `None`, a new dictionary is created and returned.
 
-- **`spmatrix`**: `bool`, *optional* (default = `True`)
-  Whether to read MATLAB sparse matrices as SciPy sparse matrix `coo_matrix`.
+- **`variable_names`**: `list` or `string`, *optional*
+  The variable names to load from the MAT-file
 
 - **`**kwargs`**:
-  Additional keyword arguments passed to [`scipy.io.loadmat`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.io.loadmat.html). Only the following arguments are supported:
+  Additional keyword arguments passed to [`scipy.io.loadmat`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.io.loadmat.html). These are only used to call `scipy.io.loadmat` and are not used natively by this package.
+  - `spmatrix`
   - `byte_order`
   - `mat_dtype`
   - `chars_as_strings`
   - `verify_compressed_data_integrity`
-  - `variable_names`
 
-Amongst these, only `variable_names` is used for `v7.3` MAT-files.
+### MATLAB Opaque Objects
 
-### MATLAB objects
+MATLAB Opaque objects are returned as an instance of class `MatioOpaque` with the following attributes:
 
-MATLAB objects are returned as a dictionary with the following fields:
+- `classname`: The class name, including namespace qualifiers (if any).
+- `type_system`: An interal MATLAB type identifier. Usually `MCOS`, but could also be `java` or `handle`.
+- `properties`: A dictionary containing the property names and property values.
 
-- `_Class`: The class name
-- `_Props`: A `numpy.ndarray` of dictionaries containing the property names and their contents. Dimensions are determined by the object dimensions.
-
-If the `raw_data` parameter is set to `False`, then `load_from_mat` converts these objects into a corresponding Pythonic datatype. This conversion is [detailed here](https://github.com/foreverallama/matio/tree/main/docs).
+These objects are contained within `numpy.ndarray` in case of object arrays. If the `raw_data` parameter is set to `False`, then `load_from_mat` converts these objects into a corresponding Pythonic datatype. This conversion is [detailed here](https://github.com/foreverallama/matio/tree/main/docs).
 
 ## Contribution
-
-There's still lots to do! I could use your help in the following:
-
-- Reading function handles
-- Write object data into MAT-files
-- Write tests
-- Algorithmic optimization to integrate within the `scipy.io` framework
-- Documentation of the MAT-file format
 
 Feel free to create a PR if you'd like to add something, or open up an issue if you'd like to discuss! I've also opened an [issue](https://github.com/scipy/scipy/issues/22736) with `scipy.io` detailing some of the workflow, as well as a [PR](https://github.com/scipy/scipy/pull/22847) to develop this iteratively. Please feel free to contribute there as well!
 

@@ -16,17 +16,17 @@ params = [
     ),
     (
         (
-            np.array([[0]], dtype="timedelta64[M]"),
+            np.array([[0, 0, 0]], dtype="timedelta64[M]"),
             np.array([[1, 2, 3]], dtype="timedelta64[D]"),
-            np.array([[0]], dtype="timedelta64[ms]"),
+            np.array([[0, 0, 0]], dtype="timedelta64[ms]"),
         ),
         "cdur2",
     ),
     (
         (
-            np.array([[0]], dtype="timedelta64[M]"),
+            np.array([[0, 0]], dtype="timedelta64[M]"),
             np.array([[7, 14]], dtype="timedelta64[D]"),
-            np.array([[0]], dtype="timedelta64[ms]"),
+            np.array([[0, 0]], dtype="timedelta64[ms]"),
         ),
         "cdur3",
     ),
@@ -34,15 +34,15 @@ params = [
         (
             np.array([[1, 0]], dtype="timedelta64[M]"),
             np.array([[1, 2]], dtype="timedelta64[D]"),
-            np.array([[0]], dtype="timedelta64[ms]"),
+            np.array([[0, 0]], dtype="timedelta64[ms]"),
         ),
         "cdur4",
     ),
     (
         (
             np.array([[12, 18]], dtype="timedelta64[M]"),
-            np.array([[0]], dtype="timedelta64[D]"),
-            np.array([[0]], dtype="timedelta64[ms]"),
+            np.array([[0, 0]], dtype="timedelta64[D]"),
+            np.array([[0, 0]], dtype="timedelta64[ms]"),
         ),
         "cdur5",
     ),
@@ -72,6 +72,7 @@ params = [
     ),
 ]
 
+
 @pytest.mark.parametrize(
     "expected_array, var_name",
     params,
@@ -86,15 +87,15 @@ params = [
         "calendarDuration-duration-v7",
     ],
 )
-def test_duration_read_v7(expected_array, var_name):
+def test_duration_load_v7(expected_array, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_caldur_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
     assert var_name in matdict
-    actual_tup = matdict[var_name][0, 0]["calendarDuration"]
-    assert np.array_equal(actual_tup[0], expected_array[0])
-    assert np.array_equal(actual_tup[1], expected_array[1])
-    assert np.array_equal(actual_tup[2], expected_array[2])
+    assert np.array_equal(matdict[var_name]["months"], expected_array[0])
+    assert np.array_equal(matdict[var_name]["days"], expected_array[1])
+    assert np.array_equal(matdict[var_name]["millis"], expected_array[2])
+
 
 @pytest.mark.parametrize(
     "expected_array, var_name",
@@ -110,12 +111,11 @@ def test_duration_read_v7(expected_array, var_name):
         "calendarDuration-duration-v7.3",
     ],
 )
-def test_duration_read_v73(expected_array, var_name):
+def test_duration_load_v73(expected_array, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_caldur_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
 
     assert var_name in matdict
-    actual_tup = matdict[var_name][0, 0]["calendarDuration"]
-    assert np.array_equal(actual_tup[0], expected_array[0])
-    assert np.array_equal(actual_tup[1], expected_array[1])
-    assert np.array_equal(actual_tup[2], expected_array[2])
+    assert np.array_equal(matdict[var_name]["months"], expected_array[0])
+    assert np.array_equal(matdict[var_name]["days"], expected_array[1])
+    assert np.array_equal(matdict[var_name]["millis"], expected_array[2])

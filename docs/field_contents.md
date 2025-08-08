@@ -15,9 +15,10 @@ Field contents of object arrays of MATLAB datatypes like `string` or `datetime` 
 - [`containers.Map`](#containersmap)
 - [`dictionary`](#dictionary)
 - [`categorical`](#categorical)
-- [What if the field contains an object?](#what-if-the-field-contains-an-object)
 - [Enumeration Instance Arrays](#enumeration-instance-arrays)
 - [Others](#others)
+- [Appendix](#appendix)
+  - [What if the field contains an object?](#what-if-the-field-contains-an-object)
 
 <!--TOC-->
 
@@ -38,7 +39,7 @@ Objects of this class contain the following properties:
 - `millis`: A real double precision number containing time in milliseconds
 - `fmt` or Format: The display format to use. e.g. `s`, `m`, `h`, `d` for `seconds`, `minutes`, `hours`, `days`
 
-`matio.load_from_mat` converts these objects into `numpy.timedelta64` arrays if `raw_data` is set to `False`. The `dtype` of the array is set according to `fmt`. It defaults to `[ms]` if `fmt` is not supported.
+`matio.load_from_mat` converts these objects into `numpy.timedelta64` arrays if `raw_data` is set to `False`. The `dtype` of the array is set according to `fmt`. It defaults to `[ms]` if `fmt` could not be parsed.
 
 ## `calendarDuration`
 
@@ -49,11 +50,11 @@ Objects of this class contains a single property `components` which is defined a
 3. `millis`
 4. `fmt`: Character Array
 
-`matio.load_from_mat` converts this into a structured `numpy.ndarray` with a single field `calendarDuration`, which contains the above properties as `numpy.timedelta64`
+`matio.load_from_mat` converts this into a structured `numpy.ndarray` with fields `months`, `days` and `millis` which contains the above properties as `numpy.timedelta64`.
 
 ## `string`
 
-Objects of this class contains only one property called `any`. The contents of this property are stored as `uint64` integers. However, this needs to be decoded to extract the actual string. The data is to be read as `uint64` integers and has the following format:
+Objects of this class contains only one property called `any` indicating the use of a `saveobj` method. This `saveobj` method returns a `uint64` integer array in the following format:
 
 - First integer most likely indicates the version of the saved `string` object
 - Second integer specifies the number of dimensions `ndims`
@@ -95,7 +96,7 @@ Objects of this class contain the following properties:
 
 ## `timetable`
 
-Objects of this class contains a single property `any`, which is defined as a `struct` array with the following fields:
+Objects of this class contains a single property `any` indicating the use of a `saveobj` method. This `saveobj` method returns a `struct` array with the following fields:
 
 1. `arrayProps`: A `1x1` struct with the following fields:
    1. `Description`
@@ -125,7 +126,7 @@ The remaining fields are metadata fields:
 11. `timeEvents`
 12. `varContinuity`
 
-`matio.load_from_mat` converts these objects into `pandas.DataFrame` objects.
+`matio.load_from_mat` converts these objects into `pandas.DataFrame` objects with row indices indicating the timesteps.
 
 ## `containers.Map`
 
@@ -137,6 +138,8 @@ Objects of this class contains a single property `serialization`, which is defin
 4. `keyType`: Char array indicating `dtype` of keys
 5. `valueType`: Char array indicating `dtype` of values
 
+`matio.load_from_mat` converts these objects into a dictionary of `{key: value}`.
+
 ## `dictionary`
 
 Objects of this class contain a single property `data` which is defined as a `struct` array with the following fields:
@@ -147,7 +150,7 @@ Objects of this class contain a single property `data` which is defined as a `st
 4. `Key`
 5. `Value`
 
-Since keys can be of any MATLAB datatype, including object instances, `matio.load_from_mat` converts this into a list of tuple `(key, value)` pairs
+Since keys can be of any MATLAB datatype, including object instances, `matio.load_from_mat` converts this into a list of tuple `(key, value)` pairs.
 
 ## `categorical`
 
@@ -159,12 +162,6 @@ Objects of this class contain the following properties:
 4. `isOrdinal`: bool, indicates ordered variables
 
 `matio.load_from_mat` converts these objects into `pandas.Categorical` objects.
-
-## What if the field contains an object?
-
-If the field contains an object, then the corresponding cell would contain a `uint32` column matrix structured exactly the same as the object metadata subelement of `mxOPAQUE_CLASS` in the normal part of the MAT-file. This metadata contains the `classID` and `objectID` of the object stored in its field. But how do you differentiate this from a regular `uint32` column matrix?
-
-The answer lies in the first value of the array - the object reference. MATLAB uses the value `0xDD000000` to internally identify arrays as object metadata. This means that if you assign a `Nx1` array with the first value as `0xDD000000` to a property of an object, then MATLAB tries to instantiate an object, fails and crashes!
 
 ## Enumeration Instance Arrays
 
@@ -185,3 +182,13 @@ To add:
 
 1. `function_handle`
 2. `timeseries`
+
+## Appendix
+
+### What if the field contains an object?
+
+If the field contains an object, then the corresponding cell would contain a `uint32` column matrix structured exactly the same as the object metadata subelement of `mxOPAQUE_CLASS` in the normal part of the MAT-file. This metadata contains the `classID` and `objectID` of the object stored in its field. But how do you differentiate this from a regular `uint32` column matrix?
+
+The answer lies in the first value of the array - the object reference. MATLAB uses the value `0xDD000000` to internally identify arrays as object metadata. This means that if you assign a `Nx1` array with the first value as `0xDD000000` to a property of an object, then MATLAB tries to instantiate an object, fails and crashes!
+
+Why doesn't MATLAB include `mxOPAQUE_CLASS` headers in this case? I suspect it has to do with loading. Since the `FileWrapper__` instance needs to be fully created before objects can be loaded, `mxOPAQUE_CLASS` headers within `FileWrapper__` data would try to load an `MCOS` object before the `FileWrapper__` object is available, causing it to crash.

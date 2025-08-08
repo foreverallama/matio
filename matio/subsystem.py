@@ -1,505 +1,458 @@
 """Reads MCOS subsystem data from MAT files"""
 
-import warnings
+from contextlib import contextmanager
 
 import numpy as np
 
-from matio.convert import convert_to_object, mat_to_enum
+from matio.mat_opaque_tools import CLASS_TO_FUNCTION, MatioOpaque, mat_to_enum
+
+FILEWRAPPER_INSTANCE = None
+OBJECT_CACHE = {}
+
+FILEWRAPPER_VERSION = 4
 
 
-class SubsystemReader:
-    """Extracts object properties from the subsystem data
-    Currently only supports MCOS objects
-    """
+@contextmanager
+def get_matio_context():
+    """Context manager for both FileWrapper and object cache"""
+    global FILEWRAPPER_INSTANCE, OBJECT_CACHE
 
-    def __init__(self, byte_order, raw_data=False, add_table_attrs=False):
-        self.byte_order = (
-            "<u4" if byte_order == "<" else ">u4"
-        )  # Could potentially be int32
+    FILEWRAPPER_INSTANCE = None
+    OBJECT_CACHE = {}
+
+    try:
+        yield
+    finally:
+        FILEWRAPPER_INSTANCE = None
+        OBJECT_CACHE.clear()
+
+
+def set_file_wrapper(fwrap_data, byte_order, raw_data, add_table_attrs):
+    """Set global FileWrapper instance"""
+    global FILEWRAPPER_INSTANCE
+    if FILEWRAPPER_INSTANCE is not None:
+        raise RuntimeError(
+            "Subsystem data was not cleaned up. Use get_matio_context() to reset"
+        )
+    FILEWRAPPER_INSTANCE = FileWrapper(byte_order, raw_data, add_table_attrs)
+    FILEWRAPPER_INSTANCE.init_load(fwrap_data)
+
+
+def get_file_wrapper():
+    """Get global FileWrapper instance"""
+    if FILEWRAPPER_INSTANCE is None:
+        raise RuntimeError(
+            "No FileWrapper instance is active. Use get_matio_context() first."
+        )
+    return FILEWRAPPER_INSTANCE
+
+
+def get_object_cache():
+    """Get global object cache"""
+    return OBJECT_CACHE
+
+
+class FileWrapper:
+    """Representation class for MATLAB FileWrapper__ data"""
+
+    def __init__(self, byte_order, raw_data, add_table_attrs):
+        self.byte_order = "<u4" if byte_order == "<" else ">u4"
+
         self.raw_data = raw_data
         self.add_table_attrs = add_table_attrs
-        self.fwrap_metadata = None
-        self.fwrap_vals = None
-        self.fwrap_defaults = None
+
+        self.version = FILEWRAPPER_VERSION
+        self.num_names = 0
+        self.region_offsets = None
         self.mcos_names = None
+        self.class_id_metadata = None
+        self.object_id_metadata = None
+        self.saveobj_prop_metadata = None
+        self.obj_prop_metadata = None
+        self.dynprop_metadata = None
+        self._u6_metadata = None  # Unknown Object Metadata
+        self._u7_metadata = None  # Unknown Object Metadata
+        self.prop_vals_saved = None
+        self._c3 = None  # Unknown Class Template
+        self._c2 = None  # Unknown Class Template
+        self.prop_vals_defaults = None
 
-    def init_fields_v7(self, ssdata):
-        """Fetches metadata and field contents from the subsystem data
-        Currently only supports MCOS objects
-        Attributes:
-            1. fwrap_metadata: Metadata for MCOS objects
-            2. fwrap_vals: Numpy array of properties of MCOS objects
-            3. fwrap_defaults: Numpy array of default properties of MCOS classes
-            4. mcos_names: List of field and class names of all MCOS objects in file
-        """
-        if "MCOS" in ssdata.dtype.names:
-            fwrap_data = ssdata[0, 0]["MCOS"][0]["_Metadata"]
-            self.fwrap_metadata = fwrap_data[0, 0][:, 0]
-            toc_flag = np.frombuffer(
-                self.fwrap_metadata, dtype=self.byte_order, count=1, offset=0
-            )[0]
+    def init_load(self, fwrap_data):
+        """Initializes the FileWrapper instance with metadata from MATLAB FileWrapper__"""
+        fwrap_metadata = fwrap_data[0, 0]
 
-            if toc_flag != 4:
-                warnings.warn(
-                    f"FileWrapper version {toc_flag} detected, may result in unexpected behavior",
-                    UserWarning,
-                )
-
-            self.fwrap_vals = fwrap_data[2:-3, 0]
-            self.fwrap_defaults = fwrap_data[-3:, 0]
-            self.mcos_names = self.get_field_names()
-
-    def init_fields_v73(self, ssdata):
-        """Fetches metadata and field contents from the subsystem data
-        Different format from aove due to scipy.io.loadmat compatibility
-        """
-
-        if "MCOS" in ssdata.dtype.names:
-            self.fwrap_metadata = ssdata[0, 0]["MCOS"][0,0]
-            toc_flag = np.frombuffer(
-                self.fwrap_metadata, dtype=self.byte_order, count=1, offset=0
-            )[0]
-
-            if toc_flag != 4:
-                warnings.warn(
-                    f"FileWrapper version {toc_flag} detected, may result in unexpected behavior",
-                    UserWarning,
-                )
-
-            self.fwrap_vals = ssdata[0, 0]["MCOS"][2:-3,0]
-            self.fwrap_defaults = ssdata[0, 0]["MCOS"][-3:,0]
-            self.mcos_names = self.get_field_names()
-
-    def get_field_names(self):
-        """Extracts field and class names from the subsystem data
-        Names are stored as a list of null-terminated strings
-        Inputs:
-            1. num_offsets: Number of offsets in the metadata
-            This is determined by FileWrapper version
-        Returns:
-            1. all_names: List of field and class names
-        """
-        byte_end = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=1, offset=8
+        fromfile_version = np.frombuffer(
+            fwrap_metadata, dtype=self.byte_order, count=1, offset=0
         )[0]
-        byte_start = 8 + 8 * 4
-        data = self.fwrap_metadata[byte_start:byte_end].tobytes()
+        if fromfile_version > self.version:
+            raise RuntimeError(
+                f"FileWrapper version {fromfile_version} is not supported"
+            )
+
+        self.num_names = np.frombuffer(
+            fwrap_metadata, dtype=self.byte_order, count=1, offset=4
+        )[0]
+
+        self.region_offsets = np.frombuffer(
+            fwrap_metadata, dtype=self.byte_order, count=8, offset=8
+        )
+
+        # Property and Class Names
+        data = fwrap_metadata[40 : self.region_offsets[0]].tobytes()
         raw_strings = data.split(b"\x00")
-        all_names = [s.decode("ascii") for s in raw_strings if s]
-        return all_names
+        self.mcos_names = [s.decode("ascii") for s in raw_strings if s]
 
-    def get_object_dependencies(self, object_id):
-        """Extracts object dependency IDs for a given object
-        Dependency IDs are stored in blocks of 24 bytes ordered by object ID
-        Each block contains:
-            1. Class ID
-            2. Unknown flag
-            3. Unknown flag
-            4. Type1 ID
-            5. Type2 ID
-            6. Dependency ID
-
-        Inputs:
-            1. object_id: ID of the object
-        Returns:
-            (class_id, type1_id, type2_id, dep_id)
-        """
-
-        byte_offset = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=1, offset=16
-        )[0]
-        byte_offset = byte_offset + object_id * 24
-        class_id, _, _, type1_id, type2_id, dep_id = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=6, offset=byte_offset
-        )
-
-        return class_id, type1_id, type2_id, dep_id
-
-    def get_class_name(self, class_id):
-        """Extracts class name and handle for a given object from its class ID
-        Class IDs are stored in blocks of 16 bytes ordered by class ID
-        Each block contains:
-            1. Namespace Index
-            2. Class Name Index
-            3. Unknown flag
-            4. Unknown flag
-        Inputs:
-            1. class_id: ID of the class
-        Returns:
-            (namespace, class_name)
-        """
-
-        byte_offset = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=1, offset=8
-        )[0]
-        byte_offset = byte_offset + class_id * 16
-
-        namespace_idx, class_idx, _, _ = np.frombuffer(
-            self.fwrap_metadata,
+        # Class ID Metadata
+        self.class_id_metadata = np.frombuffer(
+            fwrap_metadata,
             dtype=self.byte_order,
-            count=4,
-            offset=byte_offset,
+            count=(self.region_offsets[1] - self.region_offsets[0]) // 4,
+            offset=self.region_offsets[0],
         )
 
-        class_name = self.mcos_names[class_idx - 1]
-        namespace = self.mcos_names[namespace_idx - 1] if namespace_idx > 0 else None
-        return namespace, class_name
-
-    def get_ids(self, m_id, byte_offset, nbytes):
-        """Extract nblocks and subblock contents for a given object
-        Helper method to parse metadata with the format:
-            1. nsubblocks (4 bytes)
-            2. subblock contents (nblocks * nbytes)
-
-        Inputs:
-            1. m_id: ID of the object
-            2. byte_offset: Offset to start reading from
-            3. nbytes: Number of bytes in each subblock
-        Returns:
-            1. ids: Numpy array of all subblock contents
-        """
-
-        # Get block corresponding to type ID
-        while m_id > 0:
-            nblocks = np.frombuffer(
-                self.fwrap_metadata, dtype=self.byte_order, count=1, offset=byte_offset
-            )[0]
-            byte_offset = byte_offset + 4 + nblocks * nbytes
-            if ((nblocks * nbytes) + 4) % 8 != 0:
-                byte_offset += 4
-            m_id -= 1
-
-        # Get the number of blocks
-        nblocks = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=1, offset=byte_offset
-        )[0]
-
-        byte_offset += 4
-        ids = np.frombuffer(
-            self.fwrap_metadata,
+        # Saveobj Prop Metadata
+        self.saveobj_prop_metadata = np.frombuffer(
+            fwrap_metadata,
             dtype=self.byte_order,
-            count=nblocks * nbytes // 4,
-            offset=byte_offset,
+            count=(self.region_offsets[2] - self.region_offsets[1]) // 4,
+            offset=self.region_offsets[1],
         )
 
-        return ids.reshape((nblocks, nbytes // 4))
-
-    def get_dynamic_prop_instance(self, type2_id):
-        """Reads dynamic property instance ID for a given object
-        Searches for the object ID of the corresponding dynamic property from its type 2 ID
-        Inputs:
-            1. type2_id: ID of the dynamic property
-        Returns:
-            1. class_id of the dynamic property
-            2. object_id of the dynamic property
-        """
-
-        start, end = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=2, offset=16
+        # Object ID Metadata
+        self.object_id_metadata = np.frombuffer(
+            fwrap_metadata,
+            dtype=self.byte_order,
+            count=(self.region_offsets[3] - self.region_offsets[2]) // 4,
+            offset=self.region_offsets[2],
         )
-        blocks = np.frombuffer(
-            self.fwrap_metadata[start:end], dtype=self.byte_order
-        ).reshape(-1, 6)
 
-        for idx, block in enumerate(blocks):
-            if block[4] == type2_id:
-                class_id = block[0]
-                object_id = idx
-                return class_id, np.array([object_id])
+        # Object Prop Metadata
+        self.obj_prop_metadata = np.frombuffer(
+            fwrap_metadata,
+            dtype=self.byte_order,
+            count=(self.region_offsets[4] - self.region_offsets[3]) // 4,
+            offset=self.region_offsets[3],
+        )
 
-        raise ValueError(f"Dynamic property instance not found for object ID (Type 2): {type2_id}")
+        # Dynamic Prop Metadata
+        self.dynprop_metadata = np.frombuffer(
+            fwrap_metadata,
+            dtype=self.byte_order,
+            count=(self.region_offsets[5] - self.region_offsets[4]) // 4,
+            offset=self.region_offsets[4],
+        )
 
-    def extract_dynamic_props(self, dep_id):
-        """Extracts the dynamic properties for an object
-        Dynamic properties attached to an object are tagged by their type 2 IDs
-        Objects with dynamic properties can be found by their dependency ID
-        """
+        # Unknown Region 6 Metadata
+        self._u6_metadata = fwrap_metadata[
+            self.region_offsets[5] : self.region_offsets[6]
+        ]
 
-        # Get block corresponding to dep_id
-        byte_offset = np.frombuffer(
-            self.fwrap_metadata, dtype=self.byte_order, count=1, offset=24
-        )[0]
-        dyn_prop_type2_ids = self.get_ids(dep_id, byte_offset, nbytes=4)[:, 0]
-        if dyn_prop_type2_ids.size == 0:
+        # Unknown Region 7 Metadata
+        self._u7_metadata = fwrap_metadata[
+            self.region_offsets[6] : self.region_offsets[7]
+        ]
+
+        self.prop_vals_saved = fwrap_data[2:-3, 0]
+        self._c3 = fwrap_data[-3, 0]  # Unknown
+        self._c2 = fwrap_data[-2, 0]  # Unknown
+        self.prop_vals_defaults = fwrap_data[-1, 0]
+
+    def is_valid_mcos_object(self, metadata):
+        """Checks if property value is a valid MCOS metadata array"""
+
+        if not isinstance(metadata, np.ndarray):
+            return False
+
+        if metadata.dtype.names:
+            if "EnumerationInstanceTag" in metadata.dtype.names:
+                if (
+                    metadata[0, 0]["EnumerationInstanceTag"].dtype == np.uint32
+                    and metadata[0, 0]["EnumerationInstanceTag"].size == 1
+                    and metadata[0, 0]["EnumerationInstanceTag"] == 0xDD000000
+                ):
+                    return True
+            return False
+
+        if not (
+            metadata.dtype == np.uint32
+            and metadata.ndim == 2
+            and metadata.shape == (metadata.shape[0], 1)
+            and metadata.size >= 3
+        ):
+            return False
+
+        if metadata[0, 0] != 0xDD000000:
+            return False
+
+        return True
+
+    def check_prop_for_mcos(self, prop):
+        """Recursively check if a property value in FileWrapper__ contains MCOS objects"""
+
+        if not isinstance(prop, np.ndarray) or isinstance(prop, MatioOpaque):
+            return prop
+
+        if self.is_valid_mcos_object(prop):
+            prop = load_mcos_object(prop, "MCOS")
+
+        elif prop.dtype == object:
+            # Iterate through cell arrays
+            for idx in np.ndindex(prop.shape):
+                cell_item = prop[idx]
+                if self.is_valid_mcos_object(cell_item):
+                    prop[idx] = load_mcos_object(cell_item, "MCOS")
+                else:
+                    self.check_prop_for_mcos(cell_item)
+
+        elif prop.dtype.names:
+            # Iterate though struct array
+            for idx in np.ndindex(prop.shape):
+                for name in prop.dtype.names:
+                    field_val = prop[idx][name]
+                    if self.is_valid_mcos_object(field_val):
+                        prop[idx][name] = load_mcos_object(field_val, "MCOS")
+                    else:
+                        self.check_prop_for_mcos(field_val)
+
+        return prop
+
+    def get_classname(self, class_id):
+        """Extracts class name for a given object from its class ID"""
+
+        namespace_idx = self.class_id_metadata[class_id * 4]
+        classname_idx = self.class_id_metadata[class_id * 4 + 1]
+
+        if namespace_idx == 0:
+            namespace = ""
+        else:
+            namespace = self.mcos_names[namespace_idx - 1] + "."
+
+        classname = namespace + self.mcos_names[classname_idx - 1]
+        return classname
+
+    def get_object_metadata(self, object_id):
+        """Extracts object dependency IDs for a given object"""
+
+        class_id, _, _, saveobj_id, normobj_id, dep_id = self.object_id_metadata[
+            object_id * 6 : object_id * 6 + 6
+        ]
+        return class_id, saveobj_id, normobj_id, dep_id
+
+    def get_default_properties(self, class_id):
+        """Returns the default properties (as dict) for a given class ID"""
+
+        prop_arr = self.prop_vals_defaults[class_id, 0]
+        prop_map = {}
+        if prop_arr.dtype.names:
+            for prop_name in prop_arr.dtype.names:
+                prop_map[prop_name] = self.check_prop_for_mcos(
+                    prop_arr[prop_name][0, 0]
+                )
+
+        return prop_map
+
+    def get_property_idxs(self, obj_type_id, saveobj_ret_type):
+        """Returns the property field indices for an object"""
+
+        prop_field_idxs = (
+            self.saveobj_prop_metadata if saveobj_ret_type else self.obj_prop_metadata
+        )
+
+        nfields = 3
+        offset = prop_field_idxs[0]
+        for _ in range(obj_type_id):
+            nprops = prop_field_idxs[offset]
+            offset += 1 + nfields * nprops
+            offset += offset % 2  # Padding
+
+        nprops = prop_field_idxs[offset]
+        offset += 1
+        return prop_field_idxs[offset : offset + nprops * nfields].reshape(
+            (nprops, nfields)
+        )
+
+    def get_saved_properties(self, obj_type_id, saveobj_ret_type):
+        """Returns the saved properties (as dict) for an object"""
+
+        save_prop_map = {}
+
+        prop_field_idxs = self.get_property_idxs(obj_type_id, saveobj_ret_type)
+        for prop_idx, prop_type, prop_value in prop_field_idxs:
+            prop_name = self.mcos_names[prop_idx - 1]
+            if prop_type == 0:
+                save_prop_map[prop_name] = self.mcos_names[prop_value - 1]
+            elif prop_type == 1:
+                save_prop_map[prop_name] = self.check_prop_for_mcos(
+                    self.prop_vals_saved[prop_value]
+                )
+            elif prop_type == 2:
+                save_prop_map[prop_name] = prop_value
+            else:
+                raise ValueError(
+                    f"Unknown property type ID:{prop_type} encountered during deserialization"
+                )
+
+        return save_prop_map
+
+    def get_dyn_object_id(self, normobj_id):
+        """Gets the object ID from normobj ID for dynamicprops objects"""
+
+        num_objects = len(self.object_id_metadata) // 6
+
+        for object_id in range(num_objects):
+            block_start = object_id * 6
+            block_normobj_id = self.object_id_metadata[block_start + 4]
+
+            if block_normobj_id == normobj_id:
+                return object_id
+
+        raise ValueError(f"No object found with normobj_id {normobj_id}")
+
+    def get_dynamic_properties(self, dep_id):
+        """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
+
+        offset = self.dynprop_metadata[0]
+        for i in range(dep_id):
+            nprops = self.dynprop_metadata[offset]
+            offset += 1 + nprops
+            offset += offset % 2
+
+        ndynprops = self.dynprop_metadata[offset]
+        offset += 1
+        dyn_prop_type2_ids = self.dynprop_metadata[offset : offset + ndynprops]
+
+        if ndynprops == 0:
+            return {}
+
+        dyn_prop_map = {}
+        for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
+            dyn_obj_id = self.get_dyn_object_id(dyn_prop_id)
+            classname = self.get_classname(dyn_obj_id)
+            obj = MatioOpaque(classname, "MCOS")
+            obj.properties = self.get_properties(dyn_obj_id)
+            dyn_prop_map[f"__dynamic_property__{i + 1}"] = obj
+
+        return dyn_prop_map
+
+    def get_properties(self, object_id):
+        """Returns the properties as a dict for a given object ID"""
+        if object_id == 0:
             return None
 
-        dyn_props = {}
-        for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
-            class_id, object_id = self.get_dynamic_prop_instance(dyn_prop_id)
-            dyn_props[f"__dynamic_property__{i + 1}"] = self.read_object_arrays(
-                object_id, class_id, dims=[1, 1]
-            )
-        return dyn_props
-
-    def find_object_reference(self, arr, path=()):
-        """Recursively searches for object references in the data array
-        and replaces them with the corresponding MCOS object.
-
-        This is a hacky solution to find object arrays inside struct arrays or cell arrays.
-        """
-
-        if not isinstance(arr, np.ndarray):
-            return arr
-
-        if check_object_reference(arr):
-            return self.read_mcos_object(arr)
-
-        if arr.dtype == object:
-            # Iterate through cell arrays
-            for idx in np.ndindex(arr.shape):
-                cell_item = arr[idx]
-                if check_object_reference(cell_item):
-                    arr[idx] = self.read_mcos_object(cell_item)
-                else:
-                    self.find_object_reference(cell_item, path + (idx,))
-                # Path to keep track of the current index
-        elif arr.dtype.names:
-            # Iterate through struct array
-            if check_object_reference(arr):
-                return self.read_mcos_object(arr)
-            for idx in np.ndindex(arr.shape):
-                for name in arr.dtype.names:
-                    field_val = arr[idx][name]
-                    if check_object_reference(field_val):
-                        arr[idx][name] = self.read_mcos_object(field_val)
-                    else:
-                        self.find_object_reference(field_val, path + (idx, name))
-
-        return arr
-
-    def parse_field_types(self, field_type, field_value, type1_id, class_name):
-        """Parses field types and values for an object"""
-
-        if field_type == 0:
-            val = self.mcos_names[field_value - 1]
-        elif field_type == 1:
-            if type1_id and class_name == "function_handle_object":
-                # Special case to break circular reference in nested function handle
-                val = self.fwrap_vals[field_value]
-            else:
-                val = self.find_object_reference(self.fwrap_vals[field_value])
-        elif field_type == 2:
-            val = field_value
+        class_id, saveobj_id, normobj_id, dep_id = self.get_object_metadata(object_id)
+        if saveobj_id != 0:
+            saveobj_ret_type = True
+            obj_type_id = saveobj_id
         else:
-            raise ValueError(f"Unknown field type: {field_type}")
+            saveobj_ret_type = False
+            obj_type_id = normobj_id
 
-        return val
+        prop_map = self.get_default_properties(class_id)
+        prop_map.update(self.get_saved_properties(obj_type_id, saveobj_ret_type))
+        prop_map.update(self.get_dynamic_properties(dep_id))
 
-    def extract_fields(self, object_id, class_name):
-        """Extracts the properties for an object
-        Inputs:
-            (type1_id, type2_id, dep_id): Dependency IDs of the object
-        Returns:
-            1. obj_props: Dictionary of object properties keyed by property names
-        """
+        return prop_map
 
-        _, type1_id, type2_id, dep_id = self.get_object_dependencies(object_id)
 
-        if type1_id == 0 and type2_id != 0:
-            obj_type_id = type2_id
-            byte_offset = np.frombuffer(
-                self.fwrap_metadata, dtype=self.byte_order, count=1, offset=20
-            )[0]
-        elif type1_id != 0 and type2_id == 0:
-            obj_type_id = type1_id
-            byte_offset = np.frombuffer(
-                self.fwrap_metadata, dtype=self.byte_order, count=1, offset=12
-            )[0]
-        else:
-            raise ValueError("Could not determine object type")
+def load_mcos_enumeration(metadata, type_system):
+    """Loads MATLAB MCOS enumeration instance array"""
 
-        obj_props = {}
-        field_ids = self.get_ids(obj_type_id, byte_offset, nbytes=12)
-        for field_idx, field_type, field_value in field_ids:
-            obj_props[self.mcos_names[field_idx - 1]] = self.parse_field_types(
-                field_type, field_value, type1_id, class_name
-            )
-            # Passing type1_id and class_name to parse_field
-            # for special case of class function_handle_object
+    file_wrapper = get_file_wrapper()
 
-        # Include dynamic properties
-        dyn_props = self.extract_dynamic_props(dep_id)
-        if dyn_props is not None:
-            obj_props.update(dyn_props)
-        return obj_props
+    classname = file_wrapper.get_classname(metadata[0, 0]["ClassName"].item())
+    builtin_class_idx = metadata[0, 0]["BuiltinClassName"].item()
+    if builtin_class_idx != 0:
+        builtin_class_name = file_wrapper.get_classname(builtin_class_idx)
+    else:
+        builtin_class_name = None
 
-    def read_object_arrays(self, object_ids, class_id, dims):
-        """Reads an object array for a given variable
-        Inputs:
-            1. object_ids: IDs of the objects
-            2. class_id: ID of the class
-            3. dims: Dimensions of the object array
-        Returns:
-            1. result: Dictionary representing the object array
-            Dictionary contains:
-                - _Class: Class name
-                - _Props: Numpy array of object properties
-        """
+    value_names = [
+        file_wrapper.mcos_names[val - 1] for val in metadata[0, 0]["ValueNames"].ravel()
+    ]
 
-        # Attach class name to the object
-        namespace, class_name = self.get_class_name(class_id)
-        if namespace is not None:
-            class_name = f"{namespace}.{class_name}"
+    enum_vals = []
+    value_idx = metadata[0, 0]["ValueIndices"]
+    mmdata = metadata[0, 0]["Values"]  # Array is N x 1 shape
+    if mmdata.size != 0:
+        mmdata_map = mmdata[value_idx]
+        for val in np.nditer(mmdata_map, flags=["refs_ok"], op_flags=["readonly"]):
+            obj_array = load_mcos_object(val.item(), "MCOS")
+            enum_vals.append(obj_array)
 
-        if object_ids.size == 0:
-            return {
-                "_Class": class_name,
-                "_Props": np.empty(dims, dtype=object),
-            }
-
-        if object_ids[0] == 0:
-            # Deleted object
-            return {
-                "_Class": class_name,
-            }
-
-        props_list = []
-        for object_id in object_ids:
-            obj_props = self.extract_fields(object_id, class_name)
-            props_list.append(obj_props)
-        obj_props = np.array(props_list).reshape(dims)
-
-        obj_default_props = self.fwrap_defaults[2][class_id, 0]
-        obj_default_props = self.find_object_reference(obj_default_props)
-        # Update object properties with any default values
-        if obj_default_props.size != 0:
-            for name in obj_default_props.dtype.names:
-                default_val = obj_default_props[name][0, 0]
-                for idx in np.ndindex(obj_props.shape):
-                    if name not in obj_props[idx]:
-                        obj_props[idx][name] = default_val
-
-        # Converts some common MATLAB objects to Python objects
-        result = convert_to_object(
-            obj_props, class_name, self.byte_order, self.raw_data, self.add_table_attrs
+    if not file_wrapper.raw_data:
+        return mat_to_enum(
+            enum_vals,
+            value_names,
+            classname,
+            value_idx.shape,
         )
 
-        # Remaining unknown class properties
-        # _u1 = self.fwrap_defaults[0][class_id, 0]
-        # _u2 = self.fwrap_defaults[1][class_id, 0]
+    metadata[0, 0]["BuiltinClassName"] = builtin_class_name
+    metadata[0, 0]["ClassName"] = classname
+    metadata[0, 0]["ValueNames"] = np.array(value_names).reshape(
+        value_idx.shape, order="F"
+    )
+    metadata[0, 0]["ValueIndices"] = value_idx
+    metadata[0, 0]["Values"] = np.array(enum_vals).reshape(value_idx.shape, order="F")
 
-        return result
-
-    def read_mcos_enumeration(self, metadata):
-        """Reads MCOS enumeration object from the metadata
-        Inputs:
-            metadata: Metadata for the enumeration object
-        Returns:
-            metadata: Metadata for the enumeration object
-            If raw_data is False, returns the enumeration object
-        """
-
-        namespace, class_name = self.get_class_name(
-            metadata[0, 0]["ClassName"].item()
-        )
-        if namespace is not None:
-            class_name = f"{namespace}.{class_name}"
-
-        builtin_class_index = metadata[0, 0]["BuiltinClassName"].item()
-        if builtin_class_index != 0:
-            namespace, builtin_class_name = self.get_class_name(builtin_class_index)
-            if namespace is not None:
-                builtin_class_name = f"{namespace}.{builtin_class_name}"
-        else:
-            builtin_class_name = None
-
-        value_names = [
-            self.mcos_names[val - 1] for val in metadata[0, 0]["ValueNames"].ravel()
-        ]  # Array is N x 1 shape
-
-        enum_vals = []
-        value_idx = metadata[0, 0]["ValueIndices"]
-        mmdata = metadata[0, 0]["Values"]  # Array is N x 1 shape
-        if mmdata.size != 0:
-            mmdata_map = mmdata[value_idx]
-            for val in np.nditer(mmdata_map, flags=["refs_ok"], op_flags=["readonly"]):
-                obj_array = self.read_normal_mcos(val.item())
-                enum_vals.append(obj_array)
-
-        if not self.raw_data:
-            enum_array = mat_to_enum(
-                enum_vals,
-                value_names,
-                class_name,
-                value_idx.shape,
-            )
-            return enum_array
-
-        metadata[0, 0]["BuiltinClassName"] = builtin_class_name
-        metadata[0, 0]["ClassName"] = class_name
-        metadata[0, 0]["ValueNames"] = np.array(value_names).reshape(
-            value_idx.shape, order="F"
-        )
-        metadata[0, 0]["ValueIndices"] = value_idx
-        metadata[0, 0]["Values"] = np.array(enum_vals).reshape(
-            value_idx.shape, order="F"
-        )
-
-        return metadata
-
-    def read_normal_mcos(self, metadata):
-        """Reads normal MCOS object from the metadata"""
-
-        ndims = metadata[1, 0]
-        dims = metadata[2 : 2 + ndims, 0]
-        if dims.size == 0:
-            total_objs = np.uint64(0)
-        else:
-            total_objs = np.prod(dims)
-
-        object_ids = metadata[2 + ndims : 2 + ndims + total_objs, 0]
-        class_id = metadata[-1, 0]
-        return self.read_object_arrays(object_ids, class_id, dims)
-
-    def read_mcos_object(self, metadata, type_system="MCOS"):
-        """Reads MCOS object based on OPAQUE_DTYPE CONTENTS"""
-        if type_system != "MCOS":
-            warnings.warn(
-                f"Type system {type_system} is not supported.",
-                UserWarning,
-            )
-            return metadata
-
-        if metadata.dtype.names is not None:
-            if "EnumerationInstanceTag" in metadata.dtype.names:
-                return self.read_mcos_enumeration(metadata)
-
-            warnings.warn(
-                "Couldn't read MCOS object type, returning object metadata",
-                UserWarning,
-            )
-            return metadata
-
-        if metadata.dtype == np.uint32:
-            return self.read_normal_mcos(metadata)
-
-        return metadata
+    return MatioOpaque(classname, type_system, metadata)
 
 
-def check_object_reference(metadata):
-    """Checks if the metadata is a valid object reference"""
-    if not isinstance(metadata, np.ndarray):
-        return False
+def load_mcos_object(metadata, type_system):
+    """Loads MCOS object"""
+
+    file_wrapper = get_file_wrapper()
+    object_cache = get_object_cache()
 
     if metadata.dtype.names:
-        if "EnumerationInstanceTag" in metadata.dtype.names:
-            if (
-                metadata[0, 0]["EnumerationInstanceTag"].dtype == np.uint32
-                and metadata[0, 0]["EnumerationInstanceTag"].size == 1
-                and metadata[0, 0]["EnumerationInstanceTag"] == 0xDD000000
-            ):
-                return True
-        return False
+        return load_mcos_enumeration(metadata, type_system)
 
-    if not (
-        metadata.dtype == np.uint32
-        and metadata.ndim == 2
-        and metadata.shape == (metadata.shape[0], 1)
-        and metadata.size >= 3
-    ):
-        return False
+    ndims = metadata[1, 0]
+    dims = metadata[2 : 2 + ndims, 0]
+    nobjects = np.prod(dims)
+    object_ids = metadata[2 + ndims : 2 + ndims + nobjects, 0]
 
-    if metadata[0, 0] != 0xDD000000:
-        return False
+    class_id = metadata[-1, 0]
+    classname = file_wrapper.get_classname(class_id)
 
-    return True
+    obj_arr = np.empty((nobjects, 1), dtype=object)
+
+    for i, object_id in enumerate(object_ids):
+        if object_id in object_cache:
+            obj_arr[i] = object_cache[object_id]
+        elif object_id == 0:
+            # Empty object, return empty MatioOpaque
+            obj = MatioOpaque(classname, type_system)
+            obj.properties = {}
+            obj_arr[i] = obj
+        else:
+            obj = MatioOpaque(classname, type_system)
+            object_cache[object_id] = obj
+            obj.properties = file_wrapper.get_properties(object_id)
+
+            if not file_wrapper.raw_data:
+                convert_func = CLASS_TO_FUNCTION.get(classname)
+                if convert_func is not None:
+                    obj = convert_func(
+                        obj.properties,
+                        byte_order=file_wrapper.byte_order,
+                        add_table_attrs=file_wrapper.add_table_attrs,
+                    )
+
+            obj_arr[i, 0] = obj
+
+    if nobjects == 1:
+        return obj_arr[0, 0]
+    return obj_arr.reshape(dims, order="F")
+
+
+def load_opaque_object(metadata, classname, type_system):
+    """Loads opaque object"""
+
+    if type_system != "MCOS":
+        # Return raw metadata for this case
+        obj = MatioOpaque(classname, type_system)
+        obj.properties = metadata
+        return obj
+
+    return load_mcos_object(metadata, type_system)

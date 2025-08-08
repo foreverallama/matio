@@ -68,6 +68,7 @@ params = [
     ),
 ]
 
+
 @pytest.mark.parametrize(
     "categories, codes, ordered, var_name",
     params,
@@ -84,13 +85,14 @@ params = [
         "categorical-3D-v7",
     ],
 )
-def test_categorical_read_v7(categories, codes, ordered, var_name):
+def test_categorical_load_v7(categories, codes, ordered, var_name):
     file_path_v7 = os.path.join(os.path.dirname(__file__), "test_categorical_v7.mat")
     matdict = load_from_mat(file_path_v7, raw_data=False)
     assert var_name in matdict
     assert np.array_equal(matdict[var_name].codes, codes)
     assert np.array_equal(matdict[var_name].categories, categories)
     assert np.array_equal(matdict[var_name].ordered, ordered)
+
 
 @pytest.mark.parametrize(
     "categories, codes, ordered, var_name",
@@ -108,7 +110,7 @@ def test_categorical_read_v7(categories, codes, ordered, var_name):
         "categorical-3D-v7.3",
     ],
 )
-def test_categorical_read_v73(categories, codes, ordered, var_name):
+def test_categorical_load_v73(categories, codes, ordered, var_name):
     file_path_v73 = os.path.join(os.path.dirname(__file__), "test_categorical_v73.mat")
     matdict = load_from_mat(file_path_v73, raw_data=False)
     assert var_name in matdict
