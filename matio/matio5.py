@@ -14,8 +14,8 @@ def new_opaque_object(arr):
     """Creates a new MatioOpaque object in place of a MatlabOpaque array"""
 
     metadata = arr["_ObjectMetadata"].item()
-    classname = arr["_Class"]
-    type_system = arr["_TypeSystem"]
+    classname = arr["_Class"].item()
+    type_system = arr["_TypeSystem"].item()
 
     obj = load_opaque_object(metadata, classname, type_system)
     return obj
