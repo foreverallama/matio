@@ -38,7 +38,8 @@ class MatRead7:
         subsystem_arr = self.read_struct(self.h5stream["#subsystem#"])
         if "MCOS" in subsystem_arr.dtype.names:
             fwrap_data = subsystem_arr[0, 0]["MCOS"]
-            set_file_wrapper(fwrap_data, byte_order, raw_data, add_table_attrs)
+            file_wrapper = set_file_wrapper(byte_order, raw_data, add_table_attrs)
+            file_wrapper.init_load(fwrap_data)
 
     def read_int(self, obj, is_empty=0):
         """Reads MATLAB integer arrays from the v7.3 MAT-file."""

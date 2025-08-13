@@ -1,11 +1,10 @@
-# Field Content Format
+# Field Contents
 
-The contents of a field defined in its corresponding cell depends on the class and field name. It is mostly straightforward, except for some special cases, which I'll get into below. The contents of any properties not explicity defined will not be written into the MAT-file (though the field names will be present).
-
-Field contents of object arrays of MATLAB datatypes like `string` or `datetime` are contained as arrays themselves. For example, if you define a `2x2` `datetime` array, the properties of this object array will be a `2x2` array.
+This document describes in detail the saved properties of some common MATLAB datatypes. In MATLAB, most datatypes are saved using default load and save processes. However, a few such as `string` or `timetable` use a `saveobj` and `loadobj` method which can use a custom save value.
 
 <!--TOC-->
 
+- [MATLAB to Python Conversion](#matlab-to-python-conversion)
 - [`datetime`](#datetime)
 - [`duration`](#duration)
 - [`calendarDuration`](#calendarduration)
@@ -17,10 +16,26 @@ Field contents of object arrays of MATLAB datatypes like `string` or `datetime` 
 - [`categorical`](#categorical)
 - [Enumeration Instance Arrays](#enumeration-instance-arrays)
 - [Others](#others)
-- [Appendix](#appendix)
-  - [What if the field contains an object?](#what-if-the-field-contains-an-object)
 
 <!--TOC-->
+
+## MATLAB to Python Conversion
+
+The `matio` package attempts to convert some common MATLAB datatypes into a Pythonic datatype, and vice versa. These are detailed below:
+
+| MATLAB Type                       | Python Equivalent                          |
+|-----------------------------------|---------------------------------------------|
+| `datetime`                        | `numpy.datetime64`|
+| `duration`                        | `numpy.timedelta64`|
+| `calendarDuration`                | `numpy.ndarray` with fields `{months, days, millis}` |
+| `string`                          | `numpy.str_`            |
+| `table`                           | `pandas.DataFrame`                          |
+| `timetable`                       | `pandas.DataFrame` with datetime index      |
+| `containers.Map`                  | `dict`                                      |
+| `dictionary`                      | `list[(key, value)]`                                     |
+| `categorical`                     | `pandas.Categorical`                        |
+| Enumeration Instance Arrays       | `numpy.ndarray` of `enum.Enum`         |
+| User-Defined Classes              | `MatioOpaque` instance with property `dict` |
 
 ## `datetime`
 
@@ -182,13 +197,3 @@ To add:
 
 1. `function_handle`
 2. `timeseries`
-
-## Appendix
-
-### What if the field contains an object?
-
-If the field contains an object, then the corresponding cell would contain a `uint32` column matrix structured exactly the same as the object metadata subelement of `mxOPAQUE_CLASS` in the normal part of the MAT-file. This metadata contains the `classID` and `objectID` of the object stored in its field. But how do you differentiate this from a regular `uint32` column matrix?
-
-The answer lies in the first value of the array - the object reference. MATLAB uses the value `0xDD000000` to internally identify arrays as object metadata. This means that if you assign a `Nx1` array with the first value as `0xDD000000` to a property of an object, then MATLAB tries to instantiate an object, fails and crashes!
-
-Why doesn't MATLAB include `mxOPAQUE_CLASS` headers in this case? I suspect it has to do with loading. Since the `FileWrapper__` instance needs to be fully created before objects can be loaded, `mxOPAQUE_CLASS` headers within `FileWrapper__` data would try to load an `MCOS` object before the `FileWrapper__` object is available, causing it to crash.

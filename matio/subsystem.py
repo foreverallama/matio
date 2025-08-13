@@ -1,15 +1,23 @@
 """Reads MCOS subsystem data from MAT files"""
 
+import warnings
 from contextlib import contextmanager
 
 import numpy as np
+from scipy.io.matlab._mio5_params import OPAQUE_DTYPE, MatlabOpaque
 
-from matio.mat_opaque_tools import CLASS_TO_FUNCTION, MatioOpaque, mat_to_enum
+from matio.mat_opaque_tools import (
+    MatioOpaque,
+    convert_mat_to_py,
+    guess_class_name,
+    mat_to_enum,
+)
 
 FILEWRAPPER_INSTANCE = None
 OBJECT_CACHE = {}
 
 FILEWRAPPER_VERSION = 4
+SYSTEM_BYTE_ORDER = "<" if np.little_endian else ">"
 
 
 @contextmanager
@@ -27,7 +35,9 @@ def get_matio_context():
         OBJECT_CACHE.clear()
 
 
-def set_file_wrapper(fwrap_data, byte_order, raw_data, add_table_attrs):
+def set_file_wrapper(
+    byte_order=SYSTEM_BYTE_ORDER, raw_data=False, add_table_attrs=False
+):
     """Set global FileWrapper instance"""
     global FILEWRAPPER_INSTANCE
     if FILEWRAPPER_INSTANCE is not None:
@@ -35,7 +45,7 @@ def set_file_wrapper(fwrap_data, byte_order, raw_data, add_table_attrs):
             "Subsystem data was not cleaned up. Use get_matio_context() to reset"
         )
     FILEWRAPPER_INSTANCE = FileWrapper(byte_order, raw_data, add_table_attrs)
-    FILEWRAPPER_INSTANCE.init_load(fwrap_data)
+    return FILEWRAPPER_INSTANCE
 
 
 def get_file_wrapper():
@@ -52,6 +62,69 @@ def get_object_cache():
     return OBJECT_CACHE
 
 
+def is_valid_opaque_object(metadata):
+    """Checks if property value is a valid opaque object metadata array"""
+
+    if is_valid_mcos_object(metadata):
+        return True
+
+    # TODO: Add checks for other opaque objects
+
+    return False
+
+
+def is_valid_mcos_object(metadata):
+    """Checks if property value is a valid MCOS metadata array"""
+
+    if metadata.dtype.names:
+        if "EnumerationInstanceTag" in metadata.dtype.names:
+            if (
+                metadata[0, 0]["EnumerationInstanceTag"].dtype == np.uint32
+                and metadata[0, 0]["EnumerationInstanceTag"].size == 1
+                and metadata[0, 0]["EnumerationInstanceTag"] == 0xDD000000
+            ):
+                return True
+        return False
+
+    if not (
+        metadata.dtype == np.uint32
+        and metadata.ndim == 2
+        and metadata.shape == (metadata.shape[0], 1)
+        and metadata.size >= 3
+    ):
+        return False
+
+    if metadata[0, 0] != 0xDD000000:
+        return False
+
+    return True
+
+
+def check_prop_for_opaque(prop):
+    """Recursively check if a property value in FileWrapper__ contains opaque objects during load"""
+
+    if not isinstance(prop, np.ndarray):
+        return prop
+
+    if is_valid_opaque_object(prop):
+        prop = load_opaque_object(prop, classname="", type_system="MCOS")
+
+    elif prop.dtype == object:
+        # Iterate through cell arrays
+        for idx in np.ndindex(prop.shape):
+            cell_item = prop[idx]
+            prop[idx] = check_prop_for_opaque(cell_item)
+
+    elif prop.dtype.names:
+        # Iterate though struct array
+        for idx in np.ndindex(prop.shape):
+            for name in prop.dtype.names:
+                field_val = prop[idx][name]
+                prop[idx][name] = check_prop_for_opaque(field_val)
+
+    return prop
+
+
 class FileWrapper:
     """Representation class for MATLAB FileWrapper__ data"""
 
@@ -64,18 +137,24 @@ class FileWrapper:
         self.version = FILEWRAPPER_VERSION
         self.num_names = 0
         self.region_offsets = None
-        self.mcos_names = None
-        self.class_id_metadata = None
-        self.object_id_metadata = None
-        self.saveobj_prop_metadata = None
-        self.obj_prop_metadata = None
-        self.dynprop_metadata = None
+        self.mcos_names = []
+        self.class_id_metadata = []
+        self.object_id_metadata = []
+        self.saveobj_prop_metadata = []
+        self.obj_prop_metadata = []
+        self.dynprop_metadata = []
         self._u6_metadata = None  # Unknown Object Metadata
         self._u7_metadata = None  # Unknown Object Metadata
-        self.prop_vals_saved = None
+        self.prop_vals_saved = []
         self._c3 = None  # Unknown Class Template
         self._c2 = None  # Unknown Class Template
         self.prop_vals_defaults = None
+
+        # Counters for object creation
+        self.saveobj_object_counter = 0
+        self.normal_object_counter = 0
+        self.class_id_counter = 0
+        self.object_id_counter = 0
 
     def init_load(self, fwrap_data):
         """Initializes the FileWrapper instance with metadata from MATLAB FileWrapper__"""
@@ -157,67 +236,17 @@ class FileWrapper:
         self._c2 = fwrap_data[-2, 0]  # Unknown
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
-    def is_valid_mcos_object(self, metadata):
-        """Checks if property value is a valid MCOS metadata array"""
+    def init_save(self):
+        """Initializes save with metadata for object ID = 0"""
 
-        if not isinstance(metadata, np.ndarray):
-            return False
-
-        if metadata.dtype.names:
-            if "EnumerationInstanceTag" in metadata.dtype.names:
-                if (
-                    metadata[0, 0]["EnumerationInstanceTag"].dtype == np.uint32
-                    and metadata[0, 0]["EnumerationInstanceTag"].size == 1
-                    and metadata[0, 0]["EnumerationInstanceTag"] == 0xDD000000
-                ):
-                    return True
-            return False
-
-        if not (
-            metadata.dtype == np.uint32
-            and metadata.ndim == 2
-            and metadata.shape == (metadata.shape[0], 1)
-            and metadata.size >= 3
-        ):
-            return False
-
-        if metadata[0, 0] != 0xDD000000:
-            return False
-
-        return True
-
-    def check_prop_for_mcos(self, prop):
-        """Recursively check if a property value in FileWrapper__ contains MCOS objects"""
-
-        if not isinstance(prop, np.ndarray) or isinstance(prop, MatioOpaque):
-            return prop
-
-        if self.is_valid_mcos_object(prop):
-            prop = load_mcos_object(prop, "MCOS")
-
-        elif prop.dtype == object:
-            # Iterate through cell arrays
-            for idx in np.ndindex(prop.shape):
-                cell_item = prop[idx]
-                if self.is_valid_mcos_object(cell_item):
-                    prop[idx] = load_mcos_object(cell_item, "MCOS")
-                else:
-                    self.check_prop_for_mcos(cell_item)
-
-        elif prop.dtype.names:
-            # Iterate though struct array
-            for idx in np.ndindex(prop.shape):
-                for name in prop.dtype.names:
-                    field_val = prop[idx][name]
-                    if self.is_valid_mcos_object(field_val):
-                        prop[idx][name] = load_mcos_object(field_val, "MCOS")
-                    else:
-                        self.check_prop_for_mcos(field_val)
-
-        return prop
+        self.class_id_metadata.extend([0, 0, 0, 0])
+        self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
+        self.saveobj_prop_metadata.extend([0, 0])
+        self.obj_prop_metadata.extend([0, 0])
+        self.dynprop_metadata.extend([0, 0])
 
     def get_classname(self, class_id):
-        """Extracts class name for a given object from its class ID"""
+        """Extracts class name with namespace qualifier for a given object from its class ID"""
 
         namespace_idx = self.class_id_metadata[class_id * 4]
         classname_idx = self.class_id_metadata[class_id * 4 + 1]
@@ -245,9 +274,7 @@ class FileWrapper:
         prop_map = {}
         if prop_arr.dtype.names:
             for prop_name in prop_arr.dtype.names:
-                prop_map[prop_name] = self.check_prop_for_mcos(
-                    prop_arr[prop_name][0, 0]
-                )
+                prop_map[prop_name] = check_prop_for_opaque(prop_arr[prop_name][0, 0])
 
         return prop_map
 
@@ -282,7 +309,7 @@ class FileWrapper:
             if prop_type == 0:
                 save_prop_map[prop_name] = self.mcos_names[prop_value - 1]
             elif prop_type == 1:
-                save_prop_map[prop_name] = self.check_prop_for_mcos(
+                save_prop_map[prop_name] = check_prop_for_opaque(
                     self.prop_vals_saved[prop_value]
                 )
             elif prop_type == 2:
@@ -306,7 +333,7 @@ class FileWrapper:
             if block_normobj_id == normobj_id:
                 return object_id
 
-        raise ValueError(f"No object found with normobj_id {normobj_id}")
+        raise ValueError(f"No dynamicproperty found with ID {normobj_id}")
 
     def get_dynamic_properties(self, dep_id):
         """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
@@ -328,7 +355,7 @@ class FileWrapper:
         for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
             dyn_obj_id = self.get_dyn_object_id(dyn_prop_id)
             classname = self.get_classname(dyn_obj_id)
-            obj = MatioOpaque(classname, "MCOS")
+            obj = MatioOpaque(classname=classname, type_system="MCOS")
             obj.properties = self.get_properties(dyn_obj_id)
             dyn_prop_map[f"__dynamic_property__{i + 1}"] = obj
 
@@ -352,6 +379,215 @@ class FileWrapper:
         prop_map.update(self.get_dynamic_properties(dep_id))
 
         return prop_map
+
+    def get_class_id(self, classname):
+        """Gets the class ID for a given class name (including namespace)"""
+
+        for class_id in range(1, self.class_id_counter + 1):
+            existing_name = self.get_classname(class_id)
+            if existing_name == classname:
+                return class_id
+
+        self.class_id_counter += 1
+
+        # Add new class ID metadata
+        namespace, _, cname = classname.rpartition(".")
+        if namespace:
+            namespace_idx = self.set_mcos_name(namespace)
+        else:
+            namespace_idx = 0
+        cname_idx = self.set_mcos_name(cname)
+
+        metadata = [namespace_idx, cname_idx, 0, 0]
+        self.class_id_metadata.extend(metadata)
+
+        return self.class_id_counter
+
+    def set_mcos_name(self, name):
+        """Gets or creates index for a name in mcos_names"""
+        try:
+            return self.mcos_names.index(name) + 1  # 1-based
+        except ValueError:
+            # Name doesn't exist, add it
+            self.mcos_names.append(name)
+            self.num_names += 1
+            return self.num_names
+
+    def set_mcos_object_metadata(self, obj, class_id, saveobj_ret_type=False):
+        """Sets the metadata for a MATLAB MCOS object"""
+
+        object_cache = get_object_cache()
+
+        obj_key = id(obj)
+        cache_id = object_cache.get(obj_key, 0)
+        if cache_id == 0:
+            cache_id = len(object_cache) + 1
+            object_cache[obj_key] = cache_id
+            new_entry = True
+        else:
+            new_entry = False
+
+        if not new_entry:
+            return cache_id
+
+        prop_map = obj.properties
+        self.object_id_counter += 1
+
+        saveobj_object_id = 0
+        normal_object_id = 0
+
+        if saveobj_ret_type:
+            self.saveobj_object_counter += 1
+            saveobj_object_id = self.saveobj_object_counter
+        else:
+            self.normal_object_counter += 1
+            normal_object_id = self.normal_object_counter
+
+        object_id_entry = [class_id, 0, 0, saveobj_object_id, normal_object_id, 0]
+
+        object_id_metadata_pos = len(self.object_id_metadata)
+        saveobj_metadata_pos = len(self.saveobj_prop_metadata)
+        normobj_metadata_pos = len(self.obj_prop_metadata)
+
+        # Process Properties
+        prop_names = list(prop_map.keys())
+        num_props = len(prop_names)
+        prop_fields = [num_props]
+
+        for prop_name in prop_names:
+            field_name_idx = self.set_mcos_name(prop_name)
+
+            prop_value = prop_map[prop_name]
+            prop_value = find_matio_opaque(prop_value, in_subsystem=True)
+
+            cell_number_idx = len(self.prop_vals_saved)
+            self.prop_vals_saved.append(prop_value)
+            prop_fields.extend([field_name_idx, 1, cell_number_idx])
+            # TODO:Add support for different property types
+
+        if (num_props * 3 + 1) % 2 != 0:
+            prop_fields.append(0)  # Padding
+
+        cur_object_id = self.object_id_counter
+        ndeps = cur_object_id - cache_id
+        object_id_entry[5] = cache_id + ndeps  # FIXME: Needs verification
+
+        if saveobj_ret_type:
+            self.saveobj_prop_metadata[saveobj_metadata_pos:saveobj_metadata_pos] = (
+                prop_fields
+            )
+        else:
+            self.obj_prop_metadata[normobj_metadata_pos:normobj_metadata_pos] = (
+                prop_fields
+            )
+
+        self.object_id_metadata[object_id_metadata_pos:object_id_metadata_pos] = (
+            object_id_entry
+        )
+
+        # TODO: Add dynamicprop support
+        dynprop_entry = [0, 0]
+        self.dynprop_metadata = np.append(
+            self.dynprop_metadata, np.array(dynprop_entry, dtype=np.uint32)
+        )
+
+        return cache_id
+
+    def write_fwrap_metadata(self):
+        """Create FileWrapper Metadata Array"""
+
+        regions = []
+        regions.append(np.array([self.version], dtype=np.uint32).view(np.uint8))
+        regions.append(np.array([self.num_names], dtype=np.uint32).view(np.uint8))
+
+        # Region offsets (uint32 array)
+        region_offsets = np.zeros(8, dtype=np.uint32)
+        regions.append(region_offsets.view(np.uint8))
+
+        # Names string (null-terminated)
+        names_bytes = (
+            b"\x00".join(name.encode("ascii") for name in self.mcos_names) + b"\x00"
+        )
+        pad_len = (8 - len(names_bytes) % 8) % 8
+        names_bytes += b"\x00" * pad_len
+        names_uint8 = np.frombuffer(names_bytes, dtype=np.uint8)
+        regions.append(names_uint8)
+        region_offsets[0] = 40 + names_uint8.size
+
+        # Region 1
+        region1 = np.array(self.class_id_metadata, dtype=np.uint32).view(np.uint8)
+        regions.append(region1)
+        region_offsets[1] = region_offsets[0] + region1.size
+
+        # Region 2
+        region2 = (
+            np.array(self.saveobj_prop_metadata, dtype=np.uint32).view(np.uint8)
+            if len(self.saveobj_prop_metadata) > 2
+            else np.empty(0, dtype=np.uint8)
+        )
+        regions.append(region2)
+        region_offsets[2] = region_offsets[1] + region2.size
+
+        # Region 3
+        region3 = np.array(self.object_id_metadata, dtype=np.uint32).view(np.uint8)
+        regions.append(region3)
+        region_offsets[3] = region_offsets[2] + region3.size
+
+        # Region 4
+        region4 = (
+            np.array(self.obj_prop_metadata, dtype=np.uint32).view(np.uint8)
+            if len(self.obj_prop_metadata) > 0
+            else np.empty(0, dtype=np.uint8)
+        )
+        regions.append(region4)
+        region_offsets[4] = region_offsets[3] + region4.size
+
+        # Region 5
+        region5 = np.array(self.dynprop_metadata, dtype=np.uint32).view(np.uint8)
+        regions.append(region5)
+        region_offsets[5] = region_offsets[4] + region5.size
+
+        # Region 6
+        region6 = np.empty(0, dtype=np.uint8)
+        regions.append(region6)
+        region_offsets[6] = region_offsets[5] + region6.size
+
+        # Region 7
+        region7 = np.zeros(1, np.uint64).view(np.uint8)
+        regions.append(region7)
+        region_offsets[7] = region_offsets[6] + region7.size
+
+        fwrap_metadata = np.concatenate(regions)
+        return fwrap_metadata.reshape(-1, 1)
+
+    def write_subsys_data(self):
+        """Create FileWrapper Cell Array"""
+
+        if self.class_id_counter == 0:
+            return None
+
+        array_len = 5 + len(self.prop_vals_saved)
+        fwrap_data = np.empty((array_len, 1), dtype=object)
+
+        fwrap_data[0, 0] = self.write_fwrap_metadata()
+        fwrap_data[1, 0] = np.empty((0, 0), dtype=object)  # Empty Placeholder
+
+        for i, prop_val in enumerate(self.prop_vals_saved):
+            fwrap_data[2 + i, 0] = prop_val
+
+        # Write Unknowns
+        u3_arr = np.empty((self.class_id_counter + 1, 1), dtype=object)
+        for i in range(self.class_id_counter + 1):
+            u3_arr[i, 0] = np.empty((1, 0), dtype=object)  # FIXME: Needs verification
+
+        # Write U3 Array
+        fwrap_data[-3, 0] = u3_arr
+        fwrap_data[-1, 0] = u3_arr
+
+        fwrap_data[-2, 0] = np.zeros(
+            shape=(self.class_id_counter + 1, 1), dtype=np.int32
+        )
+        return fwrap_data
 
 
 def load_mcos_enumeration(metadata, type_system):
@@ -395,7 +631,9 @@ def load_mcos_enumeration(metadata, type_system):
     metadata[0, 0]["ValueIndices"] = value_idx
     metadata[0, 0]["Values"] = np.array(enum_vals).reshape(value_idx.shape, order="F")
 
-    return MatioOpaque(classname, type_system, metadata)
+    return MatioOpaque(
+        properties=metadata, classname=classname, type_system=type_system
+    )
 
 
 def load_mcos_object(metadata, type_system):
@@ -422,22 +660,20 @@ def load_mcos_object(metadata, type_system):
             obj_arr[i] = object_cache[object_id]
         elif object_id == 0:
             # Empty object, return empty MatioOpaque
-            obj = MatioOpaque(classname, type_system)
+            obj = MatioOpaque(classname=classname, type_system=type_system)
             obj.properties = {}
             obj_arr[i] = obj
         else:
-            obj = MatioOpaque(classname, type_system)
+            obj = MatioOpaque(classname=classname, type_system=type_system)
             object_cache[object_id] = obj
             obj.properties = file_wrapper.get_properties(object_id)
 
             if not file_wrapper.raw_data:
-                convert_func = CLASS_TO_FUNCTION.get(classname)
-                if convert_func is not None:
-                    obj = convert_func(
-                        obj.properties,
-                        byte_order=file_wrapper.byte_order,
-                        add_table_attrs=file_wrapper.add_table_attrs,
-                    )
+                obj = convert_mat_to_py(
+                    obj,
+                    byte_order=file_wrapper.byte_order,
+                    add_table_attrs=file_wrapper.add_table_attrs,
+                )
 
             obj_arr[i, 0] = obj
 
@@ -450,9 +686,178 @@ def load_opaque_object(metadata, classname, type_system):
     """Loads opaque object"""
 
     if type_system != "MCOS":
-        # Return raw metadata for this case
-        obj = MatioOpaque(classname, type_system)
-        obj.properties = metadata
+        warnings.warn(
+            f"Loading opaque objects of type {type_system} is not supported. Returning metadata"
+        )
+        obj = MatioOpaque(metadata, classname, type_system)
         return obj
 
     return load_mcos_object(metadata, type_system)
+
+
+def create_mcos_metadata(dims, arr_ids, class_id):
+    """Creates MCOS metadata array"""
+
+    ndims = len(dims)
+    values = [0xDD000000, ndims] + list(dims) + list(arr_ids) + [class_id]
+    return np.array(values, dtype=np.uint32).reshape(-1, 1)
+
+
+def set_object_metadata(obj, saveobj_ret_type=False):
+    """Sets metadata for a MatioOpaque object"""
+
+    if isinstance(obj, np.ndarray):
+        obj0 = obj.flat[0]
+        type_system = obj0.type_system
+        classname = obj0.classname
+    else:
+        type_system = obj.type_system
+        classname = obj.classname
+
+    if type_system != "MCOS":
+        warnings.warn(
+            "Only MCOS objects are supported currently. This item will be skipped"
+        )
+        return np.empty((), dtype=np.uint32)
+
+    file_wrapper = get_file_wrapper()
+
+    arr_ids = []
+    class_id = file_wrapper.get_class_id(classname)
+
+    if isinstance(obj, np.ndarray):
+        for idx in np.ndindex(obj.shape):
+            object_id = file_wrapper.set_mcos_object_metadata(obj[idx], class_id)
+            arr_ids.append(object_id)
+        dims = obj.shape
+    else:
+        if not isinstance(obj.properties, dict) or obj.classname == "dictionary":
+            warnings.warn(
+                f"Conversion of {type(obj.properties).__name__} into MATLAB type \
+                    {obj.classname} is not yet implemented. This will be skipped"
+            )
+            return np.empty((0, 0), dtype=object)
+
+        if classname in ("string", "timetable"):
+            saveobj_ret_type = True
+
+        object_id = file_wrapper.set_mcos_object_metadata(
+            obj, class_id, saveobj_ret_type
+        )
+        arr_ids.append(object_id)
+        dims = (1, 1)
+
+    return create_mcos_metadata(dims, arr_ids, class_id)
+
+
+def wrap_matlab_opaque(obj):
+    """Wrap data in scipy's Matlab Opaque for writing to MAT-files"""
+
+    if isinstance(obj, np.ndarray):
+        obj0 = obj.flat[0]
+        classname = obj0.classname
+        type_system = obj0.type_system
+    else:
+        classname = obj.classname
+        type_system = obj.type_system
+
+    data_new = np.empty((1,), dtype=OPAQUE_DTYPE)
+    data_new0 = data_new[0]
+    data_new0["_Class"] = classname
+    data_new0["_TypeSystem"] = type_system
+    data_new0["_ObjectMetadata"] = set_object_metadata(obj)
+
+    data_new = MatlabOpaque(data_new)
+
+    return data_new
+
+
+def find_matio_opaque(data, in_subsystem=False):
+    """Finds MatioOpaque object in the data"""
+    # FIXME: At some point it would be a good idea to merge all of these iterative search methods
+
+    data_new = data
+    if isinstance(data, MatioOpaque):
+        if data.classname is None:
+            data.classname = guess_class_name(data.properties)
+            data.type_system = "MCOS"
+        if in_subsystem:
+            data_new = set_object_metadata(data)
+        else:
+            data_new = wrap_matlab_opaque(data)
+
+    elif isinstance(data, np.ndarray):
+        if data.dtype == object:
+            if all(isinstance(item, MatioOpaque) for item in data.flat):
+                if in_subsystem:
+                    data_new = set_object_metadata(data)
+                else:
+                    data_new = wrap_matlab_opaque(data)
+            else:
+                # Iterate through cell arrays
+                for idx in np.ndindex(data.shape):
+                    data[idx] = find_matio_opaque(data[idx], in_subsystem)
+
+        elif data.dtype.names:
+            # Iterate though struct array
+            for idx in np.ndindex(data.shape):
+                for name in data.dtype.names:
+                    data[idx][name] = find_matio_opaque(data[idx][name], in_subsystem)
+
+    else:
+        classname = guess_class_name(data)
+        tmp_obj = MatioOpaque(properties=data, classname=classname, type_system="MCOS")
+        if in_subsystem:
+            data_new = set_object_metadata(tmp_obj)
+        else:
+            data_new = wrap_matlab_opaque(tmp_obj)
+
+    return data_new
+
+
+def create_subsystem_metadata(fwrap_data, java_data=None, handle_data=None):
+    """Creates subsystem struct array"""
+
+    if fwrap_data is None and java_data is None and handle_data is None:
+        return None
+
+    field_names = []
+    field_data = []
+
+    if fwrap_data is not None:
+        field_names.append("MCOS")
+        data_new = np.empty((1,), dtype=OPAQUE_DTYPE)
+        data_new0 = data_new[0]
+        data_new0["_Class"] = "FileWrapper__"
+        data_new0["_TypeSystem"] = "MCOS"
+        data_new0["_ObjectMetadata"] = fwrap_data
+        data_new = MatlabOpaque(data_new)
+        field_data.append(data_new)
+
+    dtype = [(name, object) for name in field_names]
+    subsys_metadata = np.empty((1, 1), dtype=dtype)
+
+    for field_name, data in zip(field_names, field_data):
+        subsys_metadata[0, 0][field_name] = data
+
+    return subsys_metadata
+
+
+def parse_input_dict(mdict):
+    """Parses opaque class metadata"""
+
+    file_wrapper = get_file_wrapper()
+
+    for var, data in mdict.items():
+        if var[0] == "_":
+            continue
+        try:
+            mdict[var] = find_matio_opaque(data)
+        except ValueError as e:
+            raise ValueError(f"Error processing variable '{var}': {str(e)}") from e
+
+    fwrap_data = file_wrapper.write_subsys_data()
+    subsys_data = create_subsystem_metadata(fwrap_data)
+    mdict["__subsystem__"] = subsys_data
+
+    return mdict
