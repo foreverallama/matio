@@ -3,6 +3,7 @@
 from enum import Enum
 
 import numpy as np
+from pandas import Categorical, DataFrame
 
 from matio.utils import (
     mat_to_calendarduration,
@@ -32,7 +33,11 @@ CLASS_TO_FUNCTION = {
 class MatioOpaque:
     """Represents a MATLAB opaque object"""
 
-    def __init__(self, classname, type_system, properties=None):
+    def __init__(self, properties=None, classname=None, type_system="MCOS"):
+
+        if classname is None:
+            classname = guess_class_name(properties)
+
         self.classname = classname
         self.type_system = type_system
         self.properties = properties
@@ -46,6 +51,18 @@ class MatioOpaque:
         return self.properties == other
 
 
+def convert_mat_to_py(obj, **kwargs):
+    """Converts a MATLAB object to a Python object"""
+    convert_func = CLASS_TO_FUNCTION.get(obj.classname)
+    if convert_func is not None:
+        return convert_func(
+            obj.properties,
+            byte_order=kwargs.get("byte_order", None),
+            add_table_attrs=kwargs.get("add_table_attrs", None),
+        )
+    return obj
+
+
 def mat_to_enum(values, value_names, class_name, shapes):
     """Converts MATLAB enum to Python enum"""
 
@@ -56,3 +73,44 @@ def mat_to_enum(values, value_names, class_name, shapes):
 
     enum_members = [enum_class(val.properties) for val in values]
     return np.array(enum_members, dtype=object).reshape(shapes, order="F")
+
+
+def guess_class_name(properties):
+    """Guess the class name based on properties"""
+
+    classname = None
+
+    if properties is None:
+        pass
+    elif isinstance(properties, DataFrame):
+        if isinstance(properties.index.values, np.ndarray) and (
+            np.issubdtype(properties.index.values.dtype, np.datetime64)
+            or np.issubdtype(properties.index.values.dtype, np.timedelta64)
+        ):
+            classname = "timetable"
+        else:
+            classname = "table"
+    elif isinstance(properties, Categorical):
+        classname = "categorical"
+    elif isinstance(properties, dict):
+        classname = "containers.Map"
+    elif isinstance(properties, list):
+        if all(isinstance(item, tuple) and len(item) == 2 for item in properties):
+            classname = "dictionary"
+    elif isinstance(properties, np.ndarray):
+        if properties.dtype.names is not None:
+            classname = "calendarDuration"
+        elif np.issubdtype(properties.dtype, np.datetime64):
+            classname = "datetime"
+        elif np.issubdtype(properties.dtype, np.timedelta64):
+            classname = "duration"
+        elif properties.dtype.kind in ("U", "S"):
+            classname = "string"
+
+    if classname is None:
+        raise ValueError(
+            f"Unable to determine MATLAB class equivalent for properties of \
+                type {type(properties).__name__}. Provide it explicitly."
+        )
+
+    return classname
