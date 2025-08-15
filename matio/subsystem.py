@@ -468,9 +468,6 @@ class FileWrapper:
         if (num_props * 3 + 1) % 2 != 0:
             prop_fields.append(0)  # Padding
 
-        cur_object_id = self.object_id_counter
-        ndeps = cur_object_id - cache_id
-
         if saveobj_ret_type:
             self.saveobj_prop_metadata[saveobj_metadata_pos:saveobj_metadata_pos] = (
                 prop_fields
