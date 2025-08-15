@@ -470,7 +470,6 @@ class FileWrapper:
 
         cur_object_id = self.object_id_counter
         ndeps = cur_object_id - cache_id
-        object_id_entry[5] = cache_id + ndeps  # FIXME: Needs verification
 
         if saveobj_ret_type:
             self.saveobj_prop_metadata[saveobj_metadata_pos:saveobj_metadata_pos] = (
