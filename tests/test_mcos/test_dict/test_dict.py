@@ -7,34 +7,33 @@ from matio import load_from_mat
 
 params = [
     (
-        [
-            (np.float64(1), np.str_("apple")),
-            (np.float64(2), np.str_("banana")),
-            (np.float64(3), np.str_("cherry")),
-        ],
+        (
+            np.array([[1.0, 2.0, 3.0]]).reshape(-1, 1),
+            np.array(["apple", "banana", "cherry"]).reshape(-1, 1),
+        ),
         "dict1",
     ),
     (
-        [
-            (np.str_("x"), np.float64(10)),
-            (np.str_("y"), np.float64(20)),
-            (np.str_("z"), np.float64(30)),
-        ],
+        (
+            np.array(["x", "y", "z"]).reshape(-1, 1),
+            np.array([10.0, 20.0, 30.0]).reshape(-1, 1),
+        ),
         "dict2",
     ),
     (
-        [
-            (np.str_("name"), np.array([["Alice"]])),
-            (np.str_("age"), np.array([[25]])),
-        ],
+        (
+            np.array([["name", "age"]]).reshape(-1, 1),
+            np.array([np.array(["Alice"]), np.array([25.0])], dtype=object).reshape(
+                -1, 1
+            ),
+        ),
         "dict3",
     ),
     (
-        [
-            (np.array([[1]]), np.str_("one")),
-            (np.array([[2]]), np.str_("two")),
-            (np.array([[3]]), np.str_("three")),
-        ],
+        (
+            np.array([[1, 2, 3]]).reshape(-1, 1),
+            np.array(["one", "two", "three"]).reshape(-1, 1),
+        ),
         "dict4",
     ),
 ]
@@ -55,11 +54,8 @@ def test_dict_load_v7(expected_array, var_name):
     matdict = load_from_mat(file_path_v7, raw_data=False)
 
     assert var_name in matdict
-    for i, (expected_key, expected_val) in enumerate(expected_array):
-        actual_key = matdict[var_name][i][0]
-        actual_val = matdict[var_name][i][1]
-        assert np.array_equal(actual_key, expected_key)
-        assert np.array_equal(actual_val, expected_val)
+    assert np.array_equal(matdict[var_name][0], expected_array[0])
+    assert np.array_equal(matdict[var_name][1], expected_array[1])
 
 
 @pytest.mark.parametrize(
@@ -77,8 +73,5 @@ def test_containermap_load_v73(expected_array, var_name):
     matdict = load_from_mat(file_path_v73, raw_data=False)
 
     assert var_name in matdict
-    for i, (expected_key, expected_val) in enumerate(expected_array):
-        actual_key = matdict[var_name][i][0]
-        actual_val = matdict[var_name][i][1]
-        assert np.array_equal(actual_key, expected_key)
-        assert np.array_equal(actual_val, expected_val)
+    assert np.array_equal(matdict[var_name][0], expected_array[0])
+    assert np.array_equal(matdict[var_name][1], expected_array[1])
