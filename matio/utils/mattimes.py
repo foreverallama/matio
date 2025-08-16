@@ -82,22 +82,98 @@ def mat_to_calendarduration(props, **_kwargs):
     if comps is None:
         return props
 
-    months = comps[0, 0]["months"].astype("timedelta64[M]")
-    days = comps[0, 0]["days"].astype("timedelta64[D]")
-    millis = comps[0, 0]["millis"].astype("timedelta64[ms]")
+    comps[0, 0]["months"] = comps[0, 0]["months"].astype("timedelta64[M]")
+    comps[0, 0]["days"] = comps[0, 0]["days"].astype("timedelta64[D]")
+    comps[0, 0]["millis"] = comps[0, 0]["millis"].astype("timedelta64[ms]")
 
-    # Broadcast all components to the same shape
-    # MATLAB optimizes by only broadcasting particular components
-    months_bc, days_bc, millis_bc = np.broadcast_arrays(months, days, millis)
+    return comps
 
-    dtype = [
-        ("months", "timedelta64[M]"),
-        ("days", "timedelta64[D]"),
-        ("millis", "timedelta64[ms]"),
-    ]
-    result = np.empty(months_bc.shape, dtype=dtype)
-    result["months"] = months_bc.astype("timedelta64[M]")
-    result["days"] = days_bc.astype("timedelta64[D]")
-    result["millis"] = millis_bc.astype("timedelta64[ms]")
 
-    return result
+def datetime_to_mat(arr, oned_as="row"):
+    """Convert numpy.datetime64 array to MATLAB datetime format."""
+    if not isinstance(arr, np.ndarray):
+        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
+    if not np.issubdtype(arr.dtype, np.datetime64):
+        raise TypeError(f"Expected numpy.datetime64 array, got {arr.dtype}")
+
+    if arr.ndim == 1:
+        if oned_as == "row":
+            arr = arr.reshape(1, -1)
+        elif oned_as == "col":
+            arr = arr.reshape(-1, 1)
+
+    millis = arr.astype("datetime64[ms]").astype(np.float64)
+
+    if "us" not in str(arr.dtype) and "ns" not in str(arr.dtype):
+        data = arr.astype("datetime64[ms]").astype(np.float64)
+    else:
+        # For sub-ms precision
+        millis = arr.astype("datetime64[ms]").astype(np.float64)
+        us = arr.astype("datetime64[us]").astype(np.float64)
+        frac_ms = (us % 1000) / 1000.0
+        data = millis + 1j * frac_ms
+
+    tz = np.empty((0, 0), dtype=np.str_)
+    fmt = np.empty((0, 0), dtype=np.str_)
+    prop_map = {"data": data, "tz": tz, "fmt": fmt}
+
+    return prop_map
+
+
+def duration_to_mat(arr, oned_as="row"):
+    """Convert numpy timedelta64 array to MATLAB duration format."""
+    if not isinstance(arr, np.ndarray):
+        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
+    if not np.issubdtype(arr.dtype, np.timedelta64):
+        raise TypeError(f"Expected numpy.timedelta64 array, got {arr.dtype}")
+
+    if arr.ndim == 1:
+        if oned_as == "row":
+            arr = arr.reshape(1, -1)
+        elif oned_as == "col":
+            arr = arr.reshape(-1, 1)
+
+    unit, _ = np.datetime_data(arr.dtype)
+    allowed_units = ("s", "m", "h", "D", "Y")
+    if unit not in allowed_units:
+        raise ValueError(
+            f"Unsupported timedelta unit '{unit}'. Only {allowed_units} are supported in MATLAB."
+        )
+    millis = arr.astype("timedelta64[ms]").astype(np.float64)
+
+    prop_map = {
+        "millis": millis,
+        "fmt": unit,
+    }
+
+    return prop_map
+
+
+def calendarduration_to_mat(arr, **_kwargs):
+    """Convert numpy structured array with fields ['months', 'days', 'millis'] to MATLAB calendarDuration format."""
+    if not isinstance(arr, np.ndarray):
+        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
+    if arr.dtype.names is None or set(arr.dtype.names) != {"months", "days", "millis"}:
+        raise TypeError(
+            "Expected structured array with fields ['months', 'days', 'millis']"
+        )
+    if arr.size > 0 and arr.ndim == 1:
+        arr = arr.reshape(1, -1)  # Ensure 2D Shape
+
+    if arr.size > 0:
+        arr[0, 0]["months"] = (
+            arr[0, 0]["months"].astype("timedelta64[M]").astype("float64")
+        )
+        arr[0, 0]["days"] = arr[0, 0]["days"].astype("timedelta64[D]").astype("float64")
+        arr[0, 0]["millis"] = (
+            arr[0, 0]["millis"].astype("timedelta64[ms]").astype("float64")
+        )
+
+    fmt = "ymdt"
+
+    prop_map = {
+        "components": arr,
+        "fmt": fmt,
+    }
+
+    return prop_map

@@ -9,6 +9,7 @@ from scipy.io.matlab._mio5_params import OPAQUE_DTYPE, MatlabOpaque
 from matio.mat_opaque_tools import (
     MatioOpaque,
     convert_mat_to_py,
+    convert_py_to_mat,
     guess_class_name,
     mat_to_enum,
 )
@@ -17,7 +18,7 @@ FILEWRAPPER_INSTANCE = None
 OBJECT_CACHE = {}
 
 FILEWRAPPER_VERSION = 4
-SYSTEM_BYTE_ORDER = "<" if np.little_endian else ">"
+SYSTEM_BYTE_ORDER = "<u4" if np.little_endian else ">u4"
 
 
 @contextmanager
@@ -35,16 +36,14 @@ def get_matio_context():
         OBJECT_CACHE.clear()
 
 
-def set_file_wrapper(
-    byte_order=SYSTEM_BYTE_ORDER, raw_data=False, add_table_attrs=False
-):
+def set_file_wrapper():
     """Set global FileWrapper instance"""
     global FILEWRAPPER_INSTANCE
     if FILEWRAPPER_INSTANCE is not None:
         raise RuntimeError(
             "Subsystem data was not cleaned up. Use get_matio_context() to reset"
         )
-    FILEWRAPPER_INSTANCE = FileWrapper(byte_order, raw_data, add_table_attrs)
+    FILEWRAPPER_INSTANCE = FileWrapper()
     return FILEWRAPPER_INSTANCE
 
 
@@ -128,11 +127,11 @@ def check_prop_for_opaque(prop):
 class FileWrapper:
     """Representation class for MATLAB FileWrapper__ data"""
 
-    def __init__(self, byte_order, raw_data, add_table_attrs):
-        self.byte_order = "<u4" if byte_order == "<" else ">u4"
-
-        self.raw_data = raw_data
-        self.add_table_attrs = add_table_attrs
+    def __init__(self):
+        self.byte_order = SYSTEM_BYTE_ORDER
+        self.raw_data = False
+        self.add_table_attrs = False
+        self.oned_as = "row"
 
         self.version = FILEWRAPPER_VERSION
         self.num_names = 0
@@ -156,8 +155,18 @@ class FileWrapper:
         self.class_id_counter = 0
         self.object_id_counter = 0
 
-    def init_load(self, fwrap_data):
+    def init_load(
+        self,
+        fwrap_data,
+        byte_order=SYSTEM_BYTE_ORDER,
+        raw_data=False,
+        add_table_attrs=False,
+    ):
         """Initializes the FileWrapper instance with metadata from MATLAB FileWrapper__"""
+        self.byte_order = "<u4" if byte_order[0] == "<" else ">u4"
+        self.raw_data = raw_data
+        self.add_table_attrs = add_table_attrs
+
         fwrap_metadata = fwrap_data[0, 0]
 
         fromfile_version = np.frombuffer(
@@ -236,9 +245,10 @@ class FileWrapper:
         self._c2 = fwrap_data[-2, 0]  # Unknown
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
-    def init_save(self):
+    def init_save(self, oned_as="row"):
         """Initializes save with metadata for object ID = 0"""
 
+        self.oned_as = oned_as
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
         self.saveobj_prop_metadata.extend([0, 0])
@@ -574,7 +584,7 @@ class FileWrapper:
         # Write Unknowns
         u3_arr = np.empty((self.class_id_counter + 1, 1), dtype=object)
         for i in range(self.class_id_counter + 1):
-            u3_arr[i, 0] = np.empty((1, 0), dtype=object)  # FIXME: Needs verification
+            u3_arr[i, 0] = np.empty((1, 0), dtype=object)
 
         # Write U3 Array
         fwrap_data[-3, 0] = u3_arr
@@ -727,12 +737,10 @@ def set_object_metadata(obj, saveobj_ret_type=False):
             arr_ids.append(object_id)
         dims = obj.shape
     else:
-        if not isinstance(obj.properties, dict) or obj.classname == "dictionary":
-            warnings.warn(
-                f"Conversion of {type(obj.properties).__name__} into MATLAB type \
-                    {obj.classname} is not yet implemented. This will be skipped"
+        if not isinstance(obj.properties, dict) or obj.classname == "containers.Map":
+            obj.properties = convert_py_to_mat(
+                obj.properties, obj.classname, file_wrapper.oned_as
             )
-            return np.empty((0, 0), dtype=object)
 
         if classname in ("string", "timetable"):
             saveobj_ret_type = True
@@ -783,7 +791,7 @@ def find_matio_opaque(data, in_subsystem=False):
             data_new = wrap_matlab_opaque(data)
 
     elif isinstance(data, np.ndarray):
-        if data.dtype == object:
+        if data.dtype == object and data.size >= 1:
             if all(isinstance(item, MatioOpaque) for item in data.flat):
                 if in_subsystem:
                     data_new = set_object_metadata(data)
@@ -794,11 +802,17 @@ def find_matio_opaque(data, in_subsystem=False):
                 for idx in np.ndindex(data.shape):
                     data[idx] = find_matio_opaque(data[idx], in_subsystem)
 
-        elif data.dtype.names:
+        elif data.dtype.names and data.size >= 1:
             # Iterate though struct array
             for idx in np.ndindex(data.shape):
                 for name in data.dtype.names:
                     data[idx][name] = find_matio_opaque(data[idx][name], in_subsystem)
+
+    elif isinstance(data, np.generic):
+        return data
+
+    elif isinstance(data, str):
+        return data
 
     else:
         classname = guess_class_name(data)
