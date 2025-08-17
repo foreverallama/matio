@@ -250,7 +250,7 @@ class FileWrapper:
         """Initializes save with metadata for object ID = 0"""
 
         self.oned_as = oned_as
-        self.use_strings = True
+        self.use_strings = use_strings
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
         self.saveobj_prop_metadata.extend([0, 0])

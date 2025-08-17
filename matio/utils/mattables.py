@@ -208,6 +208,7 @@ def mat_to_categorical(props, **_kwargs):
 
 
 def make_table_props():
+    """Creates default properties for a MATLAB table"""
     dtype = [
         ("useVariableNamesOriginal", object),
         ("useDimensionNamesOriginal", object),
@@ -251,7 +252,7 @@ def make_table_props():
     return props
 
 
-def table_to_mat(df, use_strings=True, **_kwargs):
+def table_to_mat(df, **_kwargs):
     """Converts a pandas DataFrame to a MATLAB table"""
 
     if not isinstance(df, pd.DataFrame):
@@ -286,6 +287,7 @@ def table_to_mat(df, use_strings=True, **_kwargs):
 
 
 def make_timetable_props():
+    """Creates default properties for a MATLAB timetable"""
 
     arrayprops_dtype = [
         ("Description", object),
@@ -316,7 +318,7 @@ def make_timetable_props():
     }
 
 
-def timetable_to_mat(df, rowtimes=None, use_strings=True, **_kwargs):
+def timetable_to_mat(df, **_kwargs):
     """Converts a pandas DataFrame to a MATLAB timetable"""
 
     if not isinstance(df, pd.DataFrame):
@@ -334,15 +336,10 @@ def timetable_to_mat(df, rowtimes=None, use_strings=True, **_kwargs):
         [np.array(["Time"]), np.array(["Variables"])], dtype=object
     ).reshape((1, 2))
 
-    if rowtimes is None:
-        if isinstance(df.index, pd.DatetimeIndex):
-            rowtimes = df.index.to_numpy()
-        else:
-            raise ValueError(
-                "Timetable requires datetime row index or explicit rowtimes"
-            )
+    if isinstance(df.index, pd.DatetimeIndex):
+        rowtimes = df.index.to_numpy()
     else:
-        rowtimes = np.asarray(rowtimes)
+        raise ValueError("Timetable requires datetime row index or explicit rowtimes")
 
     # Define timetable struct dtype
     timetable_dtype = [
@@ -355,7 +352,7 @@ def timetable_to_mat(df, rowtimes=None, use_strings=True, **_kwargs):
     ]
 
     extras = make_timetable_props()
-    timetable_dtype.extend((key, object) for key in extras.keys())
+    timetable_dtype.extend((key, object) for key in extras)
 
     # Create 1x1 structured array
     timetable = np.empty((1, 1), dtype=timetable_dtype)
@@ -366,7 +363,7 @@ def timetable_to_mat(df, rowtimes=None, use_strings=True, **_kwargs):
     timetable[0, 0]["numVars"] = nvars
     timetable[0, 0]["rowTimes"] = rowtimes.reshape((-1, 1))
 
-    for key in extras:
-        timetable[0, 0][key] = extras[key]
+    for key, value in extras.items():
+        timetable[0, 0][key] = value
 
     return {"any": timetable}
