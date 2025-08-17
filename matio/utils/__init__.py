@@ -7,7 +7,13 @@ from .matmap import (
     mat_to_dictionary,
 )
 from .matstring import mat_to_string, string_to_mat
-from .mattables import mat_to_categorical, mat_to_table, mat_to_timetable
+from .mattables import (
+    mat_to_categorical,
+    mat_to_table,
+    mat_to_timetable,
+    table_to_mat,
+    timetable_to_mat,
+)
 from .mattimes import (
     calendarduration_to_mat,
     datetime_to_mat,
@@ -33,4 +39,6 @@ __all__ = [
     "calendarduration_to_mat",
     "dictionary_to_mat",
     "containermap_to_mat",
+    "table_to_mat",
+    "timetable_to_mat",
 ]

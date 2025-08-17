@@ -89,7 +89,7 @@ def mat_to_calendarduration(props, **_kwargs):
     return comps
 
 
-def datetime_to_mat(arr, oned_as="row"):
+def datetime_to_mat(arr, oned_as="row", **_kwargs):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
     if not isinstance(arr, np.ndarray):
         raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
@@ -120,7 +120,7 @@ def datetime_to_mat(arr, oned_as="row"):
     return prop_map
 
 
-def duration_to_mat(arr, oned_as="row"):
+def duration_to_mat(arr, oned_as="row", **_kwargs):
     """Convert numpy timedelta64 array to MATLAB duration format."""
     if not isinstance(arr, np.ndarray):
         raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")

@@ -151,13 +151,18 @@ def read_matfile5(
 
 
 def save_matfile5(
-    file_stream, mdict, do_compression=False, global_vars=None, oned_as="row"
+    file_stream,
+    mdict,
+    do_compression=False,
+    global_vars=None,
+    oned_as="row",
+    use_strings=True,
 ):
     """Saves variables to MAT-file 5 format (< 7.3)"""
 
     with get_matio_context():
         file_wrapper = set_file_wrapper()
-        file_wrapper.init_save(oned_as)
+        file_wrapper.init_save(oned_as, use_strings)
 
         mdict = parse_input_dict(mdict)
     subsys_data = mdict.pop("__subsystem__", None)

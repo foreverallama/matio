@@ -5,8 +5,13 @@ import warnings
 import numpy as np
 import pandas as pd
 
+# from matio.mat_opaque_tools import MatioOpaque
+
 TABLE_VERSION = 4
+MIN_TABLE_VERSION = 1
+
 TIMETABLE_VERSION = 6
+MIN_TIMETABLE_VERSION = 2
 
 
 def add_table_props(df, tab_props):
@@ -200,3 +205,168 @@ def mat_to_categorical(props, **_kwargs):
     codes = props.get("codes").astype(int) - 1
     ordered = bool(props.get("isOrdinal").item())
     return pd.Categorical.from_codes(codes, categories=category_names, ordered=ordered)
+
+
+def make_table_props():
+    dtype = [
+        ("useVariableNamesOriginal", object),
+        ("useDimensionNamesOriginal", object),
+        ("CustomProps", object),
+        ("VariableCustomProps", object),
+        ("versionSavedFrom", object),
+        ("minCompatibleVersion", object),
+        ("incompatibilityMsg", object),
+        ("VersionSavedFrom", object),
+        ("Description", object),
+        ("VariableNamesOriginal", object),
+        ("DimensionNamesOriginal", object),
+        ("DimensionNames", object),
+        ("UserData", object),
+        ("VariableDescriptions", object),
+        ("VariableUnits", object),
+        ("VariableContinuity", object),
+    ]
+
+    props = np.empty((1, 1), dtype=dtype)
+
+    props["useVariableNamesOriginal"][0, 0] = np.bool_(False)
+    props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
+    props["CustomProps"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableCustomProps"][0, 0] = np.empty((0, 0), dtype=object)
+    props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
+    props["incompatibilityMsg"][0, 0] = ""
+    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["Description"][0, 0] = ""
+    props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
+    props["DimensionNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
+    props["DimensionNames"][0, 0] = np.array(
+        [np.array(["Row"]), np.array(["Variables"])], dtype=object
+    ).reshape((1, 2))
+    props["UserData"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableDescriptions"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableUnits"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableContinuity"][0, 0] = np.empty((0, 0), dtype=object)
+
+    return props
+
+
+def table_to_mat(df, use_strings=True, **_kwargs):
+    """Converts a pandas DataFrame to a MATLAB table"""
+
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+
+    data = np.empty((1, len(df.columns)), dtype=object)
+    for i, col in enumerate(df.columns):
+        data[0, i] = df[col].to_numpy().reshape(-1, 1)
+
+    nrows = np.float64(df.shape[0])
+    nvars = np.float64(df.shape[1])
+
+    varnames = np.array([str(col) for col in df.columns], dtype=object)
+
+    if df.index.name is not None or not isinstance(df.index, pd.RangeIndex):
+        rownames = np.array([str(idx) for idx in df.index], dtype=object)
+    else:
+        rownames = np.array([], dtype=object)
+
+    extras = make_table_props()
+    prop_map = {
+        "data": data,
+        "varnames": varnames,
+        "nrows": nrows,
+        "nvars": nvars,
+        "rownames": rownames,
+        "ndims": np.float64(2),
+        "props": extras,
+    }
+
+    return prop_map
+
+
+def make_timetable_props():
+
+    arrayprops_dtype = [
+        ("Description", object),
+        ("UserData", object),
+        ("TableCustomProperties", object),
+    ]
+    arrayprops = np.empty((1, 1), dtype=arrayprops_dtype)
+    arrayprops["Description"][0, 0] = ""
+    arrayprops["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
+    arrayprops["TableCustomProperties"][0, 0] = np.empty((0, 0), dtype=object)
+
+    return {
+        "CustomProps": np.empty((0, 0), dtype=object),
+        "VariableCustomProps": np.empty((0, 0), dtype=object),
+        "versionSavedFrom": np.float64(TIMETABLE_VERSION),
+        "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
+        "incompatibilityMsg": "",
+        "arrayProps": arrayprops,
+        "numDims": np.float64(2),
+        "useVarNamesOrig": np.bool_(False),
+        "useDimNamesOrig": np.bool_(False),
+        "dimNamesOrig": np.empty((0, 0), dtype=object),
+        "varNamesOrig": np.empty((0, 0), dtype=object),
+        "varDescriptions": np.empty((0, 0), dtype=object),
+        "varUnits": np.empty((0, 0), dtype=object),
+        "timeEvents": np.empty((0, 0), dtype=object),
+        "varContinuity": np.empty((0, 0), dtype=object),
+    }
+
+
+def timetable_to_mat(df, rowtimes=None, use_strings=True, **_kwargs):
+    """Converts a pandas DataFrame to a MATLAB timetable"""
+
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+
+    data = np.empty((1, len(df.columns)), dtype=object)
+    for i, col in enumerate(df.columns):
+        data[0, i] = df[col].to_numpy().reshape(-1, 1)
+
+    nrows = np.float64(df.shape[0])
+    nvars = np.float64(df.shape[1])
+
+    varnames = np.array([str(col) for col in df.columns], dtype=object)
+    dimnames = np.array(
+        [np.array(["Time"]), np.array(["Variables"])], dtype=object
+    ).reshape((1, 2))
+
+    if rowtimes is None:
+        if isinstance(df.index, pd.DatetimeIndex):
+            rowtimes = df.index.to_numpy()
+        else:
+            raise ValueError(
+                "Timetable requires datetime row index or explicit rowtimes"
+            )
+    else:
+        rowtimes = np.asarray(rowtimes)
+
+    # Define timetable struct dtype
+    timetable_dtype = [
+        ("data", object),
+        ("dimNames", object),
+        ("varNames", object),
+        ("numRows", object),
+        ("numVars", object),
+        ("rowTimes", object),
+    ]
+
+    extras = make_timetable_props()
+    timetable_dtype.extend((key, object) for key in extras.keys())
+
+    # Create 1x1 structured array
+    timetable = np.empty((1, 1), dtype=timetable_dtype)
+    timetable[0, 0]["data"] = data
+    timetable[0, 0]["dimNames"] = dimnames
+    timetable[0, 0]["varNames"] = varnames.reshape((1, -1))
+    timetable[0, 0]["numRows"] = nrows
+    timetable[0, 0]["numVars"] = nvars
+    timetable[0, 0]["rowTimes"] = rowtimes.reshape((-1, 1))
+
+    for key in extras:
+        timetable[0, 0][key] = extras[key]
+
+    return {"any": timetable}

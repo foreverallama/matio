@@ -22,6 +22,8 @@ from matio.utils import (
     mat_to_table,
     mat_to_timetable,
     string_to_mat,
+    table_to_mat,
+    timetable_to_mat,
 )
 
 MAT_TO_PY = {
@@ -44,8 +46,8 @@ PY_TO_MAT = {
     "dictionary": dictionary_to_mat,
     "duration": duration_to_mat,
     "string": string_to_mat,
-    # "table": table_to_mat,
-    # "timetable": timetable_to_mat,
+    "table": table_to_mat,
+    "timetable": timetable_to_mat,
 }
 
 
@@ -82,7 +84,7 @@ def convert_mat_to_py(obj, **kwargs):
     return obj
 
 
-def convert_py_to_mat(properties, classname, oned_as):
+def convert_py_to_mat(properties, classname, oned_as, use_strings):
     """Convert a Python object to a MATLAB object"""
 
     convert_func = PY_TO_MAT.get(classname)
@@ -93,7 +95,7 @@ def convert_py_to_mat(properties, classname, oned_as):
         )
         return {}
 
-    return convert_func(properties, oned_as=oned_as)
+    return convert_func(properties, oned_as=oned_as, use_strings=use_strings)
 
 
 def mat_to_enum(values, value_names, class_name, shapes):

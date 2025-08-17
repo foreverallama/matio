@@ -132,6 +132,7 @@ class FileWrapper:
         self.raw_data = False
         self.add_table_attrs = False
         self.oned_as = "row"
+        self.use_strings = True
 
         self.version = FILEWRAPPER_VERSION
         self.num_names = 0
@@ -245,10 +246,11 @@ class FileWrapper:
         self._c2 = fwrap_data[-2, 0]  # Unknown
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
-    def init_save(self, oned_as="row"):
+    def init_save(self, oned_as="row", use_strings=True):
         """Initializes save with metadata for object ID = 0"""
 
         self.oned_as = oned_as
+        self.use_strings = True
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
         self.saveobj_prop_metadata.extend([0, 0])
@@ -429,10 +431,10 @@ class FileWrapper:
         object_cache = get_object_cache()
 
         obj_key = id(obj)
-        cache_id = object_cache.get(obj_key, 0)
+        cache_id = object_cache.get(obj_key, (0, 0))[0]
         if cache_id == 0:
             cache_id = len(object_cache) + 1
-            object_cache[obj_key] = cache_id
+            object_cache[obj_key] = (cache_id, obj)
             new_entry = True
         else:
             new_entry = False
@@ -739,7 +741,10 @@ def set_object_metadata(obj, saveobj_ret_type=False):
     else:
         if not isinstance(obj.properties, dict) or obj.classname == "containers.Map":
             obj.properties = convert_py_to_mat(
-                obj.properties, obj.classname, file_wrapper.oned_as
+                obj.properties,
+                obj.classname,
+                file_wrapper.oned_as,
+                file_wrapper.use_strings,
             )
 
         if classname in ("string", "timetable"):
@@ -777,52 +782,58 @@ def wrap_matlab_opaque(obj):
 
 
 def find_matio_opaque(data, in_subsystem=False):
-    """Finds MatioOpaque object in the data"""
-    # FIXME: At some point it would be a good idea to merge all of these iterative search methods
+    """Recursively find and wrap MatioOpaque objects in data."""
 
-    data_new = data
+    # Case 1: already a MatioOpaque
     if isinstance(data, MatioOpaque):
         if data.classname is None:
             data.classname = guess_class_name(data.properties)
             data.type_system = "MCOS"
-        if in_subsystem:
-            data_new = set_object_metadata(data)
-        else:
-            data_new = wrap_matlab_opaque(data)
+        return set_object_metadata(data) if in_subsystem else wrap_matlab_opaque(data)
 
-    elif isinstance(data, np.ndarray):
-        if data.dtype == object and data.size >= 1:
-            if all(isinstance(item, MatioOpaque) for item in data.flat):
-                if in_subsystem:
-                    data_new = set_object_metadata(data)
-                else:
-                    data_new = wrap_matlab_opaque(data)
-            else:
-                # Iterate through cell arrays
-                for idx in np.ndindex(data.shape):
-                    data[idx] = find_matio_opaque(data[idx], in_subsystem)
+    # Case 2: numpy arrays
+    if isinstance(data, np.ndarray):
+        # 2a: datetime or timedelta arrays
+        if np.issubdtype(data.dtype, np.datetime64) or np.issubdtype(
+            data.dtype, np.timedelta64
+        ):
+            classname = guess_class_name(data)
+            tmp_obj = MatioOpaque(
+                properties=data, classname=classname, type_system="MCOS"
+            )
+            return (
+                set_object_metadata(tmp_obj)
+                if in_subsystem
+                else wrap_matlab_opaque(tmp_obj)
+            )
 
-        elif data.dtype.names and data.size >= 1:
-            # Iterate though struct array
+        # 2b: object arrays (cells)
+        if data.dtype == object and data.size > 0:
+            for idx in np.ndindex(data.shape):
+                data[idx] = find_matio_opaque(data[idx], in_subsystem)
+            return data
+
+        # 2c: structured arrays (MATLAB structs)
+        if data.dtype.names and data.size > 0:
+            # Ignore calendarDuration arrays:
+            if set(data.dtype.names) == {"months", "days", "millis"}:
+                return data
             for idx in np.ndindex(data.shape):
                 for name in data.dtype.names:
                     data[idx][name] = find_matio_opaque(data[idx][name], in_subsystem)
+            return data
 
-    elif isinstance(data, np.generic):
+        # Other ndarray: return as-is
         return data
 
-    elif isinstance(data, str):
+    # Case 3: scalars and strings
+    if isinstance(data, (np.generic, str, list)):
         return data
 
-    else:
-        classname = guess_class_name(data)
-        tmp_obj = MatioOpaque(properties=data, classname=classname, type_system="MCOS")
-        if in_subsystem:
-            data_new = set_object_metadata(tmp_obj)
-        else:
-            data_new = wrap_matlab_opaque(tmp_obj)
-
-    return data_new
+    # Case 4: everything else: attempt to wrap into MatioOpaque
+    classname = guess_class_name(data)
+    tmp_obj = MatioOpaque(properties=data, classname=classname, type_system="MCOS")
+    return set_object_metadata(tmp_obj) if in_subsystem else wrap_matlab_opaque(tmp_obj)
 
 
 def create_subsystem_metadata(fwrap_data, java_data=None, handle_data=None):
