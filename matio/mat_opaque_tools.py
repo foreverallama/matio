@@ -1,11 +1,17 @@
 """Convert MATLAB objects to Python compatible objects"""
 
+import warnings
 from enum import Enum
 
 import numpy as np
 from pandas import Categorical, DataFrame
 
 from matio.utils import (
+    calendarduration_to_mat,
+    containermap_to_mat,
+    datetime_to_mat,
+    dictionary_to_mat,
+    duration_to_mat,
     mat_to_calendarduration,
     mat_to_categorical,
     mat_to_containermap,
@@ -15,9 +21,12 @@ from matio.utils import (
     mat_to_string,
     mat_to_table,
     mat_to_timetable,
+    string_to_mat,
+    table_to_mat,
+    timetable_to_mat,
 )
 
-CLASS_TO_FUNCTION = {
+MAT_TO_PY = {
     "calendarDuration": mat_to_calendarduration,
     "categorical": mat_to_categorical,
     "containers.Map": mat_to_containermap,
@@ -27,6 +36,18 @@ CLASS_TO_FUNCTION = {
     "string": mat_to_string,
     "table": mat_to_table,
     "timetable": mat_to_timetable,
+}
+
+PY_TO_MAT = {
+    "calendarDuration": calendarduration_to_mat,
+    # "categorical": categorical_to_mat,
+    "containers.Map": containermap_to_mat,
+    "datetime": datetime_to_mat,
+    "dictionary": dictionary_to_mat,
+    "duration": duration_to_mat,
+    "string": string_to_mat,
+    "table": table_to_mat,
+    "timetable": timetable_to_mat,
 }
 
 
@@ -53,7 +74,7 @@ class MatioOpaque:
 
 def convert_mat_to_py(obj, **kwargs):
     """Converts a MATLAB object to a Python object"""
-    convert_func = CLASS_TO_FUNCTION.get(obj.classname)
+    convert_func = MAT_TO_PY.get(obj.classname)
     if convert_func is not None:
         return convert_func(
             obj.properties,
@@ -61,6 +82,20 @@ def convert_mat_to_py(obj, **kwargs):
             add_table_attrs=kwargs.get("add_table_attrs", None),
         )
     return obj
+
+
+def convert_py_to_mat(properties, classname, oned_as, use_strings):
+    """Convert a Python object to a MATLAB object"""
+
+    convert_func = PY_TO_MAT.get(classname)
+    if convert_func is None:
+        warnings.warn(
+            f"Conversion of {type(properties)} into MATLAB type "
+            f"{classname} is not yet implemented. This will be skipped"
+        )
+        return {}
+
+    return convert_func(properties, oned_as=oned_as, use_strings=use_strings)
 
 
 def mat_to_enum(values, value_names, class_name, shapes):
@@ -94,9 +129,8 @@ def guess_class_name(properties):
         classname = "categorical"
     elif isinstance(properties, dict):
         classname = "containers.Map"
-    elif isinstance(properties, list):
-        if all(isinstance(item, tuple) and len(item) == 2 for item in properties):
-            classname = "dictionary"
+    elif isinstance(properties, tuple):
+        classname = "dictionary"
     elif isinstance(properties, np.ndarray):
         if properties.dtype.names is not None:
             classname = "calendarDuration"
@@ -109,8 +143,8 @@ def guess_class_name(properties):
 
     if classname is None:
         raise ValueError(
-            f"Unable to determine MATLAB class equivalent for properties of \
-                type {type(properties).__name__}. Provide it explicitly."
+            f"Unable to determine MATLAB class equivalent for properties of "
+            f"type {type(properties)}. Provide it explicitly."
         )
 
     return classname

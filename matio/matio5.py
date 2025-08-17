@@ -141,8 +141,8 @@ def read_matfile5(
 
     with get_matio_context():
 
-        file_wrapper = set_file_wrapper(byte_order, raw_data, add_table_attrs)
-        file_wrapper.init_load(fwrap_data)
+        file_wrapper = set_file_wrapper()
+        file_wrapper.init_load(fwrap_data, byte_order, raw_data, add_table_attrs)
 
         for var, data in matfile_dict.items():
             matfile_dict[var] = find_matlab_opaque(data)
@@ -151,13 +151,18 @@ def read_matfile5(
 
 
 def save_matfile5(
-    file_stream, mdict, do_compression=False, global_vars=None, oned_as="row"
+    file_stream,
+    mdict,
+    do_compression=False,
+    global_vars=None,
+    oned_as="row",
+    use_strings=True,
 ):
     """Saves variables to MAT-file 5 format (< 7.3)"""
 
     with get_matio_context():
         file_wrapper = set_file_wrapper()
-        file_wrapper.init_save()
+        file_wrapper.init_save(oned_as, use_strings)
 
         mdict = parse_input_dict(mdict)
     subsys_data = mdict.pop("__subsystem__", None)

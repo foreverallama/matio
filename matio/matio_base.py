@@ -74,6 +74,7 @@ def save_to_mat(
     do_compression=False,
     global_vars=None,
     oned_as="row",
+    use_strings=True,
 ):
     """Saves variables to MAT-file
     Inputs
@@ -96,7 +97,7 @@ def save_to_mat(
 
     if version == "v7":
         subsys_offset = save_matfile5(
-            file_stream, mdict_copy, do_compression, global_vars, oned_as
+            file_stream, mdict_copy, do_compression, global_vars, oned_as, use_strings
         )
     elif version == "v7.3":
         raise NotImplementedError("v7.3 MAT-file saving is not implemented")
