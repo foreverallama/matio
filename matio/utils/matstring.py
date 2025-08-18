@@ -39,7 +39,7 @@ def mat_to_string(props, byte_order, **_kwargs):
     return np.reshape(strings, shape, order="F")
 
 
-def string_to_mat(arr, oned_as="row", **_kwargs):
+def string_to_mat(arr):
     """Converts numpy string array to MATLAB string format as uint64 array"""
 
     if not isinstance(arr, np.ndarray):

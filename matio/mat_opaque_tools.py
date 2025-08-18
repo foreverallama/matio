@@ -83,7 +83,7 @@ def convert_mat_to_py(obj, **kwargs):
     return obj
 
 
-def convert_py_to_mat(properties, classname, oned_as, use_strings):
+def convert_py_to_mat(properties, classname):
     """Convert a Python object to a MATLAB object"""
 
     convert_func = PY_TO_MAT.get(classname)
@@ -94,7 +94,7 @@ def convert_py_to_mat(properties, classname, oned_as, use_strings):
         )
         return {}
 
-    return convert_func(properties, oned_as=oned_as, use_strings=use_strings)
+    return convert_func(properties)
 
 
 def mat_to_enum(values, value_names, class_name, shapes):

@@ -251,7 +251,7 @@ def make_table_props():
     return props
 
 
-def table_to_mat(df, **_kwargs):
+def table_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB table"""
 
     if not isinstance(df, pd.DataFrame):
@@ -322,7 +322,7 @@ def make_timetable_props():
     }
 
 
-def timetable_to_mat(df, **_kwargs):
+def timetable_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB timetable"""
 
     if not isinstance(df, pd.DataFrame):
@@ -389,17 +389,17 @@ def timetable_to_mat(df, **_kwargs):
     return {"any": timetable}
 
 
-def categorical_to_mat(cat, **_kwargs):
+def categorical_to_mat(cat):
     """Converts a pandas Categorical to a MATLAB categorical"""
 
-    categoryNames = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
+    category_names = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
     codes = cat.codes.astype("int8") + 1  # 1-based indexing
-    isOrdinal = np.bool_(cat.ordered)
-    isProtected = np.bool_(False)  # not supported in pandas
+    is_ordinal = np.bool_(cat.ordered)
+    is_protected = np.bool_(False)  # not supported in pandas
 
     return {
-        "categoryNames": categoryNames,
+        "categoryNames": category_names,
         "codes": codes,
-        "isOrdinal": isOrdinal,
-        "isProtected": isProtected,
+        "isOrdinal": is_ordinal,
+        "isProtected": is_protected,
     }

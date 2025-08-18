@@ -30,12 +30,12 @@ The `matio` package attempts to convert some common MATLAB datatypes into a Pyth
 | `calendarDuration`                | `numpy.ndarray` with fields `{months, days, millis}` |
 | `string`                          | `numpy.str_`            |
 | `table`                           | `pandas.DataFrame`                          |
-| `timetable`                       | `pandas.DataFrame` with datetime index      |
+| `timetable`                       | `pandas.DataFrame` with datetime or duration index      |
 | `containers.Map`                  | `dict`                                      |
-| `dictionary`                      | `list[(key, value)]`                                     |
+| `dictionary`                      | `(keys, values)`                                     |
 | `categorical`                     | `pandas.Categorical`                        |
 | Enumeration Instance Arrays       | `numpy.ndarray` of `enum.Enum`         |
-| User-Defined Classes              | `MatioOpaque` instance with property `dict` |
+| User-Defined Classes              | `MatioOpaque` instance with property map `dict` |
 
 ## `datetime`
 
@@ -165,7 +165,7 @@ Objects of this class contain a single property `data` which is defined as a `st
 4. `Key`
 5. `Value`
 
-Since keys can be of any MATLAB datatype, including object instances, `matio.load_from_mat` converts this into a list of tuple `(key, value)` pairs.
+Since keys can be of any MATLAB datatype, including object instances, `matio.load_from_mat` converts this into a tuple `(keys, values)`. Each value in the tuple contains all the keys and values for the dictionary. These values are not split up as MATLAB optimizes on object representation.
 
 ## `categorical`
 

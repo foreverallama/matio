@@ -137,8 +137,7 @@ class FileWrapper:
         self.byte_order = SYSTEM_BYTE_ORDER
         self.raw_data = False
         self.add_table_attrs = False
-        self.oned_as = "row"
-        self.use_strings = True
+        self._use_strings = True  # Use in future?
 
         self.version = FILEWRAPPER_VERSION
         self.num_names = 0
@@ -252,11 +251,10 @@ class FileWrapper:
         self._c2 = fwrap_data[-2, 0]  # Unknown
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
-    def init_save(self, oned_as="row", use_strings=True):
+    def init_save(self, use_strings=True):
         """Initializes save with metadata for object ID = 0"""
 
-        self.oned_as = oned_as
-        self.use_strings = use_strings
+        self._use_strings = use_strings
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
         self.saveobj_prop_metadata.extend([0, 0])
@@ -704,7 +702,8 @@ def load_opaque_object(metadata, classname, type_system):
 
     if type_system != "MCOS":
         warnings.warn(
-            f"subsystem:load_mcos_object: Loading opaque objects of type {type_system} is not supported. Returning metadata"
+            f"subsystem:load_mcos_object: Loading opaque objects of type "
+            f"{type_system} is not supported. Returning metadata"
         )
         obj = MatioOpaque(metadata, classname, type_system)
         return obj
@@ -753,8 +752,6 @@ def set_object_metadata(obj, saveobj_ret_type=False):
             obj.properties = convert_py_to_mat(
                 obj.properties,
                 obj.classname,
-                file_wrapper.oned_as,
-                file_wrapper.use_strings,
             )
 
         if classname in ("string", "timetable"):
@@ -832,24 +829,23 @@ def find_matio_opaque(data, in_subsystem=False):
             if data.dtype.str.endswith("1") or data.size == 1:
                 # FIXME: Need a better way to distinguish between char arrays and strings
                 return data
-            else:
-                # Treat as string array
-                tmp_obj = MatioOpaque(
-                    properties=data, classname="string", type_system="MCOS"
-                )
-                return (
-                    set_object_metadata(tmp_obj)
-                    if in_subsystem
-                    else wrap_matlab_opaque(tmp_obj)
-                )
+
+            # Read as string array
+            tmp_obj = MatioOpaque(
+                properties=data, classname="string", type_system="MCOS"
+            )
+            return (
+                set_object_metadata(tmp_obj)
+                if in_subsystem
+                else wrap_matlab_opaque(tmp_obj)
+            )
 
         # 2b: Cell Arrays
         if data.dtype == object:
             if data.size == 0:
                 return data
             if all(
-                isinstance(item, MatioOpaque) and item.is_array == True
-                for item in data.flat
+                isinstance(item, MatioOpaque) and item.is_array for item in data.flat
             ):
                 return (
                     set_object_metadata(data)

@@ -78,13 +78,15 @@ mdict = {"table1": mat_df}
 data = save_to_mat(file_path="temp.mat", mdict=mdict)
 ```
 
-For user-defined classes, a dictionary of property name-value pairs must be wrapped around a `MatioOpaque` instance. In case of arrays, these objects should be contained within a `numpy.ndarray` with `dtype=object`. All user-defined classes default to the `MCOS` type system.
+For user-defined classes, a dictionary of property name-value pairs must be wrapped around a `MatioOpaque` instance. In case of arrays, these objects should be contained within a `numpy.ndarray` with `dtype=object` and each `MatioOpaque` instance should be flagged with the `is_array` attribute. All user-defined classes default to the `MCOS` type system.
 
 ### Notes
 
 - Extra keyword arguments (`**kwargs`) are passed directly to [`scipy.io.loadmat`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.io.loadmat.html) or [`scipy.io.savemat`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.io.savemat.html).
 
-- For conversion rules between MATLAB and Python datatypes, see the [documentation](https://github.com/foreverallama/matio/tree/main/docs).
+- For conversion rules between MATLAB and Python datatypes, see the [documentation](./docs/field_contents.md).
+
+- To differentiate between MATLAB character and string arrays, it would be ideal to wrap a numpy string array around a `MatioOpaque` instance. However, this is not feasible all the time, especially as MATLAB seems to be using strings in most of their new datatypes. Hence, this module uses Scipy's convention of converting Python `str`, `list(str)` or `numpy.array(dtype=<U1/S1)` to a character array. Numpy string arrays with multiple strings is converted to a MATLAB string
 
 ## Contribution
 

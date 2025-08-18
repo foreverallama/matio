@@ -47,7 +47,7 @@ def mat_to_dictionary(props, **_kwargs):
     return (ks, vals)
 
 
-def dictionary_to_mat(props, **_kwargs):
+def dictionary_to_mat(props):
     """Converts a Python dictionary to MATLAB dictionary"""
     if not (isinstance(props, tuple) and len(props) == 2):
         raise TypeError("Expected tuple of (key, value)")
@@ -86,7 +86,7 @@ def dictionary_to_mat(props, **_kwargs):
     return prop_map
 
 
-def containermap_to_mat(props, **_kwargs):
+def containermap_to_mat(props):
     """Converts a Python dictionary to MATLAB container.Map"""
     if not isinstance(props, dict):
         raise TypeError(f"Expected dict, got {type(props)}")
