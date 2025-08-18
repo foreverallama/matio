@@ -36,7 +36,7 @@ def mat_to_dictionary(props, **_kwargs):
     ver = int(comps[0, 0]["Version"].item())
     if ver != MAT_DICT_VERSION:
         warnings.warn(
-            f"Only v{MAT_DICT_VERSION} MATLAB dictionaries are supported. Got v{ver}",
+            f"mat_to_dictionary: Only v{MAT_DICT_VERSION} MATLAB dictionaries are supported. Got v{ver}",
             UserWarning,
         )
         return props
@@ -47,7 +47,7 @@ def mat_to_dictionary(props, **_kwargs):
     return (ks, vals)
 
 
-def dictionary_to_mat(props, **_kwargs):
+def dictionary_to_mat(props):
     """Converts a Python dictionary to MATLAB dictionary"""
     if not (isinstance(props, tuple) and len(props) == 2):
         raise TypeError("Expected tuple of (key, value)")
@@ -76,8 +76,8 @@ def dictionary_to_mat(props, **_kwargs):
     data_arr["Key"][0, 0] = keys
     data_arr["Value"][0, 0] = values
     data_arr["Version"][0, 0] = np.uint64(MAT_DICT_VERSION)
-    data_arr["IsKeyCombined"][0, 0] = np.array(True, dtype=np.bool_)
-    data_arr["IsValueCombined"][0, 0] = np.array(True, dtype=np.bool_)
+    data_arr["IsKeyCombined"][0, 0] = np.bool_(True)
+    data_arr["IsValueCombined"][0, 0] = np.bool_(True)
 
     prop_map = {
         "data": data_arr,
@@ -86,13 +86,13 @@ def dictionary_to_mat(props, **_kwargs):
     return prop_map
 
 
-def containermap_to_mat(props, **_kwargs):
+def containermap_to_mat(props):
     """Converts a Python dictionary to MATLAB container.Map"""
     if not isinstance(props, dict):
         raise TypeError(f"Expected dict, got {type(props)}")
     if "serialization" in props:
         warnings.warn(
-            "Key 'Serialization' was found in the map. This clashes with an expected MATLAB "
+            "containermap_to_mat: Key 'Serialization' was found in the map. This clashes with an expected MATLAB "
             "keyword and will be treated as a raw property map."
         )
         return props
@@ -131,7 +131,7 @@ def containermap_to_mat(props, **_kwargs):
         }
         value_type = dtype_map.get(next(iter(value_dtypes)), "any")
     else:
-        uniformity = False
+        uniformity = np.bool_(False)
         value_type = "any"
 
     ser_dtype = [

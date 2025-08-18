@@ -153,7 +153,7 @@ def read_matfile5(
 def save_matfile5(
     file_stream,
     mdict,
-    do_compression=False,
+    do_compression=True,
     global_vars=None,
     oned_as="row",
     use_strings=True,
@@ -162,7 +162,7 @@ def save_matfile5(
 
     with get_matio_context():
         file_wrapper = set_file_wrapper()
-        file_wrapper.init_save(oned_as, use_strings)
+        file_wrapper.init_save(use_strings)
 
         mdict = parse_input_dict(mdict)
     subsys_data = mdict.pop("__subsystem__", None)

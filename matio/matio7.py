@@ -47,7 +47,7 @@ class MatRead7:
         int_decode = obj.attrs.get("MATLAB_int_decode", None)
         if int_decode is not None:
             warnings.warn(
-                f"MATLAB_int_decode {int_decode} is not supported. "
+                f"MatRead7:read_int: MATLAB_int_decode {int_decode} is not supported. "
                 "This may lead to unexpected behaviour.",
                 UserWarning,
             )
@@ -79,7 +79,7 @@ class MatRead7:
             codec = "utf-16"
         else:
             warnings.warn(
-                f"MATLAB_int_decode {decode_type} not supported. "
+                f"MatRead7:read_char:MATLAB_int_decode {decode_type} not supported. "
                 "This may lead to unexpected behaviour",
                 UserWarning,
             )

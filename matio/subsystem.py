@@ -4,7 +4,13 @@ import warnings
 from contextlib import contextmanager
 
 import numpy as np
-from scipy.io.matlab._mio5_params import OPAQUE_DTYPE, MatlabOpaque
+from scipy.io.matlab._mio5 import EmptyStructMarker
+from scipy.io.matlab._mio5_params import (
+    OPAQUE_DTYPE,
+    MatlabFunction,
+    MatlabObject,
+    MatlabOpaque,
+)
 
 from matio.mat_opaque_tools import (
     MatioOpaque,
@@ -131,8 +137,7 @@ class FileWrapper:
         self.byte_order = SYSTEM_BYTE_ORDER
         self.raw_data = False
         self.add_table_attrs = False
-        self.oned_as = "row"
-        self.use_strings = True
+        self._use_strings = True  # Use in future?
 
         self.version = FILEWRAPPER_VERSION
         self.num_names = 0
@@ -246,11 +251,10 @@ class FileWrapper:
         self._c2 = fwrap_data[-2, 0]  # Unknown
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
-    def init_save(self, oned_as="row", use_strings=True):
+    def init_save(self, use_strings=True):
         """Initializes save with metadata for object ID = 0"""
 
-        self.oned_as = oned_as
-        self.use_strings = use_strings
+        self._use_strings = use_strings
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.object_id_metadata.extend([0, 0, 0, 0, 0, 0])
         self.saveobj_prop_metadata.extend([0, 0])
@@ -376,7 +380,7 @@ class FileWrapper:
     def get_properties(self, object_id):
         """Returns the properties as a dict for a given object ID"""
         if object_id == 0:
-            return None
+            return {}
 
         class_id, saveobj_id, normobj_id, dep_id = self.get_object_metadata(object_id)
         if saveobj_id != 0:
@@ -608,7 +612,7 @@ def load_mcos_enumeration(metadata, type_system):
     if builtin_class_idx != 0:
         builtin_class_name = file_wrapper.get_classname(builtin_class_idx)
     else:
-        builtin_class_name = None
+        builtin_class_name = np.str_("")
 
     value_names = [
         file_wrapper.mcos_names[val - 1] for val in metadata[0, 0]["ValueNames"].ravel()
@@ -687,6 +691,9 @@ def load_mcos_object(metadata, type_system):
 
     if nobjects == 1:
         return obj_arr[0, 0]
+
+    for obj in obj_arr.flat:
+        obj.is_array = True
     return obj_arr.reshape(dims, order="F")
 
 
@@ -695,7 +702,8 @@ def load_opaque_object(metadata, classname, type_system):
 
     if type_system != "MCOS":
         warnings.warn(
-            f"Loading opaque objects of type {type_system} is not supported. Returning metadata"
+            f"subsystem:load_mcos_object: Loading opaque objects of type "
+            f"{type_system} is not supported. Returning metadata"
         )
         obj = MatioOpaque(metadata, classname, type_system)
         return obj
@@ -724,7 +732,7 @@ def set_object_metadata(obj, saveobj_ret_type=False):
 
     if type_system != "MCOS":
         warnings.warn(
-            "Only MCOS objects are supported currently. This item will be skipped"
+            "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped"
         )
         return np.empty((), dtype=np.uint32)
 
@@ -734,6 +742,7 @@ def set_object_metadata(obj, saveobj_ret_type=False):
     class_id = file_wrapper.get_class_id(classname)
 
     if isinstance(obj, np.ndarray):
+        # Object Arrays
         for idx in np.ndindex(obj.shape):
             object_id = file_wrapper.set_mcos_object_metadata(obj[idx], class_id)
             arr_ids.append(object_id)
@@ -743,8 +752,6 @@ def set_object_metadata(obj, saveobj_ret_type=False):
             obj.properties = convert_py_to_mat(
                 obj.properties,
                 obj.classname,
-                file_wrapper.oned_as,
-                file_wrapper.use_strings,
             )
 
         if classname in ("string", "timetable"):
@@ -784,22 +791,22 @@ def wrap_matlab_opaque(obj):
 def find_matio_opaque(data, in_subsystem=False):
     """Recursively find and wrap MatioOpaque objects in data."""
 
-    # Case 1: already a MatioOpaque
     if isinstance(data, MatioOpaque):
         if data.classname is None:
             data.classname = guess_class_name(data.properties)
             data.type_system = "MCOS"
         return set_object_metadata(data) if in_subsystem else wrap_matlab_opaque(data)
 
-    # Case 2: numpy arrays
+    if isinstance(data, np.generic):
+        # For compatibility
+        data = np.asarray(data).reshape(1, 1)
+
     if isinstance(data, np.ndarray):
-        # 2a: datetime or timedelta arrays
-        if np.issubdtype(data.dtype, np.datetime64) or np.issubdtype(
-            data.dtype, np.timedelta64
-        ):
-            classname = guess_class_name(data)
+
+        # 2a: datetime
+        if np.issubdtype(data.dtype, np.datetime64):
             tmp_obj = MatioOpaque(
-                properties=data, classname=classname, type_system="MCOS"
+                properties=data, classname="datetime", type_system="MCOS"
             )
             return (
                 set_object_metadata(tmp_obj)
@@ -807,30 +814,91 @@ def find_matio_opaque(data, in_subsystem=False):
                 else wrap_matlab_opaque(tmp_obj)
             )
 
-        # 2b: object arrays (cells)
-        if data.dtype == object and data.size > 0:
+        # 2b: duration
+        if np.issubdtype(data.dtype, np.timedelta64):
+            tmp_obj = MatioOpaque(
+                properties=data, classname="duration", type_system="MCOS"
+            )
+            return (
+                set_object_metadata(tmp_obj)
+                if in_subsystem
+                else wrap_matlab_opaque(tmp_obj)
+            )
+
+        if data.dtype.kind in {"U", "S"}:
+            if data.dtype.str.endswith("1") or data.size == 1:
+                # FIXME: Need a better way to distinguish between char arrays and strings
+                return data
+
+            # Read as string array
+            tmp_obj = MatioOpaque(
+                properties=data, classname="string", type_system="MCOS"
+            )
+            return (
+                set_object_metadata(tmp_obj)
+                if in_subsystem
+                else wrap_matlab_opaque(tmp_obj)
+            )
+
+        # 2b: Cell Arrays
+        if data.dtype == object:
+            if data.size == 0:
+                return data
+            if all(
+                isinstance(item, MatioOpaque) and item.is_array for item in data.flat
+            ):
+                return (
+                    set_object_metadata(data)
+                    if in_subsystem
+                    else wrap_matlab_opaque(data)
+                )
             for idx in np.ndindex(data.shape):
                 data[idx] = find_matio_opaque(data[idx], in_subsystem)
             return data
 
-        # 2c: structured arrays (MATLAB structs)
-        if data.dtype.names and data.size > 0:
-            # Ignore calendarDuration arrays:
+        # 2c: struct arrays
+        if data.dtype.names:
             if set(data.dtype.names) == {"months", "days", "millis"}:
-                return data
+                # calendarDuration
+                if not all(
+                    np.issubdtype(data[name].item().dtype, np.timedelta64)
+                    for name in ("months", "days", "millis")
+                ):
+                    return data  # If calendarDuration is converted into prop map
+                tmp_obj = MatioOpaque(
+                    properties=data, classname="calendarDuration", type_system="MCOS"
+                )
+                return (
+                    set_object_metadata(tmp_obj)
+                    if in_subsystem
+                    else wrap_matlab_opaque(tmp_obj)
+                )
             for idx in np.ndindex(data.shape):
                 for name in data.dtype.names:
                     data[idx][name] = find_matio_opaque(data[idx][name], in_subsystem)
             return data
 
-        # Other ndarray: return as-is
         return data
 
-    # Case 3: scalars and strings
-    if isinstance(data, (np.generic, str, list)):
+    if isinstance(
+        data,
+        (
+            MatlabObject,
+            MatlabFunction,
+            MatlabOpaque,
+            str,
+            list,
+            bool,
+            int,
+            float,
+            EmptyStructMarker,
+        ),
+    ):
+        # For scipy compatibility
+        # Scipy also accepts tuple, but here it is used for MATLAB dictionary
         return data
 
-    # Case 4: everything else: attempt to wrap into MatioOpaque
+    # Everything else: attempt to wrap into MatioOpaque
     classname = guess_class_name(data)
     tmp_obj = MatioOpaque(properties=data, classname=classname, type_system="MCOS")
     return set_object_metadata(tmp_obj) if in_subsystem else wrap_matlab_opaque(tmp_obj)

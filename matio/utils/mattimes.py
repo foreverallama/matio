@@ -18,7 +18,7 @@ def get_tz_offset(tz):
             offset = 0
     except ZoneInfoNotFoundError as e:
         warnings.warn(
-            f"Could not get timezone offset for {tz}: {e}. Defaulting to UTC."
+            f"mat_to_datetime: Could not get timezone offset for {tz}: {e}. Defaulting to UTC."
         )
         offset = 0
     return offset
@@ -89,18 +89,12 @@ def mat_to_calendarduration(props, **_kwargs):
     return comps
 
 
-def datetime_to_mat(arr, oned_as="row", **_kwargs):
+def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
     if not isinstance(arr, np.ndarray):
         raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
     if not np.issubdtype(arr.dtype, np.datetime64):
         raise TypeError(f"Expected numpy.datetime64 array, got {arr.dtype}")
-
-    if arr.ndim == 1:
-        if oned_as == "row":
-            arr = arr.reshape(1, -1)
-        elif oned_as == "col":
-            arr = arr.reshape(-1, 1)
 
     millis = arr.astype("datetime64[ms]").astype(np.float64)
 
@@ -120,27 +114,24 @@ def datetime_to_mat(arr, oned_as="row", **_kwargs):
     return prop_map
 
 
-def duration_to_mat(arr, oned_as="row", **_kwargs):
+def duration_to_mat(arr):
     """Convert numpy timedelta64 array to MATLAB duration format."""
     if not isinstance(arr, np.ndarray):
         raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
     if not np.issubdtype(arr.dtype, np.timedelta64):
         raise TypeError(f"Expected numpy.timedelta64 array, got {arr.dtype}")
 
-    if arr.ndim == 1:
-        if oned_as == "row":
-            arr = arr.reshape(1, -1)
-        elif oned_as == "col":
-            arr = arr.reshape(-1, 1)
-
     unit, _ = np.datetime_data(arr.dtype)
+    millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6
     allowed_units = ("s", "m", "h", "D", "Y")
     if unit not in allowed_units:
-        raise ValueError(
-            f"Unsupported timedelta unit '{unit}'. Only {allowed_units} are supported in MATLAB."
+        warnings.warn(
+            f"duration_to_mat: MATLAB Duration arrays do not support timedelta64[{unit}]. Defaulting to 's'.",
+            UserWarning,
         )
-    millis = arr.astype("timedelta64[ms]").astype(np.float64)
+        unit = "s"
 
+    unit = unit.lower()
     prop_map = {
         "millis": millis,
         "fmt": unit,
@@ -149,7 +140,7 @@ def duration_to_mat(arr, oned_as="row", **_kwargs):
     return prop_map
 
 
-def calendarduration_to_mat(arr, **_kwargs):
+def calendarduration_to_mat(arr):
     """Convert numpy structured array with fields ['months', 'days', 'millis'] to MATLAB calendarDuration format."""
     if not isinstance(arr, np.ndarray):
         raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")

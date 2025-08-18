@@ -71,7 +71,7 @@ def save_to_mat(
     file_path,
     mdict,
     version="v7",
-    do_compression=False,
+    do_compression=True,
     global_vars=None,
     oned_as="row",
     use_strings=True,

@@ -8,6 +8,7 @@ from .matmap import (
 )
 from .matstring import mat_to_string, string_to_mat
 from .mattables import (
+    categorical_to_mat,
     mat_to_categorical,
     mat_to_table,
     mat_to_timetable,
@@ -41,4 +42,5 @@ __all__ = [
     "containermap_to_mat",
     "table_to_mat",
     "timetable_to_mat",
+    "categorical_to_mat",
 ]
