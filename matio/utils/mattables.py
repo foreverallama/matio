@@ -387,3 +387,19 @@ def timetable_to_mat(df, **_kwargs):
         timetable[0, 0][key] = value
 
     return {"any": timetable}
+
+
+def categorical_to_mat(cat, **_kwargs):
+    """Converts a pandas Categorical to a MATLAB categorical"""
+
+    categoryNames = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
+    codes = cat.codes.astype("int8") + 1  # 1-based indexing
+    isOrdinal = np.bool_(cat.ordered)
+    isProtected = np.bool_(False)  # not supported in pandas
+
+    return {
+        "categoryNames": categoryNames,
+        "codes": codes,
+        "isOrdinal": isOrdinal,
+        "isProtected": isProtected,
+    }

@@ -8,6 +8,7 @@ from pandas import Categorical, DataFrame
 
 from matio.utils import (
     calendarduration_to_mat,
+    categorical_to_mat,
     containermap_to_mat,
     datetime_to_mat,
     dictionary_to_mat,
@@ -40,7 +41,7 @@ MAT_TO_PY = {
 
 PY_TO_MAT = {
     "calendarDuration": calendarduration_to_mat,
-    # "categorical": categorical_to_mat,
+    "categorical": categorical_to_mat,
     "containers.Map": containermap_to_mat,
     "datetime": datetime_to_mat,
     "dictionary": dictionary_to_mat,
