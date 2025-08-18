@@ -4,8 +4,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-
-# from matio.mat_opaque_tools import MatioOpaque
+from scipy.io.matlab._mio5 import EmptyStructMarker
 
 TABLE_VERSION = 4
 MIN_TABLE_VERSION = 1
@@ -94,7 +93,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     ver = int(table_attrs[0, 0]["versionSavedFrom"].item())
     if ver > TABLE_VERSION:
         warnings.warn(
-            f"MATLAB table version {ver} is not supported.",
+            f"mat_to_table: MATLAB table version {ver} is not supported.",
             UserWarning,
         )
         return props
@@ -138,6 +137,7 @@ def get_row_times(row_times, num_rows):
     else:
         comps = row_times[0, 0]["stepSize"]
         if comps.dtype.names is not None:
+            # calendarDuration
             # Only one of months, days, or millis is non-zero array
             for key in ["months", "days", "millis"]:
                 arr = comps[0, 0][key]
@@ -162,10 +162,9 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
-    min_compatible_ver = int(timetable_data[0, 0]["minCompatibleVersion"].item())
-    if ver > TIMETABLE_VERSION or ver < min_compatible_ver:
+    if ver > TIMETABLE_VERSION or ver <= MIN_TIMETABLE_VERSION:
         warnings.warn(
-            f"MATLAB timetable version {ver} is not supported.",
+            f"mat_to_timetable: MATLAB timetable version {ver} is not supported.",
             UserWarning,
         )
         return props
@@ -220,8 +219,8 @@ def make_table_props():
         ("VersionSavedFrom", object),
         ("Description", object),
         ("VariableNamesOriginal", object),
-        ("DimensionNamesOriginal", object),
         ("DimensionNames", object),
+        ("DimensionNamesOriginal", object),
         ("UserData", object),
         ("VariableDescriptions", object),
         ("VariableUnits", object),
@@ -232,19 +231,19 @@ def make_table_props():
 
     props["useVariableNamesOriginal"][0, 0] = np.bool_(False)
     props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
-    props["CustomProps"][0, 0] = np.empty((0, 0), dtype=object)
-    props["VariableCustomProps"][0, 0] = np.empty((0, 0), dtype=object)
+    props["CustomProps"][0, 0] = EmptyStructMarker()
+    props["VariableCustomProps"][0, 0] = EmptyStructMarker()
     props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
     props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
     props["incompatibilityMsg"][0, 0] = ""
     props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
     props["Description"][0, 0] = ""
     props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
-    props["DimensionNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
     props["DimensionNames"][0, 0] = np.array(
         [np.array(["Row"]), np.array(["Variables"])], dtype=object
     ).reshape((1, 2))
-    props["UserData"][0, 0] = np.empty((0, 0), dtype=object)
+    props["DimensionNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
+    props["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
     props["VariableDescriptions"][0, 0] = np.empty((0, 0), dtype=object)
     props["VariableUnits"][0, 0] = np.empty((0, 0), dtype=object)
     props["VariableContinuity"][0, 0] = np.empty((0, 0), dtype=object)
@@ -260,7 +259,11 @@ def table_to_mat(df, **_kwargs):
 
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
-        data[0, i] = df[col].to_numpy().reshape(-1, 1)
+        if pd.api.types.is_string_dtype(df[col]):
+            coldata = df[col].to_numpy(dtype="U")
+        else:
+            coldata = df[col].to_numpy().reshape(-1, 1)
+        data[0, i] = coldata
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])
@@ -272,6 +275,7 @@ def table_to_mat(df, **_kwargs):
     else:
         rownames = np.array([], dtype=object)
 
+    # FIXME: Add table attributes
     extras = make_table_props()
     prop_map = {
         "data": data,
@@ -297,11 +301,11 @@ def make_timetable_props():
     arrayprops = np.empty((1, 1), dtype=arrayprops_dtype)
     arrayprops["Description"][0, 0] = ""
     arrayprops["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
-    arrayprops["TableCustomProperties"][0, 0] = np.empty((0, 0), dtype=object)
+    arrayprops["TableCustomProperties"][0, 0] = EmptyStructMarker()
 
     return {
-        "CustomProps": np.empty((0, 0), dtype=object),
-        "VariableCustomProps": np.empty((0, 0), dtype=object),
+        "CustomProps": EmptyStructMarker(),
+        "VariableCustomProps": EmptyStructMarker(),
         "versionSavedFrom": np.float64(TIMETABLE_VERSION),
         "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
         "incompatibilityMsg": "",
@@ -313,7 +317,7 @@ def make_timetable_props():
         "varNamesOrig": np.empty((0, 0), dtype=object),
         "varDescriptions": np.empty((0, 0), dtype=object),
         "varUnits": np.empty((0, 0), dtype=object),
-        "timeEvents": np.empty((0, 0), dtype=object),
+        "timeEvents": np.empty((0, 0), dtype=np.float64),
         "varContinuity": np.empty((0, 0), dtype=object),
     }
 
@@ -326,7 +330,11 @@ def timetable_to_mat(df, **_kwargs):
 
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
-        data[0, i] = df[col].to_numpy().reshape(-1, 1)
+        if pd.api.types.is_string_dtype(df[col]):
+            coldata = df[col].to_numpy(dtype="U")
+        else:
+            coldata = df[col].to_numpy().reshape(-1, 1)
+        data[0, i] = coldata
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])
@@ -336,10 +344,21 @@ def timetable_to_mat(df, **_kwargs):
         [np.array(["Time"]), np.array(["Variables"])], dtype=object
     ).reshape((1, 2))
 
-    if isinstance(df.index, pd.DatetimeIndex):
+    if isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
         rowtimes = df.index.to_numpy()
+        if np.issubdtype(rowtimes.dtype, np.timedelta64):
+            unit, _ = np.datetime_data(rowtimes.dtype)
+            if unit not in ("s", "m", "h", "D", "Y"):
+                warnings.warn(
+                    f"timetable_to_mat: MATLAB Duration arrays do not support timedelta64[{unit}]. Defaulting to 'ns'.",
+                    UserWarning,
+                )
+                rowtimes = rowtimes.astype("timedelta64[ns]")
     else:
-        raise ValueError("Timetable requires datetime row index or explicit rowtimes")
+        raise ValueError(
+            "cannot convert DataFrame to MATLAB Timetable: "
+            "Requires datetime or timedelta row index"
+        )
 
     # Define timetable struct dtype
     timetable_dtype = [
@@ -351,6 +370,7 @@ def timetable_to_mat(df, **_kwargs):
         ("rowTimes", object),
     ]
 
+    # FIXME: Add timetable attributes
     extras = make_timetable_props()
     timetable_dtype.extend((key, object) for key in extras)
 

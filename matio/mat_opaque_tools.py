@@ -56,12 +56,10 @@ class MatioOpaque:
 
     def __init__(self, properties=None, classname=None, type_system="MCOS"):
 
-        if classname is None:
-            classname = guess_class_name(properties)
-
         self.classname = classname
         self.type_system = type_system
         self.properties = properties
+        self.is_array = False
 
     def __repr__(self):
         return f"MatioOpaque(classname={self.classname})"
@@ -90,7 +88,7 @@ def convert_py_to_mat(properties, classname, oned_as, use_strings):
     convert_func = PY_TO_MAT.get(classname)
     if convert_func is None:
         warnings.warn(
-            f"Conversion of {type(properties)} into MATLAB type "
+            f"convert_py_to_mat: Conversion of {type(properties)} into MATLAB type "
             f"{classname} is not yet implemented. This will be skipped"
         )
         return {}
@@ -113,11 +111,11 @@ def mat_to_enum(values, value_names, class_name, shapes):
 def guess_class_name(properties):
     """Guess the class name based on properties"""
 
-    classname = None
-
     if properties is None:
-        pass
-    elif isinstance(properties, DataFrame):
+        return properties
+
+    classname = None
+    if isinstance(properties, DataFrame):
         if isinstance(properties.index.values, np.ndarray) and (
             np.issubdtype(properties.index.values.dtype, np.datetime64)
             or np.issubdtype(properties.index.values.dtype, np.timedelta64)
@@ -132,7 +130,7 @@ def guess_class_name(properties):
     elif isinstance(properties, tuple):
         classname = "dictionary"
     elif isinstance(properties, np.ndarray):
-        if properties.dtype.names is not None:
+        if set(properties.dtype.names) == {"months", "days", "millis"}:
             classname = "calendarDuration"
         elif np.issubdtype(properties.dtype, np.datetime64):
             classname = "datetime"

@@ -16,7 +16,7 @@ def mat_to_string(props, byte_order, **_kwargs):
 
     if data[0, 0] != MAT_STRING_VERSION:
         warnings.warn(
-            "String saved from a different MAT-file version. Returning raw data",
+            "mat_to_string: String saved from a different MAT-file version. Returning raw data",
             UserWarning,
         )
         return props[0, 0].get("any")
@@ -48,11 +48,11 @@ def string_to_mat(arr, oned_as="row", **_kwargs):
         except Exception as e:
             raise TypeError(f"Expected numpy.ndarray, got {type(arr)}") from e
 
-    if arr.ndim == 1:
-        if oned_as == "row":
-            arr = arr.reshape(1, -1)
-        elif oned_as == "col":
-            arr = arr.reshape(-1, 1)
+    # if arr.ndim == 1:
+    #     if oned_as == "row":
+    #         arr = arr.reshape(1, -1)
+    #     elif oned_as == "col":
+    #         arr = arr.reshape(-1, 1)
 
     ndims = arr.ndim
     shape = arr.shape
