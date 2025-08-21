@@ -178,7 +178,7 @@ class FileWrapper:
         fromfile_version = np.frombuffer(
             fwrap_metadata, dtype=self.byte_order, count=1, offset=0
         )[0]
-        if fromfile_version > self.version:
+        if not (1 < fromfile_version <= self.version):
             raise RuntimeError(
                 f"FileWrapper version {fromfile_version} is not supported"
             )
@@ -237,18 +237,29 @@ class FileWrapper:
         )
 
         # Unknown Region 6 Metadata
-        self._u6_metadata = fwrap_metadata[
-            self.region_offsets[5] : self.region_offsets[6]
-        ]
+        if self.region_offsets[6] > 0:
+            # Some versions its reserved
+            self._u6_metadata = fwrap_metadata[
+                self.region_offsets[5] : self.region_offsets[6]
+            ]
 
         # Unknown Region 7 Metadata
-        self._u7_metadata = fwrap_metadata[
-            self.region_offsets[6] : self.region_offsets[7]
-        ]
+        if self.region_offsets[7] > 0:
+            # Some versions its reserved
+            self._u7_metadata = fwrap_metadata[
+                self.region_offsets[6] : self.region_offsets[7]
+            ]
 
-        self.prop_vals_saved = fwrap_data[2:-3, 0]
-        self._c3 = fwrap_data[-3, 0]  # Unknown
-        self._c2 = fwrap_data[-2, 0]  # Unknown
+        if fromfile_version == 2:
+            self.prop_vals_saved = fwrap_data[2:-1, 0]
+        elif fromfile_version == 3:
+            self.prop_vals_saved = fwrap_data[2:-2, 0]
+            self._c2 = fwrap_data[-2, 0]
+        else:
+            self.prop_vals_saved = fwrap_data[2:-3, 0]
+            self._c3 = fwrap_data[-3, 0]
+            self._c2 = fwrap_data[-2, 0]
+
         self.prop_vals_defaults = fwrap_data[-1, 0]
 
     def init_save(self, use_strings=True):
