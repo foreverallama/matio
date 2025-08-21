@@ -178,7 +178,7 @@ class FileWrapper:
         fromfile_version = np.frombuffer(
             fwrap_metadata, dtype=self.byte_order, count=1, offset=0
         )[0]
-        if not (1 < fromfile_version <= self.version):
+        if not 1 < fromfile_version <= self.version:
             raise RuntimeError(
                 f"FileWrapper version {fromfile_version} is not supported"
             )
