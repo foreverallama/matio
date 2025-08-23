@@ -381,7 +381,8 @@ class FileWrapper:
         dyn_prop_map = {}
         for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
             dyn_obj_id = self.get_dyn_object_id(dyn_prop_id)
-            classname = self.get_classname(dyn_obj_id)
+            dyn_class_id = self.get_object_metadata(dyn_obj_id)[0]
+            classname = self.get_classname(dyn_class_id)
             obj = MatioOpaque(classname=classname, type_system="MCOS")
             obj.properties = self.get_properties(dyn_obj_id)
             dyn_prop_map[f"__dynamic_property__{i + 1}"] = obj
