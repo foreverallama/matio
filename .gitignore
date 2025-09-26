@@ -84,6 +84,13 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# build files
+build/
+dist/
+*.egg-info
+*.so
+*.c
+
 # Cython debug symbols
 cython_debug/
 
