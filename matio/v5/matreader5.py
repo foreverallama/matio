@@ -38,17 +38,16 @@ import sys
 import warnings
 from io import BytesIO
 
+from matio.subsystem import MatSubsystem
+from matio.utils.matclass import MatReadError, MatReadWarning
 from matio.utils.matheaders import MAT5_HEADER_SIZE_BYTES, check_mat_version
 
-from ..subsystem.subsys import MatSubsystem
-from ..utils.matclass import MatReadError, MatReadWarning
+# Constants and helper objects
+from matio.v5.matio5_params import mclass_info, miTypes
 
 # Reader object for matlab 5 format variables
 from ._mio5_utils import VarReader5
 from ._streams import ZlibInputStream
-
-# Constants and helper objects
-from .matio5_params import mclass_info, miTypes
 
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
@@ -247,7 +246,9 @@ def read_subsystem(f, subsystem_offset, byte_order, raw_data, add_table_attrs):
     except MatReadError as err:
         raise MatReadError(f'Unreadable subsystem data because "{err}"')
 
-    subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)
+    subsystem = MatSubsystem(
+        byte_order, raw_data=raw_data, add_table_attrs=add_table_attrs
+    )
     subsystem.load_subsystem(subsys_data)
 
     return subsystem

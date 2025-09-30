@@ -3,9 +3,16 @@
 import warnings
 
 import numpy as np
+from scipy.sparse import issparse
 
-from .matclass import EmptyMatStruct, IntegerDecodingHint, MatWriteWarning
-from .matheaders import MAT_5_VERSION, MAT_HDF_VERSION
+from matio.utils.matclass import (
+    EmptyMatStruct,
+    IntegerDecodingHint,
+    MatlabOpaque,
+    MatWriteWarning,
+)
+from matio.utils.matconvert import convert_py_to_mat, guess_class_name
+from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION
 
 
 def chars_to_strings(in_arr):
@@ -79,7 +86,7 @@ def matlab_class_to_dtype(matlab_class, current_dtype):
     return dtype
 
 
-def matdims(arr, oned_as="column"):
+def matdims(arr, oned_as="col"):
     """Determine equivalent MATLAB dimensions for given array"""
     shape = arr.shape
     if shape == ():  # scalar
@@ -87,12 +94,12 @@ def matdims(arr, oned_as="column"):
     if len(shape) == 1:  # 1D
         if shape[0] == 0:
             return (0, 0)
-        elif oned_as == "column":
+        elif oned_as == "col":
             return shape + (1,)
         elif oned_as == "row":
             return (1,) + shape
         else:
-            raise ValueError(f'1-D option "{oned_as}" is strange')
+            raise ValueError(f'Expected oned_as to be "col" or "row", got {oned_as!r}')
     return shape
 
 
@@ -193,7 +200,7 @@ def guess_type_system(classname):
     return type_system
 
 
-def to_writeable(source):
+def to_writeable(source, oned_as="col"):
     """Convert input object ``source`` to something we can write
 
     Parameters
@@ -208,29 +215,55 @@ def to_writeable(source):
         ``EmptyStructMarker``.  Otherwise return `source` converted to an
         ndarray with contents for writing to matfile.
     """
-    if isinstance(source, np.ndarray):
-        return source
     if source is None:
-        return None
+        return np.empty((0, 0), dtype=np.float64)
+
+    if isinstance(source, MatlabOpaque):
+        return source
+
+    if issparse(source):
+        return source
+
+    classname = guess_class_name(source)
+    if classname is not None:
+        if isinstance(source, (np.ndarray, np.generic)):
+            source = np.asanyarray(source)
+            source = np.atleast_2d(source)
+            if source.ndim == 1 and oned_as == "col":
+                source = source.T
+        return convert_py_to_mat(source, classname)
+
+    if isinstance(source, (np.ndarray, np.generic)):
+        narr = np.asanyarray(source)
+
+        if narr.dtype.kind in ("U", "S"):
+            # Backwards compatibility with scipy "chars_to_strings"
+            return narr
+
+        narr = np.atleast_2d(narr)
+        if narr.ndim == 1 and oned_as == "col":
+            narr = narr.T
+
+        return narr
+
     if hasattr(source, "__array__"):
         return np.asarray(source)
+
     # Objects that implement mappings
     is_mapping = (
         hasattr(source, "keys")
         and hasattr(source, "values")
         and hasattr(source, "items")
     )
-    # Objects that don't implement mappings, but do have dicts
-    if isinstance(source, np.generic):
-        # NumPy scalars are never mappings (PyPy issue workaround)
-        pass
-    elif not is_mapping and hasattr(source, "__dict__"):
+
+    if not is_mapping and hasattr(source, "__dict__"):
         source = {
             key: value
             for key, value in source.__dict__.items()
             if not key.startswith("_")
         }
         is_mapping = True
+
     if is_mapping:
         dtype = []
         values = []
@@ -249,12 +282,21 @@ def to_writeable(source):
             return np.array([tuple(values)], dtype)
         else:
             return EmptyMatStruct(np.array([]))
-    # Next try and convert to an array
+
+    # Try and convert to numpy array
     try:
         narr = np.asanyarray(source)
     except ValueError:
         narr = np.asanyarray(source, dtype=object)
+
     if narr.dtype.type in (object, np.object_) and narr.shape == () and narr == source:
-        # No interesting conversion possible
-        return None
+        raise TypeError(f"Could not convert {type(source)} to a writeable datatype")
+
+    if narr.dtype.kind in ("U", "S"):
+        # Backwards compatibility with scipy "chars_to_strings"
+        return np.atleast_1d(narr)
+
+    narr = np.atleast_2d(narr)
+    if oned_as == "col":
+        narr = narr.T
     return narr

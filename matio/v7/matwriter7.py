@@ -1,6 +1,7 @@
 """MAT-file version 7.3 (HDF5) writer."""
 
 import string
+import sys
 import warnings
 from itertools import count, product
 
@@ -8,27 +9,26 @@ import h5py
 import numpy as np
 from scipy.sparse import issparse
 
-from ..utils.matclass import (
+from matio.subsystem import MatSubsystem
+from matio.utils.matclass import (
     EmptyMatStruct,
     IntegerDecodingHint,
+    MatlabEnumerationArray,
     MatlabFunction,
     MatlabObject,
     MatlabOpaque,
-    MatWriteError,
+    MatlabOpaqueArray,
     MatWriteWarning,
     ObjectDecodingHint,
 )
-from ..utils.matheaders import (
+from matio.utils.matheaders import (
     MAT_HDF_USER_BLOCK_BYTES,
     MAT_HDF_VERSION,
     write_file_header,
 )
-from ..utils.matutils import (
-    _get_string_arr_dtype,
-    mat_numeric,
-    strings_to_chars,
-    to_writeable,
-)
+from matio.utils.matutils import mat_numeric, strings_to_chars, to_writeable
+
+SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
 
 def savemat7(file_path, mdict, global_vars, oned_as):
@@ -36,7 +36,13 @@ def savemat7(file_path, mdict, global_vars, oned_as):
 
     with h5py.File(file_path, "w", userblock_size=MAT_HDF_USER_BLOCK_BYTES) as f:
         MW7 = MatWrite7(f, oned_as=oned_as)
+        MW7.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW7.subsystem.init_save()
         MW7.put_variables(mdict, global_vars)
+
+        subsystem = MW7.subsystem.set_subsystem(version=MAT_HDF_VERSION)
+        if subsystem is not None:
+            MW7.write_struct_array(f, "#subsystem#", subsystem)
 
     with open(file_path, "r+b") as f:
         f.seek(0)
@@ -48,9 +54,10 @@ def savemat7(file_path, mdict, global_vars, oned_as):
 class MatWrite7:
     """Writes MAT-file version 7.3 (HDF5) files."""
 
-    def __init__(self, h5file, oned_as="row"):
+    def __init__(self, h5file, oned_as="col"):
         self.h5file = h5file
         self.oned_as = oned_as
+        self.subsystem = None
         self.refs_group = "#refs#"
         self._name_gen = self._matlab_refname_generator()
 
@@ -263,20 +270,25 @@ class MatWrite7:
             self.add_int_decode_attr(sparse_group, int_decode)
         return sparse_group
 
-    # def write_opaque_object(self, parent, var_name, data):
-    #     """Writes an opaque object to the HDF5 file."""
+    def write_opaque_object(self, parent, var_name, data):
+        """Writes an opaque object to the HDF5 file."""
 
-    #     if data.classname == "FileWrapper__":
-    #         dset = self.write_cell_array(parent, var_name, data.properties.T)
-    #     else:
-    #         metadata = set_object_metadata(data)
-    #         if metadata.size == 0:
-    #             metadata = self.get_empty_array(metadata)
-    #         dset = parent.create_dataset(var_name, data=metadata.T)
+        if data.classname == "FileWrapper__":
+            dset = self.write_cell_array(parent, var_name, data.properties.T)
+        else:
+            metadata = self.subsystem.set_object_metadata(data)
+            dset = parent.create_dataset(var_name, data=metadata.T)
 
-    #     dset.attrs.create("MATLAB_class", np.bytes_(data.classname))
-    #     dset.attrs.create("MATLAB_object_decode", np.int32(ObjectDecodingHint.OPAQUE_HINT))
-    #     return dset
+        if isinstance(data, MatlabOpaqueArray):
+            classname = data.flat[0].classname
+        else:
+            classname = data.classname
+
+        dset.attrs.create("MATLAB_class", np.bytes_(classname))
+        dset.attrs.create(
+            "MATLAB_object_decode", np.int32(ObjectDecodingHint.OPAQUE_HINT)
+        )
+        return dset
 
     def write_variable(self, var_name, data, group=None):
         """Writes a variable to the HDF5 file."""
@@ -288,34 +300,27 @@ class MatWrite7:
         else:
             parent = self.h5file.require_group(group)
 
+        data = to_writeable(data, self.oned_as)
+
         if issparse(data):
             dset = self.write_sparse_array(parent, var_name, data)
-            return dset
-
-        # if not isinstance(data, MatioOpaque):
-        #     classname = guess_class_name(data)
-        #     if classname is not None:
-        #         data = MatioOpaque(classname=classname, properties=data, type_system="MCOS")
-
-        if isinstance(data, EmptyMatStruct):
-            dset = self.write_empty_struct(parent, var_name, data)
-            return dset
-        if isinstance(data, MatlabOpaque):
+        elif isinstance(data, (MatlabOpaque, MatlabOpaqueArray)):
+            dset = self.write_opaque_object(parent, var_name, data)
+        elif isinstance(data, MatlabFunction):
+            dset = self.write_function_handle(parent, var_name, data)
+        elif isinstance(data, MatlabObject):
+            dset = self.write_matlab_object(parent, var_name, data)
+        elif isinstance(data, MatlabEnumerationArray):
             warnings.warn(
-                f"Opaque object {data.classname} not supported for writing. Skipping.",
+                f"MatlabEnumerationArray {data.classname} not supported for writing. Skipping.",
                 UserWarning,
             )
             return None
-        if isinstance(data, MatlabFunction):
-            dset = self.write_function_handle(parent, var_name, data)
-            return dset
-        if isinstance(data, MatlabObject):
-            dset = self.write_matlab_object(parent, var_name, data)
-            return dset
+        elif isinstance(data, EmptyMatStruct):
+            dset = self.write_empty_struct(parent, var_name, data)
 
-        # At this point we expect basic datatypes
-        data = to_writeable(data)
-        if data.dtype.kind in ("i", "u", "f", "c", "b"):
+        # At this point it must be a numpy array
+        elif data.dtype.kind in ("i", "u", "f", "c", "b"):
             dset = self.write_numeric_dset(parent, var_name, data)
         elif data.dtype.kind in ("U", "S"):
             dset = self.write_char_dset(parent, var_name, data)

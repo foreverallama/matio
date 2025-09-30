@@ -15,7 +15,7 @@ namespace = "TestClasses"
 class TestLoadMatlabUserDefined:
 
     def test_obj_no_vals(self, filename, version):
-        """Test reading datetime scalar data from MAT-file"""
+        """Test reading uninitialized object from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["obj_no_vals"])
         assert "obj_no_vals" in mdict
@@ -36,7 +36,7 @@ class TestLoadMatlabUserDefined:
             )
 
     def test_obj_with_vals(self, filename, version):
-        """Test reading datetime array data from MAT-file"""
+        """Test reading initialized object from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["obj_with_vals"])
         assert "obj_with_vals" in mdict
@@ -57,7 +57,7 @@ class TestLoadMatlabUserDefined:
             )
 
     def test_obj_with_default_val(self, filename, version):
-        """Test reading datetime with format data from MAT-file"""
+        """Test reading object with default values (including objects in default vals) from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["obj_with_default_val"])
         assert "obj_with_default_val" in mdict
@@ -81,7 +81,7 @@ class TestLoadMatlabUserDefined:
         )
 
     def test_obj_array(self, filename, version):
-        """Test reading datetime with timezone data from MAT-file"""
+        """Test reading object array from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["obj_array"])
         assert "obj_array" in mdict
@@ -114,7 +114,7 @@ class TestLoadMatlabUserDefined:
         )
 
     def test_obj_with_nested_props(self, filename, version):
-        """Test reading datetime with timezone data from MAT-file"""
+        """Test reading objects with nested properties from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["obj_with_nested_props"])
         assert "obj_with_nested_props" in mdict
@@ -197,7 +197,7 @@ class TestLoadMatlabUserDefined:
             )
 
     def test_handle_class_obj(self, filename, version):
-        """Test reading datetime with timezone data from MAT-file"""
+        """Test reading handle class objects from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["obj_handle_1", "obj_handle_2"]
@@ -215,3 +215,222 @@ class TestLoadMatlabUserDefined:
         np.testing.assert_array_equal(
             mdict["obj_handle_1"].properties["a"], val, strict=True
         )
+
+
+@pytest.mark.parametrize("filename, version", files)
+class TestSaveMatlabUserDefined:
+
+    def test_obj_no_vals(self, filename, version):
+        """Test writing uninitialized objects to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["obj_no_vals"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["obj_no_vals"])
+
+            assert isinstance(mload["obj_no_vals"], MatlabOpaque)
+            assert mload["obj_no_vals"].classname == f"{namespace}.BasicClass"
+            assert mload["obj_no_vals"].type_system == "MCOS"
+
+            for key, val in mdict["obj_no_vals"].properties.items():
+                assert key in mload["obj_no_vals"].properties
+                np.testing.assert_array_equal(
+                    mload["obj_no_vals"].properties[key], val, strict=True
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_obj_with_vals(self, filename, version):
+        """Test writing initialized objects to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["obj_with_vals"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["obj_with_vals"])
+
+            assert isinstance(mload["obj_with_vals"], MatlabOpaque)
+            assert mload["obj_with_vals"].classname == f"{namespace}.BasicClass"
+            assert mload["obj_with_vals"].type_system == "MCOS"
+
+            for key, val in mdict["obj_with_vals"].properties.items():
+                assert key in mload["obj_with_vals"].properties
+                np.testing.assert_array_equal(
+                    mload["obj_with_vals"].properties[key], val, strict=True
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_obj_with_default_val(self, filename, version):
+        """Test writing objects with default values (including objects in default vals) to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["obj_with_default_val"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["obj_with_default_val"]
+            )
+
+            assert isinstance(mload["obj_with_default_val"], MatlabOpaque)
+            assert (
+                mload["obj_with_default_val"].classname == f"{namespace}.DefaultClass"
+            )
+            assert mload["obj_with_default_val"].type_system == "MCOS"
+
+            for key, val in mdict["obj_with_default_val"].properties.items():
+                assert key in mload["obj_with_default_val"].properties
+                np.testing.assert_array_equal(
+                    mload["obj_with_default_val"].properties[key], val, strict=True
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_obj_array(self, filename, version):
+        """Test writing object arrays to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["obj_array"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["obj_array"])
+
+            assert isinstance(mload["obj_array"], MatlabOpaqueArray)
+            assert mload["obj_array"].classname == f"{namespace}.BasicClass"
+            assert mload["obj_array"].type_system == "MCOS"
+            assert mload["obj_array"].shape == mdict["obj_array"].shape
+            assert mload["obj_array"].dtype == object
+            assert all(isinstance(x, MatlabOpaque) for x in mload["obj_array"].flat)
+
+            for idx in np.ndindex(mdict["obj_array"].shape):
+                for key, val in mdict["obj_array"][idx].properties.items():
+                    assert key in mload["obj_array"][idx].properties
+                    np.testing.assert_array_equal(
+                        mload["obj_array"][idx].properties[key], val, strict=True
+                    )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_obj_with_nested_props(self, filename, version):
+        """Test writing objects with nested properties to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["obj_with_nested_props"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["obj_with_nested_props"]
+            )
+
+            assert isinstance(mload["obj_with_nested_props"], MatlabOpaque)
+            assert mload["obj_with_nested_props"].classname == f"{namespace}.BasicClass"
+            assert mload["obj_with_nested_props"].type_system == "MCOS"
+
+            assert isinstance(
+                mload["obj_with_nested_props"].properties["a"], MatlabOpaque
+            )
+            for key, val in (
+                mdict["obj_with_nested_props"].properties["a"].properties.items()
+            ):
+                assert key in mload["obj_with_nested_props"].properties["a"].properties
+                np.testing.assert_array_equal(
+                    mload["obj_with_nested_props"].properties["a"].properties[key],
+                    val,
+                    strict=True,
+                )
+
+            assert isinstance(
+                mdict["obj_with_nested_props"].properties["b"][0, 0], MatlabOpaque
+            )
+
+            for key, val in (
+                mdict["obj_with_nested_props"].properties["b"][0, 0].properties.items()
+            ):
+                assert (
+                    key
+                    in mload["obj_with_nested_props"].properties["b"][0, 0].properties
+                )
+                np.testing.assert_array_equal(
+                    mload["obj_with_nested_props"]
+                    .properties["b"][0, 0]
+                    .properties[key],
+                    val,
+                    strict=True,
+                )
+
+            for key, val in (
+                mdict["obj_with_nested_props"]
+                .properties["c"][0, 0]["InnerProp"]
+                .properties.items()
+            ):
+                assert (
+                    key
+                    in mload["obj_with_nested_props"]
+                    .properties["c"][0, 0]["InnerProp"]
+                    .properties
+                )
+                np.testing.assert_array_equal(
+                    mload["obj_with_nested_props"]
+                    .properties["c"][0, 0]["InnerProp"]
+                    .properties[key],
+                    val,
+                    strict=True,
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_handle_class_obj(self, filename, version):
+        """Test writing handle class objects to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["obj_handle_1", "obj_handle_2"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["obj_handle_1", "obj_handle_2"]
+            )
+
+            assert isinstance(mload["obj_handle_1"], MatlabOpaque)
+            assert isinstance(mload["obj_handle_2"], MatlabOpaque)
+            assert mload["obj_handle_1"] is mload["obj_handle_2"]
+
+            for key, val in mdict["obj_handle_1"].properties.items():
+                assert key in mload["obj_handle_1"].properties
+                np.testing.assert_array_equal(
+                    mload["obj_handle_1"].properties[key], val, strict=True
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

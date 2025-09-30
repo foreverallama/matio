@@ -163,7 +163,7 @@ class TestLoadSparse:
 class TestSaveSparse:
 
     def test_sparse_empty(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing empty sparse to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_empty"])
 
@@ -185,7 +185,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_col(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse column to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_col"])
 
@@ -207,7 +207,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_row(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse row to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_row"])
 
@@ -229,7 +229,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_diag(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse diagonal matrix to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_diag"])
 
@@ -251,7 +251,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_rec_row(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse rectangular row to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_rec_row"])
 
@@ -273,7 +273,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_rec_col(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse rectangular column to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_rec_col"])
 
@@ -295,7 +295,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_symmetric(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse symmetric to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_symmetric"])
 
@@ -317,7 +317,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_neg(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse matrix with negative values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_neg"])
 
@@ -339,7 +339,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_logical(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse matrix with logical values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_logical"])
 
@@ -361,7 +361,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_complex(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse matrix with complex values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_complex"])
 
@@ -383,7 +383,7 @@ class TestSaveSparse:
                 os.remove(temp_file_path)
 
     def test_sparse_nnz(self, filename, version):
-        """Test writing int8 data to MAT-file"""
+        """Test writing sparse with all non-zeros to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["sparse_nnz"])
 

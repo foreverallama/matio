@@ -15,7 +15,7 @@ namespace = "TestClasses"
 class TestLoadMatlabEnum:
 
     def test_enum_scalar(self, filename, version):
-        """Test reading datetime scalar data from MAT-file"""
+        """Test reading enum scalar from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["enum_scalar"])
         assert "enum_scalar" in mdict
@@ -34,7 +34,7 @@ class TestLoadMatlabEnum:
             np.testing.assert_array_equal(mdict["enum_scalar"][0, 0].value[key], val)
 
     def test_enum_uint32(self, filename, version):
-        """Test reading datetime array data from MAT-file"""
+        """Test reading enum array from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["enum_uint32"])
         assert "enum_uint32" in mdict

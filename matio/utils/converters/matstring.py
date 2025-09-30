@@ -43,18 +43,6 @@ def mat_to_string(props, byte_order, **_kwargs):
 def string_to_mat(arr):
     """Converts numpy string array to MATLAB string format as uint64 array"""
 
-    if not isinstance(arr, np.ndarray):
-        try:
-            arr = np.str_(arr)
-        except Exception as e:
-            raise TypeError(f"Expected numpy.ndarray, got {type(arr)}") from e
-
-    # if arr.ndim == 1:
-    #     if oned_as == "row":
-    #         arr = arr.reshape(1, -1)
-    #     elif oned_as == "col":
-    #         arr = arr.reshape(-1, 1)
-
     ndims = arr.ndim
     shape = arr.shape
     encoding = "utf-16-le" if np.little_endian else "utf-16-be"
@@ -62,7 +50,7 @@ def string_to_mat(arr):
     utf16_data_list = []
     char_counts = []
 
-    for s in arr.ravel():
+    for s in arr.ravel(order="F"):
         utf16_arr = np.frombuffer(s.encode(encoding), dtype=np.uint16)
         utf16_data_list.append(utf16_arr)
         char_counts.append(len(utf16_arr))

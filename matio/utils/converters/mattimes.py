@@ -6,7 +6,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import numpy as np
 
-from ..matclass import MatConvertWarning
+from matio.utils.matclass import MatConvertWarning
+
+caldur_dtype = [
+    ("months", "timedelta64[M]"),
+    ("days", "timedelta64[D]"),
+    ("millis", "timedelta64[ms]"),
+]
 
 
 def get_tz_offset(tz):
@@ -64,8 +70,8 @@ def mat_to_duration(props, **_kwargs):
     """Convert MATLAB duration to Numpy timedelta64 array"""
 
     millis = props["millis"]
-    if millis.size == 0:
-        return np.empty((0, 0), dtype="timedelta64[ms]")
+    # if millis.size == 0:
+    # return np.empty((0, 0), dtype="timedelta64[ms]")
 
     fmt = props.get("fmt", None)
     if fmt is None:
@@ -108,18 +114,12 @@ def mat_caldur_to_numpy(arr):
             return np.full(ref_shape, x.item(), dtype=dtype)
         return x.astype(dtype)
 
-    out_dtype = [
-        ("months", "timedelta64[M]"),
-        ("days", "timedelta64[D]"),
-        ("millis", "timedelta64[ms]"),
-    ]
-
     months = arr[0, 0]["months"]
     days = arr[0, 0]["days"]
     millis = arr[0, 0]["millis"]
 
     ref_shape = max([x.shape for x in (months, days, millis)], key=lambda s: np.prod(s))
-    res = np.empty(ref_shape, dtype=out_dtype)
+    res = np.empty(ref_shape, dtype=caldur_dtype)
     res["months"] = _broadcast_to_ref(months, "timedelta64[M]")
     res["days"] = _broadcast_to_ref(days, "timedelta64[D]")
     res["millis"] = _broadcast_to_ref(millis, "timedelta64[ms]")
@@ -140,10 +140,8 @@ def mat_to_calendarduration(props, **_kwargs):
 
 def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
-    if not isinstance(arr, np.ndarray):
-        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
-    if not np.issubdtype(arr.dtype, np.datetime64):
-        raise TypeError(f"Expected numpy.datetime64 array, got {arr.dtype}")
+
+    # TODO: Allow python datetime input
 
     millis = arr.astype("datetime64[ms]").astype(np.float64)
 
@@ -165,10 +163,6 @@ def datetime_to_mat(arr):
 
 def duration_to_mat(arr):
     """Convert numpy timedelta64 array to MATLAB duration format."""
-    if not isinstance(arr, np.ndarray):
-        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
-    if not np.issubdtype(arr.dtype, np.timedelta64):
-        raise TypeError(f"Expected numpy.timedelta64 array, got {arr.dtype}")
 
     unit, _ = np.datetime_data(arr.dtype)
     millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6
@@ -176,7 +170,7 @@ def duration_to_mat(arr):
     if unit not in allowed_units:
         warnings.warn(
             f"duration_to_mat: MATLAB Duration arrays do not support timedelta64[{unit}]. Defaulting to 's'.",
-            UserWarning,
+            MatConvertWarning,
         )
         unit = "s"
 
@@ -189,30 +183,37 @@ def duration_to_mat(arr):
     return prop_map
 
 
+def numpy_to_matcaldur(arr):
+    """Convert numpy structured array with fields ['months', 'days', 'millis'] to MATLAB calendarDuration format."""
+
+    fields = ["months", "days", "millis"]
+    comp_dtype = [(f, object) for f in fields]
+    comps = np.empty((1, 1), dtype=comp_dtype)
+
+    if arr.size == 0:
+        for f in fields:
+            comps[0, 0][f] = np.empty((0, 0), dtype=np.float64)
+        return comps
+
+    for f in fields:
+        if np.all(arr[f] == arr[f].flat[0]):
+            # MATLAB reduces to scalar if all values are the same
+            reduced = np.array([[arr[f].flat[0]]], dtype=arr[f].dtype)
+            comps[0, 0][f] = reduced.astype(np.float64)
+        else:
+            comps[0, 0][f] = arr[f].astype(np.float64)
+
+    return comps
+
+
 def calendarduration_to_mat(arr):
     """Convert numpy structured array with fields ['months', 'days', 'millis'] to MATLAB calendarDuration format."""
-    if not isinstance(arr, np.ndarray):
-        raise TypeError(f"Expected numpy.ndarray, got {type(arr)}")
-    if arr.dtype.names is None or set(arr.dtype.names) != {"months", "days", "millis"}:
-        raise TypeError(
-            "Expected structured array with fields ['months', 'days', 'millis']"
-        )
-    if arr.size > 0 and arr.ndim == 1:
-        arr = arr.reshape(1, -1)  # Ensure 2D Shape
 
-    if arr.size > 0:
-        arr[0, 0]["months"] = (
-            arr[0, 0]["months"].astype("timedelta64[M]").astype("float64")
-        )
-        arr[0, 0]["days"] = arr[0, 0]["days"].astype("timedelta64[D]").astype("float64")
-        arr[0, 0]["millis"] = (
-            arr[0, 0]["millis"].astype("timedelta64[ms]").astype("float64")
-        )
-
-    fmt = "ymdt"
+    comps = numpy_to_matcaldur(arr)
+    fmt = "ymwdt"
 
     prop_map = {
-        "components": arr,
+        "components": comps,
         "fmt": fmt,
     }
 

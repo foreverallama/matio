@@ -6,12 +6,12 @@ import h5py
 import numpy as np
 from scipy.sparse import csc_array
 
+from matio.subsystem import MatSubsystem
 from matio.utils.matclass import (
     EmptyMatStruct,
     IntegerDecodingHint,
     MatlabFunction,
     MatlabObject,
-    MatlabOpaque,
     ObjectDecodingHint,
 )
 from matio.utils.matheaders import MCOS_MAGIC_NUMBER
@@ -20,8 +20,6 @@ from matio.utils.matutils import (
     guess_type_system,
     matlab_class_to_dtype,
 )
-
-from ..subsystem.subsys import MatSubsystem
 
 
 def loadmat7(
@@ -219,10 +217,6 @@ class MatRead7:
 
         type_system = guess_type_system(classname)
 
-        # if is_empty:
-        #     return MatlabOpaque(None, type_system, classname)
-
-        # Need to decode variable type at this point and read
         # Check Enumeration Instances
         fields = obj.attrs.get("MATLAB_fields", None)
         if fields is not None:

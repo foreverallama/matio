@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatConvertWarning, MatlabOpaque
+from matio.utils.matclass import MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"

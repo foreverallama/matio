@@ -43,22 +43,25 @@ from io import BytesIO
 import numpy as np
 import scipy.sparse
 
+from matio.subsystem import MatSubsystem
+from matio.utils.matclass import (
+    EmptyMatStruct,
+    MatlabFunction,
+    MatlabObject,
+    MatlabOpaque,
+    MatlabOpaqueArray,
+    MatWriteError,
+    MatWriteWarning,
+)
 from matio.utils.matheaders import (
     MAT5_MAX_ARR_BYTES,
     MAT5_MAX_STRUCT_FIELDNAME_LEN,
     MAT_5_VERSION,
     write_file_header,
+    write_subsystem_offset,
+    write_version,
 )
-
-from ..utils.matclass import (
-    EmptyMatStruct,
-    MatlabFunction,
-    MatlabObject,
-    MatlabOpaque,
-    MatWriteError,
-    MatWriteWarning,
-)
-from ..utils.matutils import (
+from matio.utils.matutils import (
     _get_string_arr_dtype,
     mat_numeric,
     matdims,
@@ -67,10 +70,13 @@ from ..utils.matutils import (
 )
 
 # Constants and helper objects
-from .matio5_params import MDTYPES, NP_TO_MTYPES, NP_TO_MXTYPES, miTypes, mxTypes
-
-# from ..utils.matclass import MatlabFunction, MatlabObject, MatlabOpaque, EmptyStruct
-# from ._mio_subsys import MatlabOpaque, MatSubsystem
+from matio.v5.matio5_params import (
+    MDTYPES,
+    NP_TO_MTYPES,
+    NP_TO_MXTYPES,
+    miTypes,
+    mxTypes,
+)
 
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
@@ -87,9 +93,39 @@ def savemat5(file_path, mdict, global_vars, oned_as, do_compression):
     with open(file_path, "wb") as f:
         write_file_header(f, version=MAT_5_VERSION)
         MW = MatFile5Writer(f, oned_as=oned_as)
+        MW.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW.subsystem.init_save()
+
         MW.put_variables(mdict, global_vars, do_compression)
+        subsystem = MW.subsystem.set_subsystem(version=MAT_5_VERSION)
+        if subsystem is None:
+            return
+
+        subsystem_offset = f.tell()
+        subsys_stream = write_subsystem(subsystem, oned_as)
+
+        temp_dict = {"__subsystem__": subsys_stream}
+        MW.put_variables(temp_dict, global_vars=[], do_compression=do_compression)
+
+        write_subsystem_offset(f, subsystem_offset)
 
     return
+
+
+def write_subsystem(subsystem, oned_as):
+    """Write subsystem data to subsys stream"""
+
+    subsys_stream = BytesIO()
+    subsys_stream.seek(0)
+    write_version(subsys_stream, MAT_5_VERSION)
+    subsys_stream.write(b"\x00" * 4)  # Padding
+
+    MW = MatFile5Writer(subsys_stream, oned_as=oned_as)
+    temp_dict = {"__subsystem__": subsystem}
+
+    MW.put_variables(temp_dict, global_vars=[], do_compression=False)
+    subsys_view = np.frombuffer(subsys_stream.getbuffer(), dtype=np.uint8)
+    return subsys_view
 
 
 class VarWriter5:
@@ -101,6 +137,8 @@ class VarWriter5:
     def __init__(self, file_writer):
         self.file_stream = file_writer.file_stream
         self.oned_as = file_writer.oned_as
+        self.subsystem = file_writer.subsystem
+
         # These are used for top level writes, and unset after
         self._var_name = None
         self._var_is_global = False
@@ -205,35 +243,23 @@ class VarWriter5:
 
     def write(self, arr):
         """Write data element to MAT-file"""
-        # TODO: Update Method Later
+
         mat_tag_pos = self.file_stream.tell()
 
-        # First check if these are sparse
-        if scipy.sparse.issparse(arr):
-            self.write_sparse(arr)
-            self.update_matrix_tag(mat_tag_pos)
-            return
+        narr = to_writeable(arr, self.oned_as)
 
-        # if isinstance(narr, MatlabOpaque):
-        #     self.write_opaque(narr)
-        if isinstance(arr, MatlabObject):
+        if scipy.sparse.issparse(narr):
+            self.write_sparse(narr)
+        elif isinstance(narr, MatlabObject):
             self.write_object(narr)
-            self.update_matrix_tag(mat_tag_pos)
-            return
-        elif isinstance(arr, MatlabFunction):
+        elif isinstance(narr, MatlabFunction):
             warnings.warn("Writing function handles is not supported", MatWriteWarning)
             return
-        elif isinstance(arr, EmptyMatStruct):
-            self.write_empty_struct(arr)
-            self.update_matrix_tag(mat_tag_pos)
-            return
-
-        # Try to convert things that aren't arrays
-        narr = to_writeable(arr)
-        if narr is None:
-            raise TypeError(f"Could not convert {arr} (type {type(arr)}) to array")
-
-        if narr.dtype.fields:  # struct array
+        elif isinstance(narr, EmptyMatStruct):
+            self.write_empty_struct(narr)
+        elif isinstance(narr, (MatlabOpaque, MatlabOpaqueArray)):
+            self.write_opaque(narr)
+        elif narr.dtype.fields:  # struct array
             self.write_struct(narr)
         elif narr.dtype.hasobject:  # cell array
             self.write_cells(narr)
@@ -241,6 +267,7 @@ class VarWriter5:
             self.write_char(narr)
         elif narr.dtype.kind in ("i", "u", "f", "c", "b"):
             self.write_numeric(narr)
+
         self.update_matrix_tag(mat_tag_pos)
 
     def write_numeric(self, arr):
@@ -362,15 +389,16 @@ class VarWriter5:
         self.write_element(np.array(arr.classname, dtype="S"), mdtype=miTypes.miINT8)
         self._write_items(arr)
 
-    # def write_opaque(self, arr):
-    #     '''Array Flags, Var Name, Type System, Class Name, Metadata'''
-    #     self.write_header(None, mxTypes.mxOPAQUE_CLASS)
-    #     self.write_element(np.array(arr.type_system, dtype='S'),
-    #                         mdtype=miTypes.miINT8)
-    #     self.write_element(np.array(arr.classname, dtype='S'),
-    #                         mdtype=miTypes.miINT8)
-    #     # TODO: Set object Metadata
-    #     # self.write(arr['_ObjectMetadata'].item())
+    def write_opaque(self, arr):
+        """Array Flags, Var Name, Type System, Class Name, Metadata"""
+        self.write_header(None, mxTypes.mxOPAQUE_CLASS)
+        self.write_element(np.array(arr.type_system, dtype="S"), mdtype=miTypes.miINT8)
+        self.write_element(np.array(arr.classname, dtype="S"), mdtype=miTypes.miINT8)
+        if arr.classname == "FileWrapper__":
+            self.write(arr.properties)
+        else:
+            objmetadata = self.subsystem.set_object_metadata(arr)
+            self.write(objmetadata)
 
 
 class MatFile5Writer:
@@ -381,19 +409,18 @@ class MatFile5Writer:
         self.file_stream = file_stream
         self.oned_as = oned_as
         self._matrix_writer = None
-        self._subsystem = None
+        self.subsystem = None
 
     def put_variables(self, mdict, global_vars, do_compression):
         """Write variables to MATLAB file."""
 
         self._matrix_writer = VarWriter5(self)
 
-        # self._subsystem = MatSubsystem()
-        # self._subsystem.init_save()
-
         for name, var in mdict.items():
-            if name[0] == "_":
-                msg = f"Starting field name with a " f"underscore ({name}) is ignored"
+            if name == "__subsystem__":
+                name = ""
+            elif name[0] in "_0123456789":
+                msg = f"Variable names cannot start with '{name[0]}'. Skipping '{name}'"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue
             is_global = name in global_vars

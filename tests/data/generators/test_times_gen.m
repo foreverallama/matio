@@ -3,7 +3,7 @@
 dt_basic = datetime(2025, 4, 1, 12, 00, 00);
 dt_tz = datetime(2025,4,1,12,00,00, 'TimeZone', "America/New_York");
 
-dt_array = datetime(2025, 4, 1) + days(0:5);
+dt_vector = datetime(2025, 4, 1) + days(0:5);
 dt_array = reshape(dt_array, 2, 3);
 
 dt_empty = datetime.empty;

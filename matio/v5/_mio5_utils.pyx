@@ -96,7 +96,7 @@ from matio.utils.matutils import chars_to_strings
 from matio.v5 cimport _streams
 
 import matio.v5.matio5_params as mio5p
-from matio.subsystem.subsys import MatSubsystem
+from matio.subsystem import MatSubsystem
 
 
 cdef enum:

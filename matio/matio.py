@@ -2,11 +2,9 @@
 
 from scipy.sparse import coo_matrix, issparse
 
-from .utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION, read_mat_header
-from .v5.matreader5 import loadmat5
-from .v5.matwriter5 import savemat5
-from .v7.matreader7 import loadmat7
-from .v7.matwriter7 import savemat7
+from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION, read_mat_header
+from matio.v5 import loadmat5, savemat5
+from matio.v7 import loadmat7, savemat7
 
 
 def load_from_mat(
@@ -62,7 +60,7 @@ def save_to_mat(
     mdict,
     version="v7",
     global_vars=None,
-    oned_as="row",
+    oned_as="col",
     do_compression=True,
 ):
     """Saves variables to MAT-file"""
