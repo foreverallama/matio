@@ -58,7 +58,7 @@ def load_from_mat(
 def save_to_mat(
     file_path,
     mdict,
-    version="v7",
+    version="v7.3",
     global_vars=None,
     oned_as="col",
     do_compression=True,
