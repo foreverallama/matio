@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8", "cython", "wheel"]
+requires = ["setuptools>=64", "setuptools-scm>=8", "Cython", "wheel", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -30,7 +30,7 @@ Homepage = "https://github.com/foreverallama/matio"
 Repository = "https://github.com/foreverallama/matio"
 Issues = "https://github.com/foreverallama/matio"
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+include = ["matio*"]
 
 [tool.setuptools_scm]

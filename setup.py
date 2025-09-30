@@ -1,7 +1,6 @@
 import numpy
 from Cython.Build import cythonize
-from Cython.Distutils import build_ext
-from setuptools import Extension, find_packages, setup
+from setuptools import Extension, setup
 
 extensions = [
     Extension(
@@ -18,9 +17,4 @@ extensions = [
 
 setup(
     ext_modules=cythonize(extensions, include_path=["matio"]),
-    include_dirs=["matio"],
-    name="matio",
-    cmdclass={"build_ext": build_ext},
-    packages=find_packages(where="."),
-    package_dir={"": "."},
 )
