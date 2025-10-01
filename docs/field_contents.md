@@ -31,7 +31,7 @@ The `matio` package attempts to convert some common MATLAB datatypes into a Pyth
 | `string`                          | `numpy.dtypes.StringDType()`            |
 | `table`                           | `pandas.DataFrame`                          |
 | `timetable`                       | `pandas.DataFrame` with datetime or duration index      |
-| `containers.Map`                  | TODO                                      |
+| `containers.Map`                  | `MatlabContainerMap` instance subclassed from `collections.UserDict` |
 | `dictionary`                      | TODO                                     |
 | `categorical`                     | `pandas.Categorical`                        |
 | Enumeration Instance Arrays       | `MatlabEnumerationArray` instance where each element is `enum.Enum`    |

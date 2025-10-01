@@ -56,6 +56,17 @@ save_to_mat(
 )
 ```
 
+### List variables in a MAT-file
+
+```python
+from matio import whosmat
+
+file_path = "path/to/your/file.mat"
+vars = whosmat(file_path)
+# Returns (variable_name, dims, datatype/classname)
+print(vars)
+```
+
 ## Opaque Class Objects
 
 Opaque class objects are what MATLAB calls object instances. Opaque objects have different types. The most common is `MCOS`, which is used for all user-defined classdefs, enumeration classes, as well as most MATLAB datatypes like `string`, `datetime` and `table.`
