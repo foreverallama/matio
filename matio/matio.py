@@ -2,9 +2,15 @@
 
 from scipy.sparse import coo_matrix, issparse
 
-from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION, read_mat_header
-from matio.v5 import loadmat5, savemat5
-from matio.v7 import loadmat7, savemat7
+from matio.utils.matclass import MatReadError, MatWriteError
+from matio.utils.matheaders import (
+    MAT_5_VERSION,
+    MAT_HDF_VERSION,
+    MAT_VERSIONS,
+    read_mat_header,
+)
+from matio.v5 import loadmat5, savemat5, whosmat5
+from matio.v7 import loadmat7, savemat7, whosmat7
 
 
 def load_from_mat(
@@ -55,6 +61,19 @@ def load_from_mat(
     return mdict
 
 
+def whosmat(file_path):
+    """Lists variables in MAT-file"""
+
+    _, ver, byte_order = read_mat_header(file_path)
+
+    if ver == MAT_5_VERSION:
+        vars = whosmat5(file_path, byte_order)
+    elif ver == MAT_HDF_VERSION:
+        vars = whosmat7(file_path)
+
+    return vars
+
+
 def save_to_mat(
     file_path,
     mdict,
@@ -72,25 +91,13 @@ def save_to_mat(
     elif not isinstance(global_vars, list):
         raise ValueError("global_vars must be a list of strings")
 
-    # subsys_offset = None
+    ver_int = MAT_VERSIONS.get(version)
+    if ver_int is None:
+        raise MatWriteError(
+            f"Unknown MAT-file version '{version}' specified. Supported versions are: {list(MAT_VERSIONS.keys())}"
+        )
 
-    if version == "v7":
+    if ver_int == MAT_5_VERSION:
         savemat5(file_path, mdict, global_vars, oned_as, do_compression)
-    elif version == "v7.3":
+    elif ver_int == MAT_HDF_VERSION:
         savemat7(file_path, mdict, global_vars, oned_as)
-    else:
-        raise ValueError(f"Unknown MAT-file version '{version}' specified")
-
-    # if subsys_offset is not None:
-    #     # For v7 version
-    #     if subsys_offset > 0:
-    #         write_subsystem_offset(file_stream, subsys_offset)
-
-    #     with open(file_path, "wb") as f:
-    #         f.write(file_stream.getvalue())
-
-    # else:
-    #     # For v7.3 version
-    #     with open(file_path, "wb") as f:
-    #         f.write(file_stream.getvalue())
-    #         f.write(h5buf.getvalue())

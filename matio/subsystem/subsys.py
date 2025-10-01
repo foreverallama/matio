@@ -5,7 +5,11 @@ import warnings
 import numpy as np
 
 from matio.utils.matclass import (
+    DYNAMIC_PROPERTY_PREFIX,
+    ENUMERATION_INSTANCE_TAG,
+    MCOS_SUBSYSTEM_CLASS,
     EmptyMatStruct,
+    MatlabCanonicalEmpty,
     MatlabEnumerationArray,
     MatlabOpaque,
     MatlabOpaqueArray,
@@ -27,6 +31,7 @@ from matio.utils.matutils import to_writeable
 SYSTEM_BYTE_ORDER = "<" if np.little_endian else ">"
 
 FILEWRAPPER_VERSION = 4
+MIN_FILEWRAPPER_VERSION = 2
 
 
 class MatSubsystem:
@@ -38,7 +43,7 @@ class MatSubsystem:
         raw_data=False,
         add_table_attrs=False,
         oned_as="col",
-        saveobj_ret_classes=[],
+        saveobj_ret_classes=[],  # TODO: Allow as user arg
     ):
         self.byte_order = "<u4" if byte_order[0] == "<" else ">u4"
         self.raw_data = raw_data
@@ -111,8 +116,10 @@ class MatSubsystem:
         self.version = np.frombuffer(
             fwrap_metadata, dtype=self.byte_order, count=1, offset=0
         )[0]
-        if not 1 < self.version <= FILEWRAPPER_VERSION:
-            raise MatReadError(f"FileWrapper version {self.version} is not supported")
+        if not MIN_FILEWRAPPER_VERSION <= self.version <= FILEWRAPPER_VERSION:
+            raise MatReadError(
+                f"{MCOS_SUBSYSTEM_CLASS} version {self.version} is not supported"
+            )
 
         # Number of unique property and class names
         self.num_names = np.frombuffer(
@@ -198,11 +205,11 @@ class MatSubsystem:
         """Checks if property value is a valid MCOS enumeration metadata array"""
 
         if metadata.dtype.names:
-            if "EnumerationInstanceTag" in metadata.dtype.names:
+            if ENUMERATION_INSTANCE_TAG in metadata.dtype.names:
                 if (
-                    metadata[0, 0]["EnumerationInstanceTag"].dtype == np.uint32
-                    and metadata[0, 0]["EnumerationInstanceTag"].size == 1
-                    and metadata[0, 0]["EnumerationInstanceTag"] == MCOS_MAGIC_NUMBER
+                    metadata[0, 0][ENUMERATION_INSTANCE_TAG].dtype == np.uint32
+                    and metadata[0, 0][ENUMERATION_INSTANCE_TAG].size == 1
+                    and metadata[0, 0][ENUMERATION_INSTANCE_TAG] == MCOS_MAGIC_NUMBER
                 ):
                     return True
 
@@ -340,7 +347,7 @@ class MatSubsystem:
             else:
                 warnings.warn(
                     f'Unknown property type {prop_type} for property "{prop_name}"',
-                    Warning,
+                    MatReadWarning,
                     stacklevel=3,
                 )
                 save_prop_map[prop_name] = prop_value
@@ -386,7 +393,7 @@ class MatSubsystem:
                 None, type_system=OpaqueType.MCOS, classname=classname
             )
             dynobj.properties = self.get_properties(dyn_obj_id)
-            dyn_prop_map[f"__dynamic_property__{i + 1}"] = dynobj
+            dyn_prop_map[f"{DYNAMIC_PROPERTY_PREFIX}{i + 1}"] = dynobj
 
         return dyn_prop_map
 
@@ -459,6 +466,7 @@ class MatSubsystem:
             and prop_value.dtype.kind != "T"
         ):
             # Iterate through cell arrays and struct arrays
+            # Ignore StringDType(): Used for MATLAB strings which uses 'O' internally
 
             # Make a copy to avoid modifying the original
             # Should be cheap as we're only copying object arrays
@@ -494,12 +502,13 @@ class MatSubsystem:
         obj_prop_metadata.extend([nprops])
 
         for prop_name, prop_value in prop_map.items():
-            if prop_name.startswith("__dynamic_property__"):
+            if prop_name.startswith(DYNAMIC_PROPERTY_PREFIX):
                 warnings.warn(
                     f"Dynamic property '{prop_name}' cannot be serialized. Skipping",
                     MatWriteWarning,
                     stacklevel=3,
                 )
+                continue
 
             if prop_name[0] in "_0123456789":
                 msg = f"Property names cannot start with '{prop_name[0]}'. Skipping '{prop_name}'"
@@ -527,6 +536,12 @@ class MatSubsystem:
 
     def set_object_id(self, obj, saveobj_ret_type=False):
         """Sets the object ID for a given object key (id(obj) or obj_key)"""
+
+        if obj.properties is None:
+            # Deleted object
+            class_id = self.set_class_id(obj.classname)
+            obj_id = 0
+            return obj_id, class_id
 
         if obj in self.mcos_object_cache:
             class_id = self.set_class_id(obj.classname)
@@ -615,7 +630,8 @@ class MatSubsystem:
 
         if type_system != OpaqueType.MCOS:
             warnings.warn(
-                "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped"
+                "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped",
+                MatWriteWarning,
             )
             return np.empty((0, 0), dtype=np.uint8)
 
@@ -691,17 +707,18 @@ class MatSubsystem:
         fwrap_metadata = np.concatenate(regions)
         return fwrap_metadata.reshape(-1, 1)
 
-    def set_fwrap_data(self, version):
+    def set_fwrap_data(self):
         """Create FileWrapper Cell Array"""
 
         if self.class_id_counter == 0:
+            # No MCOS objects to save
             return None
 
         array_len = 5 + len(self.mcos_props_saved)
         fwrap_data = np.empty((array_len, 1), dtype=object)
 
         fwrap_data[0, 0] = self.set_fwrap_metadata()
-        fwrap_data[1, 0] = np.empty((0, 0), dtype=object)  # Empty Placeholder
+        fwrap_data[1, 0] = MatlabCanonicalEmpty()
 
         for i, prop_val in enumerate(self.mcos_props_saved):
             fwrap_data[2 + i, 0] = prop_val
@@ -717,17 +734,13 @@ class MatSubsystem:
             shape=(self.class_id_counter + 1, 1), dtype=np.int32
         )
 
-        if version == MAT_HDF_VERSION:
-            # For some reason data is transposed in v7.3 files
-            fwrap_data = fwrap_data.T
-
-        fwrapper = MatlabOpaque(fwrap_data, OpaqueType.MCOS, "FileWrapper__")
+        fwrapper = MatlabOpaque(fwrap_data, OpaqueType.MCOS, MCOS_SUBSYSTEM_CLASS)
         return fwrapper
 
-    def set_subsystem(self, version):
+    def set_subsystem(self):
         """Creates subsystem struct array"""
 
-        fwrap_data = self.set_fwrap_data(version)
+        fwrap_data = self.set_fwrap_data()
         if fwrap_data is None:
             return None
 

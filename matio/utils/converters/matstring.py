@@ -4,6 +4,8 @@ import warnings
 
 import numpy as np
 
+from matio.utils.matclass import MatConvertWarning
+
 MAT_STRING_VERSION = 1
 
 
@@ -17,7 +19,7 @@ def mat_to_string(props, byte_order, **_kwargs):
     if data[0, 0] != MAT_STRING_VERSION:
         warnings.warn(
             "mat_to_string: String saved from a different MAT-file version. Returning raw data",
-            UserWarning,
+            MatConvertWarning,
         )
         return props[0, 0].get("any")
 

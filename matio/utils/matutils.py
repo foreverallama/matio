@@ -8,6 +8,8 @@ from scipy.sparse import issparse
 from matio.utils.matclass import (
     EmptyMatStruct,
     IntegerDecodingHint,
+    MatlabCanonicalEmpty,
+    MatlabClasses,
     MatlabOpaque,
     MatWriteWarning,
 )
@@ -78,7 +80,7 @@ def matlab_class_to_dtype(matlab_class, current_dtype):
     try:
         dtype = np.dtype(matlab_class)
     except TypeError:
-        if matlab_class == "logical":
+        if matlab_class == MatlabClasses.LOGICAL:
             dtype = np.dtype(np.bool_)
         else:
             # Fallback
@@ -122,13 +124,13 @@ def mat_numeric(arr, version, classname=None, int_decode=None):
     elif dt.kind == "f":
         if dt.itemsize == 4:
             target_dtype = np.dtype(np.float32)
-            classname = "single"
+            classname = MatlabClasses.SINGLE
         elif dt.itemsize == 8:
             target_dtype = np.dtype(np.float64)
-            classname = "double"
+            classname = MatlabClasses.DOUBLE
         else:
             target_dtype = np.dtype(np.float64)
-            classname = "double"
+            classname = MatlabClasses.DOUBLE
             warnings.warn(
                 f"Float type {dt} not supported in MATLAB. Converting to {target_dtype}.",
                 MatWriteWarning,
@@ -160,44 +162,11 @@ def mat_numeric(arr, version, classname=None, int_decode=None):
     elif dt.kind == "b":
         target_dtype = np.dtype(np.uint8)
         int_decode = IntegerDecodingHint.LOGICAL_HINT
-        classname = "logical"
+        classname = MatlabClasses.LOGICAL
 
-    arr = arr.astype(target_dtype, copy=True)
+    # arr = arr.astype(target_dtype, copy=True)
+    arr = arr.astype(target_dtype)
     return arr, classname, int_decode
-
-
-def prop_dict_to_array(self, props, nobjects, dims):
-    """Converts property map to a structured array"""
-
-    # Handle Empty Case
-    if not props or not props[0]:
-        return np.empty((0, 0), dtype=object)
-
-    dtype = [(name, object) for name in props[0].keys()]
-    arr = np.empty((nobjects,), dtype=dtype)
-
-    for i, prop in enumerate(props):
-        for name, _ in dtype:
-            prop_val = prop.get(name, np.empty((0, 0)))
-            arr[i][name] = prop_val
-
-    return arr.reshape(dims, order="F")
-
-
-def guess_type_system(classname):
-    """Gets the type system for the given class name."""
-
-    # Possibly, MATLAB decodes internally based on some object attribute
-    # This function is just guess work as of now
-    # Used for decoding HDF5 files
-    if classname.startswith("java.") or classname.startswith("com."):
-        type_system = "java"
-    elif classname.startswith("COM."):
-        type_system = "handle"
-    else:
-        type_system = "MCOS"
-
-    return type_system
 
 
 def to_writeable(source, oned_as="col"):
@@ -218,7 +187,7 @@ def to_writeable(source, oned_as="col"):
     if source is None:
         return np.empty((0, 0), dtype=np.float64)
 
-    if isinstance(source, MatlabOpaque):
+    if isinstance(source, (MatlabOpaque, MatlabCanonicalEmpty)):
         return source
 
     if issparse(source):
@@ -300,3 +269,23 @@ def to_writeable(source, oned_as="col"):
     if oned_as == "col":
         narr = narr.T
     return narr
+
+
+def shape_from_metadata(metadata):
+    """Extract shape from MATLAB object metadata"""
+
+    if not isinstance(metadata, np.ndarray):
+        return ()
+
+    if metadata.dtype == np.uint32:
+        ndims = metadata.flat[1]
+        dims = [int(x) for x in metadata.flat[2 : 2 + ndims]]
+
+    elif metadata.dtype.hasobject and metadata.dtype.names:
+        # Enumeration Array
+        dims = metadata[0, 0]["ValueIndices"].shape
+
+    else:
+        dims = metadata.shape
+
+    return tuple(dims)

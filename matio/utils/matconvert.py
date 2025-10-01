@@ -67,6 +67,22 @@ def convert_mat_to_py(props, classname, **kwargs):
     )
 
 
+def guess_type_system(classname):
+    """Gets the type system for the given class name."""
+
+    # Possibly, MATLAB decodes internally based on some object attribute
+    # This function is just guess work as of now
+    # Used for decoding HDF5 files
+    if classname.startswith("java.") or classname.startswith("com."):
+        type_system = "java"
+    elif classname.startswith("COM."):
+        type_system = "handle"
+    else:
+        type_system = "MCOS"
+
+    return type_system
+
+
 def guess_class_name(data):
     """Guess the MATLAB class name for a given Python object"""
 
@@ -91,18 +107,12 @@ def convert_py_to_mat(data, classname):
     """Convert a Python object to a MATLAB object"""
 
     convert_func = PY_TO_MAT.get(classname)
-    if convert_func is None:
-        warnings.warn(
-            f"convert_py_to_mat: Conversion of {type(data)} into MATLAB type "
-            f"{classname} is not yet implemented. This will be skipped"
-        )
-        prop_map = {}
-    else:
-        prop_map = convert_func(data)
+    type_system = guess_type_system(classname)
+    prop_map = convert_func(data)
 
     obj = MatlabOpaque(
         prop_map,
-        type_system=OpaqueType.MCOS,
+        type_system=type_system,
         classname=classname,
     )
 

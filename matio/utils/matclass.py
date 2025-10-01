@@ -2,6 +2,10 @@ from enum import IntEnum, StrEnum
 
 import numpy as np
 
+MCOS_SUBSYSTEM_CLASS = "FileWrapper__"
+DYNAMIC_PROPERTY_PREFIX = "__dynamic_property__"
+ENUMERATION_INSTANCE_TAG = "EnumerationInstanceTag"
+
 
 class IntegerDecodingHint(IntEnum):
     """MATLAB integer arrays typedefs"""
@@ -36,6 +40,19 @@ class OpaqueType(StrEnum):
     MCOS = "MCOS"
     JAVA = "java"
     HANDLE = "handle"
+
+
+class MatlabClasses(StrEnum):
+    """Enumeration for different MATLAB class names"""
+
+    CHAR = "char"
+    STRUCT = "struct"
+    CELL = "cell"
+    FUNCTION = "function_handle"
+    LOGICAL = "logical"
+    DOUBLE = "double"
+    SINGLE = "single"
+    EMPTY = "canonical empty"
 
 
 class MatReadError(Exception):
@@ -142,3 +159,7 @@ class EmptyMatStruct(np.ndarray):
         """Create a new instance of EmptyMatStruct"""
         obj = np.asarray(input_array).view(cls)
         return obj
+
+
+class MatlabCanonicalEmpty:
+    """Class to represent a canonical empty MATLAB array."""

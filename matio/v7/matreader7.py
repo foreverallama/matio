@@ -8,17 +8,27 @@ from scipy.sparse import csc_array
 
 from matio.subsystem import MatSubsystem
 from matio.utils.matclass import (
+    ENUMERATION_INSTANCE_TAG,
+    MCOS_SUBSYSTEM_CLASS,
     EmptyMatStruct,
     IntegerDecodingHint,
+    MatlabCanonicalEmpty,
     MatlabFunction,
     MatlabObject,
+    MatReadWarning,
     ObjectDecodingHint,
 )
-from matio.utils.matheaders import MCOS_MAGIC_NUMBER
+from matio.utils.matconvert import guess_type_system
+from matio.utils.matheaders import (
+    MAT_HDF_ATTRS,
+    MAT_HDF_REFS_GROUP,
+    MAT_HDF_SUBSYS_GROUP,
+    MCOS_MAGIC_NUMBER,
+)
 from matio.utils.matutils import (
     chars_to_strings,
-    guess_type_system,
     matlab_class_to_dtype,
+    shape_from_metadata,
 )
 
 
@@ -39,6 +49,65 @@ def loadmat7(
     return matfile_dict
 
 
+def whosmat7(file_path):
+    """Lists variables in MAT-file version 7.3 (HDF5) files."""
+
+    with h5py.File(file_path, "r") as f:
+        vars = []
+        for var in f:
+            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+                continue
+
+            class_name = f[var].attrs.get(MAT_HDF_ATTRS.CLASS, None)
+            object_decode = f[var].attrs.get(MAT_HDF_ATTRS.OBJECT_DECODE, -1)
+            is_empty = f[var].attrs.get(MAT_HDF_ATTRS.EMPTY, 0)
+            is_sparse = f[var].attrs.get(MAT_HDF_ATTRS.SPARSE, -1)
+
+            if class_name is not None:
+                class_name = class_name.decode("ascii")
+
+            if is_empty:
+                shape = tuple(int(x) for x in f[var][()])
+            elif is_sparse >= 0:
+                ncols = f[var]["jc"].size - 1
+                shape = (int(is_sparse), ncols)
+                class_name = "sparse"
+            elif object_decode == ObjectDecodingHint.OPAQUE_HINT:
+                if isinstance(f[var], h5py.Dataset):
+                    objmetadata = f[var][()]
+                    shape = shape_from_metadata(objmetadata)
+                else:
+                    if MAT_HDF_ATTRS.FIELDS in f[var].attrs:
+                        # Enumeration Array
+                        shape = f[var]["ValueIndices"].shape[::-1]
+                    else:
+                        warnings.warn(
+                            f"Cannot determine shape of opaque object {var}",
+                            MatReadWarning,
+                        )
+                        shape = ()
+            elif class_name == "struct":
+                keys = list(f[var].keys())
+                if len(keys) == 0:
+                    # Struct with no fields
+                    shape = (1, 1)
+                f[var][keys[0]]
+                if isinstance(f[var][keys[0]], h5py.Dataset) and f[var][
+                    keys[0]
+                ].dtype == np.dtype("O"):
+                    # Struct array
+                    shape = f[var][keys[0]].shape[::-1]
+                else:
+                    # Scalar struct
+                    shape = (1, 1)
+            else:
+                shape = f[var].shape[::-1]
+
+            vars.append((var, shape, class_name))
+
+        return vars
+
+
 class MatRead7:
     """Reads MAT-file version 7.3 (HDF5) files."""
 
@@ -57,10 +126,10 @@ class MatRead7:
     def read_numeric(self, obj, is_empty=0):
         """Reads MATLAB numeric arrays from the v7.3 MAT-file."""
 
-        int_decode = obj.attrs.get("MATLAB_int_decode", None)
+        int_decode = obj.attrs.get(MAT_HDF_ATTRS.INT_DECODE, None)
 
         if is_empty:
-            obj_class = obj.attrs.get("MATLAB_class", None)
+            obj_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
             dtype = matlab_class_to_dtype(obj_class, obj.dtype)
             return np.empty(shape=obj[()], dtype=dtype)
 
@@ -81,7 +150,7 @@ class MatRead7:
     def read_char(self, obj, is_empty=0):
         """Decodes MATLAB char arrays from the v7.3 MAT-file."""
 
-        decode_type = obj.attrs.get("MATLAB_int_decode", None)
+        decode_type = obj.attrs.get(MAT_HDF_ATTRS.INT_DECODE, None)
         raw = obj[()].T
 
         if is_empty:
@@ -91,9 +160,9 @@ class MatRead7:
             codec = "utf-16"
         else:
             warnings.warn(
-                f"MatRead7:read_char:MATLAB_int_decode {decode_type} not supported. "
+                f"MatRead7:read_char:{MAT_HDF_ATTRS.INT_DECODE}={decode_type} not supported. "
                 "This may lead to unexpected behaviour",
-                UserWarning,
+                MatReadWarning,
             )
             codec = "utf-8"
 
@@ -111,7 +180,7 @@ class MatRead7:
                 return False
 
             if isinstance(obj, h5py.Dataset):
-                class_name = obj.attrs.get("MATLAB_class", None)
+                class_name = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
                 if class_name is not None:
                     return False
 
@@ -124,7 +193,7 @@ class MatRead7:
             return EmptyMatStruct(np.empty(shape=obj[()], dtype=object))
 
         fields = list(obj.keys())
-        field_order = obj.attrs.get("MATLAB_fields", None)
+        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
         if field_order is not None:
             # For maximum compatibility with scipy.io
             fields = ["".join(x.astype(str)) for x in field_order]
@@ -169,7 +238,7 @@ class MatRead7:
         if "data" in obj:
             # Exists only if sparse matrix contains non-zero elements
             data = self.read_numeric(obj["data"])
-            matlab_class = obj.attrs.get("MATLAB_class", None)
+            matlab_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
             if data.dtype.kind != "c":
                 dtype = matlab_class_to_dtype(matlab_class, data.dtype)
                 data = data.astype(dtype)
@@ -197,12 +266,12 @@ class MatRead7:
         fields = self.read_struct(obj)
         return MatlabObject(fields, classname)
 
-    def read_opaque(self, obj, object_decode, is_empty=0):
+    def read_opaque(self, obj, object_decode):
         """Reads MATLAB opaque objects from the v7.3 MAT-file."""
 
-        classname = obj.attrs.get("MATLAB_class", None)
+        classname = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
         if classname is not None:
-            classname = classname.decode("utf-8")
+            classname = classname.decode("ascii")
 
         if object_decode == ObjectDecodingHint.OBJECT_HINT:
             return self.read_object(obj, classname)
@@ -212,19 +281,19 @@ class MatRead7:
                 f"Opaque object with object decode {object_decode} not supported. Data may be corrupted"
             )
 
-        if classname == "FileWrapper__":
+        if classname == MCOS_SUBSYSTEM_CLASS:
             return self.read_cell(obj)
 
         type_system = guess_type_system(classname)
 
         # Check Enumeration Instances
-        fields = obj.attrs.get("MATLAB_fields", None)
+        fields = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
         if fields is not None:
             fields = ["".join(x.astype(str)) for x in fields]
 
-            if "EnumerationInstanceTag" in fields:
+            if ENUMERATION_INSTANCE_TAG in fields:
                 metadata = self.read_struct(obj)
-                if metadata[0, 0]["EnumerationInstanceTag"] != MCOS_MAGIC_NUMBER:
+                if metadata[0, 0][ENUMERATION_INSTANCE_TAG] != MCOS_MAGIC_NUMBER:
                     return metadata
                 return self.subsystem.load_mcos_enumeration(metadata, type_system)
             else:
@@ -236,10 +305,10 @@ class MatRead7:
     def read_h5_data(self, obj):
         """Reads data from the HDF5 object."""
 
-        matlab_class = obj.attrs.get("MATLAB_class", None)
-        is_empty = obj.attrs.get("MATLAB_empty", 0)
-        object_decode = obj.attrs.get("MATLAB_object_decode", -1)
-        matlab_sparse = obj.attrs.get("MATLAB_sparse", -1)
+        matlab_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
+        is_empty = obj.attrs.get(MAT_HDF_ATTRS.EMPTY, 0)
+        object_decode = obj.attrs.get(MAT_HDF_ATTRS.OBJECT_DECODE, -1)
+        matlab_sparse = obj.attrs.get(MAT_HDF_ATTRS.SPARSE, -1)
 
         if matlab_sparse >= 0:
             arr = self.read_sparse(obj, matlab_sparse)
@@ -266,13 +335,11 @@ class MatRead7:
         elif matlab_class == b"function_handle":
             arr = self.read_function_handle(obj, object_decode)
         elif matlab_class == b"canonical empty" and is_empty:
-            arr = np.array([[]])  # scipy returns empty double
+            arr = MatlabCanonicalEmpty()
         elif object_decode >= 0:
-            arr = self.read_opaque(obj, object_decode, is_empty)
+            arr = self.read_opaque(obj, object_decode)
         else:
-            raise NotImplementedError(
-                f"MATLAB class {matlab_class} not supported", UserWarning
-            )
+            raise NotImplementedError(f"MATLAB class {matlab_class} not supported")
 
         return arr
 
@@ -284,7 +351,7 @@ class MatRead7:
 
         for var in self.h5stream:
             obj = self.h5stream[var]
-            if var in ("#refs#", "#subsystem#"):
+            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
                 continue
             if variable_names is not None and var not in variable_names:
                 continue
@@ -293,7 +360,7 @@ class MatRead7:
             except Exception as err:
                 raise ValueError(f"Error reading variable {var}: {err}") from err
             mdict[var] = data
-            is_global = obj.attrs.get("MATLAB_global", 0)
+            is_global = obj.attrs.get(MAT_HDF_ATTRS.GLOBAL, 0)
             if is_global:
                 mdict["__globals__"].append(var)
             if variable_names is not None:
@@ -307,10 +374,10 @@ class MatRead7:
 def read_subsystem(f, byte_order, raw_data, add_table_attrs):
     """Read subsystem data if present"""
 
-    if "#subsystem#" not in f:
+    if MAT_HDF_SUBSYS_GROUP not in f:
         return None
 
-    subsys_group = f["#subsystem#"]
+    subsys_group = f[MAT_HDF_SUBSYS_GROUP]
     MR7 = MatRead7(f, None)
     subsys_data = MR7.read_struct(subsys_group)
     subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)

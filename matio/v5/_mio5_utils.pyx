@@ -90,7 +90,13 @@ DEF _N_MXS = 20
 
 from scipy.sparse import csc_array
 
-from matio.utils.matclass import EmptyMatStruct, MatlabFunction, MatlabObject
+from matio.utils.matclass import (
+    MCOS_SUBSYSTEM_CLASS,
+    EmptyMatStruct,
+    MatlabCanonicalEmpty,
+    MatlabFunction,
+    MatlabObject,
+)
 from matio.utils.matutils import chars_to_strings
 
 from matio.v5 cimport _streams
@@ -151,6 +157,8 @@ cpdef cnp.uint32_t byteswap_u4(cnp.uint32_t u4) noexcept:
 
 cdef class VarHeader5:
     cdef readonly object name
+    cdef readonly object classname
+    cdef readonly object type_system
     cdef readonly int mclass
     cdef readonly object dims
     cdef cnp.int32_t dims_ptr[_MAT_MAXDIMS]
@@ -622,8 +630,11 @@ cdef class VarReader5:
         # name.
         if mc == mxOPAQUE_CLASS:
             header.name = self.read_int8_string()
+            header.type_system = self.read_int8_string().decode('ascii')
+            header.classname = self.read_int8_string().decode('ascii')
             header.dims = None
             return header
+
         header.n_dims = self.read_into_int32s(header.dims_ptr, sizeof(header.dims_ptr))
         if header.n_dims > _MAT_MAXDIMS:
             raise ValueError('Too many dimensions (%d) for numpy arrays'
@@ -631,6 +642,10 @@ cdef class VarReader5:
         # convert dims to list
         header.dims = [header.dims_ptr[i] for i in range(header.n_dims)]
         header.name = self.read_int8_string()
+
+        if mc == mxOBJECT_CLASS:
+            header.classname = self.read_int8_string().decode('ascii')
+
         return header
 
     cdef inline size_t size_from_header(self, VarHeader5 header) noexcept:
@@ -679,8 +694,8 @@ cdef class VarReader5:
         self.cread_full_tag(&mdtype, &byte_count)
         if mdtype != miMATRIX:
             raise TypeError('Expecting matrix here')
-        if byte_count == 0: # empty matrix
-            return np.array([[]])
+        if byte_count == 0:
+            return MatlabCanonicalEmpty
         header = self.read_header(False)
         return self.array_from_header(header, process)
 
@@ -730,16 +745,13 @@ cdef class VarReader5:
         elif mc == mxSTRUCT_CLASS:
             arr = self.read_struct(header)
         elif mc == mxOBJECT_CLASS:
-            classname = self.read_int8_string().decode('latin1')
             arr = self.read_struct(header)
-            arr = MatlabObject(arr, classname)
+            arr = MatlabObject(arr, header.classname)
         elif mc == mxFUNCTION_CLASS: # just a matrix of struct type
             arr = self.read_mi_matrix()
             arr = MatlabFunction(arr)
         elif mc == mxOPAQUE_CLASS:
-            type_system = self.read_int8_string().decode('latin1')
-            classname = self.read_int8_string().decode('latin1')
-            arr = self.read_opaque(header, classname, type_system)
+            arr = self.read_opaque(header)
 
         # ensure we have read checksum.
         read_ok = self.cstream.all_data_read()
@@ -965,16 +977,16 @@ cdef class VarReader5:
                 rec_res[i][field_name] = self.read_mi_matrix()
         return rec_res.reshape(tupdims).T
 
-    cpdef object read_opaque(self, VarHeader5 hdr, str classname, str type_system):
+    cpdef object read_opaque(self, VarHeader5 hdr):
         ''' Read opaque (function workspace) type'''
 
         objmetadata = self.read_mi_matrix()
 
-        if classname == "FileWrapper__":
+        if hdr.classname == MCOS_SUBSYSTEM_CLASS:
             return objmetadata
 
         if self.subsystem is None:
             return objmetadata
 
-        res = self.subsystem.load_opaque_object(objmetadata, type_system, classname)
+        res = self.subsystem.load_opaque_object(objmetadata, hdr.type_system, hdr.classname)
         return res

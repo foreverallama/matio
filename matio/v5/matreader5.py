@@ -41,9 +41,10 @@ from io import BytesIO
 from matio.subsystem import MatSubsystem
 from matio.utils.matclass import MatReadError, MatReadWarning
 from matio.utils.matheaders import MAT5_HEADER_SIZE_BYTES, check_mat_version
+from matio.utils.matutils import shape_from_metadata
 
 # Constants and helper objects
-from matio.v5.matio5_params import mclass_info, miTypes
+from matio.v5.matio5_params import mclass_info, miTypes, mxTypes
 
 # Reader object for matlab 5 format variables
 from ._mio5_utils import VarReader5
@@ -124,7 +125,7 @@ class MatFile5Reader:
 
         mdtype, byte_count = self._file_reader.read_full_tag()
         if not byte_count > 0:
-            raise ValueError("Did not read any bytes")
+            raise MatReadError("Did not read any bytes")
         next_pos = self.mat_stream.tell() + byte_count
         if mdtype == miTypes.miCOMPRESSED:
             # Make new stream from compressed data
@@ -154,7 +155,7 @@ class MatFile5Reader:
 
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
-            name = hdr.name.decode("latin1")
+            name = hdr.name.decode("ascii")
             if name in mdict:
                 msg = f"Duplicate variable name {name!r} in file. Overwriting previous."
                 warnings.warn(msg, MatReadWarning, stacklevel=2)
@@ -192,20 +193,34 @@ class MatFile5Reader:
         vars = []
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
-            name = hdr.name.decode("latin1")
+            name = hdr.name.decode("ascii")
             if name == "":
                 # Skip subsystem
                 self.mat_stream.seek(next_position)
                 continue
-            shape = self._matrix_reader.shape_from_header(hdr)
+            if hdr.mclass == mxTypes.mxOPAQUE_CLASS:
+                shape = self.read_opaque_class_shape(hdr)
+            else:
+                shape = self._matrix_reader.shape_from_header(hdr)
+
             if hdr.is_logical:
                 info = "logical"
+            elif hdr.classname is not None:
+                info = hdr.classname
             else:
                 info = mclass_info.get(hdr.mclass, "unknown")
+
             vars.append((name, shape, info))
 
             self.mat_stream.seek(next_position)
         return vars
+
+    def read_opaque_class_shape(self, hdr):
+        """Read class info for OBJECT and OPAQUE types"""
+
+        objmetadata = self._matrix_reader.array_from_header(hdr, False)
+        shape = shape_from_metadata(objmetadata)
+        return shape
 
 
 def load_subsys_stream(f, subsystem_offset, byte_order):

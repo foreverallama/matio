@@ -45,7 +45,10 @@ import scipy.sparse
 
 from matio.subsystem import MatSubsystem
 from matio.utils.matclass import (
+    MCOS_SUBSYSTEM_CLASS,
     EmptyMatStruct,
+    MatlabCanonicalEmpty,
+    MatlabEnumerationArray,
     MatlabFunction,
     MatlabObject,
     MatlabOpaque,
@@ -97,7 +100,7 @@ def savemat5(file_path, mdict, global_vars, oned_as, do_compression):
         MW.subsystem.init_save()
 
         MW.put_variables(mdict, global_vars, do_compression)
-        subsystem = MW.subsystem.set_subsystem(version=MAT_5_VERSION)
+        subsystem = MW.subsystem.set_subsystem()
         if subsystem is None:
             return
 
@@ -250,6 +253,8 @@ class VarWriter5:
 
         if scipy.sparse.issparse(narr):
             self.write_sparse(narr)
+        elif isinstance(narr, MatlabCanonicalEmpty):
+            self.write_canonical_empty(narr)
         elif isinstance(narr, MatlabObject):
             self.write_object(narr)
         elif isinstance(narr, MatlabFunction):
@@ -259,6 +264,9 @@ class VarWriter5:
             self.write_empty_struct(narr)
         elif isinstance(narr, (MatlabOpaque, MatlabOpaqueArray)):
             self.write_opaque(narr)
+        elif isinstance(narr, MatlabEnumerationArray):
+            warnings.warn("Writing enumerations is not supported", MatWriteWarning)
+            return
         elif narr.dtype.fields:  # struct array
             self.write_struct(narr)
         elif narr.dtype.hasobject:  # cell array
@@ -394,11 +402,16 @@ class VarWriter5:
         self.write_header(None, mxTypes.mxOPAQUE_CLASS)
         self.write_element(np.array(arr.type_system, dtype="S"), mdtype=miTypes.miINT8)
         self.write_element(np.array(arr.classname, dtype="S"), mdtype=miTypes.miINT8)
-        if arr.classname == "FileWrapper__":
+        if arr.classname == MCOS_SUBSYSTEM_CLASS:
             self.write(arr.properties)
         else:
             objmetadata = self.subsystem.set_object_metadata(arr)
             self.write(objmetadata)
+
+    def write_canonical_empty(self, arr):
+        """Write canonical empty array"""
+        self._mat_tag_pos = self.file_stream.tell()
+        self.write_bytes(self.mat_tag)  # 0 byte miMATRIX Tag
 
 
 class MatFile5Writer:

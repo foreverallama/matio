@@ -1,9 +1,12 @@
 import struct
 import sys
 import time
+from enum import StrEnum
 
 import h5py
 import numpy as np
+
+from matio.utils.matclass import MatReadError
 
 MAT5_HEADER_SIZE_BYTES = 128
 MAT5_MAX_ARR_BYTES = 2**32
@@ -12,10 +15,24 @@ MAT_5_VERSION = 1
 
 MAT_HDF_VERSION = 2
 MAT_HDF_USER_BLOCK_BYTES = 512
+MAT_HDF_REFS_GROUP = "#refs#"
+MAT_HDF_SUBSYS_GROUP = "#subsystem#"
 
 MCOS_MAGIC_NUMBER = 0xDD000000
 
 MAT_VERSIONS = {"v7": MAT_5_VERSION, "v7.3": MAT_HDF_VERSION}
+
+
+class MAT_HDF_ATTRS(StrEnum):
+    """Enumeration for standard HDF5 attributes in MAT v7.3 files"""
+
+    CLASS = "MATLAB_class"
+    OBJECT_DECODE = "MATLAB_object_decode"
+    INT_DECODE = "MATLAB_int_decode"
+    EMPTY = "MATLAB_empty"
+    GLOBAL = "MATLAB_global"
+    SPARSE = "MATLAB_sparse"
+    FIELDS = "MATLAB_fields"
 
 
 def check_mat_version(data):
@@ -26,14 +43,14 @@ def check_mat_version(data):
     elif data[2:] == b"MI":
         byte_order = ">"
     else:
-        raise ValueError("Invalid endian indicator in MAT-file header")
+        raise MatReadError("Invalid endian indicator in MAT-file header")
 
     v_major, v_minor = int(data[1]), int(data[0])
     if byte_order != "<":
         v_major, v_minor = v_minor, v_major
 
     if v_major not in (MAT_5_VERSION, MAT_HDF_VERSION):
-        raise ValueError(f"Unknown MAT-file version {v_major}.{v_minor}")
+        raise MatReadError(f"Unknown MAT-file version {v_major}.{v_minor}")
 
     return byte_order, v_major
 
