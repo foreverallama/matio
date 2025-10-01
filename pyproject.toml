@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A package for reading MATLAB .mat files, with support for MATLAB datatypes like table and string"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 keywords = ["MATLAB", "mat", "io"]
