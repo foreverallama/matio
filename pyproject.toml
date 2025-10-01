@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8", "wheel"]
+requires = ["setuptools>=64", "setuptools-scm>=8", "Cython", "wheel", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A package for reading MATLAB .mat files, with support for MATLAB datatypes like table and string"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 keywords = ["MATLAB", "mat", "io"]
@@ -30,7 +30,7 @@ Homepage = "https://github.com/foreverallama/matio"
 Repository = "https://github.com/foreverallama/matio"
 Issues = "https://github.com/foreverallama/matio"
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+include = ["matio*"]
 
 [tool.setuptools_scm]

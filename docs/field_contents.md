@@ -25,17 +25,18 @@ The `matio` package attempts to convert some common MATLAB datatypes into a Pyth
 
 | MATLAB Type                       | Python Equivalent                          |
 |-----------------------------------|---------------------------------------------|
-| `datetime`                        | `numpy.datetime64`|
+| `datetime`                        | `numpy.datetime64` |
 | `duration`                        | `numpy.timedelta64`|
-| `calendarDuration`                | `numpy.ndarray` with fields `{months, days, millis}` |
-| `string`                          | `numpy.str_`            |
+| `calendarDuration`                | `numpy.timedelta64` with fields `{months, days, millis}` |
+| `string`                          | `numpy.dtypes.StringDType()`            |
 | `table`                           | `pandas.DataFrame`                          |
 | `timetable`                       | `pandas.DataFrame` with datetime or duration index      |
-| `containers.Map`                  | `dict`                                      |
-| `dictionary`                      | `(keys, values)`                                     |
+| `containers.Map`                  | TODO                                      |
+| `dictionary`                      | TODO                                     |
 | `categorical`                     | `pandas.Categorical`                        |
-| Enumeration Instance Arrays       | `numpy.ndarray` of `enum.Enum`         |
-| User-Defined Classes              | `MatioOpaque` instance with property map `dict` |
+| Enumeration Instance Arrays       | `MatlabEnumerationArray` instance where each element is `enum.Enum`    |
+| Object Scalar                     | `MatlabOpaque` instance with property map `dict` |
+| Object Array                      | `MatlabOpaqueArray` instance where each element is a `MatlabOpaque` instance |
 
 ## `datetime`
 
