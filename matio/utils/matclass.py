@@ -1,3 +1,4 @@
+from collections import UserDict
 from enum import IntEnum, StrEnum
 
 import numpy as np
@@ -150,6 +151,12 @@ class MatlabEnumerationArray(np.ndarray):
         """Finalize the array, copying the classnames."""
         self.type_system = getattr(obj, "type_system", None)
         self.classname = getattr(obj, "classname", None)
+
+
+class MatlabContainerMap(UserDict):
+    """Class to represent a MATLAB containers.Map object."""
+
+    classname = "container.Map"
 
 
 class EmptyMatStruct(np.ndarray):

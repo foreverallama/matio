@@ -4,25 +4,27 @@ import warnings
 
 import numpy as np
 
+from matio.utils.matclass import MatlabContainerMap
+
 MAT_DICT_VERSION = 1
 
 
-# def mat_to_containermap(props, **_kwargs):
-#     """Converts MATLAB container.Map to Python dictionary"""
-#     comps = props.get("serialization", None)
-#     if comps is None:
-#         return props
+def mat_to_containermap(props, **_kwargs):
+    """Converts MATLAB container.Map to Python dictionary"""
+    comps = props.get("serialization", None)
+    if comps is None:
+        return props
 
-#     ks = comps[0, 0]["keys"]
-#     vals = comps[0, 0]["values"]
+    ks = comps[0, 0]["keys"]
+    vals = comps[0, 0]["values"]
 
-#     result = {}
-#     for i in range(ks.shape[1]):
-#         key = ks[0, i].item()
-#         val = vals[0, i]
-#         result[key] = val
+    result = {}
+    for i in range(ks.shape[1]):
+        key = ks[0, i].item()
+        val = vals[0, i]
+        result[key] = val
 
-#     return result
+    return MatlabContainerMap(result)
 
 
 # # def mat_to_dictionary(props, **_kwargs):

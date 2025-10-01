@@ -1,6 +1,7 @@
 """Utility functions for matio"""
 
 import warnings
+from collections.abc import Mapping
 
 import numpy as np
 from scipy.sparse import issparse
@@ -218,20 +219,17 @@ def to_writeable(source, oned_as="col"):
     if hasattr(source, "__array__"):
         return np.asarray(source)
 
-    # Objects that implement mappings
-    is_mapping = (
-        hasattr(source, "keys")
-        and hasattr(source, "values")
-        and hasattr(source, "items")
-    )
-
-    if not is_mapping and hasattr(source, "__dict__"):
+    if isinstance(source, Mapping):
+        is_mapping = True
+    elif hasattr(source, "__dict__"):
         source = {
             key: value
             for key, value in source.__dict__.items()
             if not key.startswith("_")
         }
         is_mapping = True
+    else:
+        is_mapping = False
 
     if is_mapping:
         dtype = []

@@ -222,88 +222,88 @@ def mat_to_categorical(props, **_kwargs):
     return pd.Categorical.from_codes(codes, categories=category_names, ordered=ordered)
 
 
-# def make_table_props():
-#     """Creates default properties for a MATLAB table"""
-#     dtype = [
-#         ("useVariableNamesOriginal", object),
-#         ("useDimensionNamesOriginal", object),
-#         ("CustomProps", object),
-#         ("VariableCustomProps", object),
-#         ("versionSavedFrom", object),
-#         ("minCompatibleVersion", object),
-#         ("incompatibilityMsg", object),
-#         ("VersionSavedFrom", object),
-#         ("Description", object),
-#         ("VariableNamesOriginal", object),
-#         ("DimensionNames", object),
-#         ("DimensionNamesOriginal", object),
-#         ("UserData", object),
-#         ("VariableDescriptions", object),
-#         ("VariableUnits", object),
-#         ("VariableContinuity", object),
-#     ]
+def make_table_props():
+    """Creates default properties for a MATLAB table"""
+    dtype = [
+        ("useVariableNamesOriginal", object),
+        ("useDimensionNamesOriginal", object),
+        ("CustomProps", object),
+        ("VariableCustomProps", object),
+        ("versionSavedFrom", object),
+        ("minCompatibleVersion", object),
+        ("incompatibilityMsg", object),
+        ("VersionSavedFrom", object),
+        ("Description", object),
+        ("VariableNamesOriginal", object),
+        ("DimensionNames", object),
+        ("DimensionNamesOriginal", object),
+        ("UserData", object),
+        ("VariableDescriptions", object),
+        ("VariableUnits", object),
+        ("VariableContinuity", object),
+    ]
 
-#     props = np.empty((1, 1), dtype=dtype)
+    props = np.empty((1, 1), dtype=dtype)
 
-#     props["useVariableNamesOriginal"][0, 0] = np.bool_(False)
-#     props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
-#     props["CustomProps"][0, 0] = EmptyStructMarker()
-#     props["VariableCustomProps"][0, 0] = EmptyStructMarker()
-#     props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
-#     props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
-#     props["incompatibilityMsg"][0, 0] = ""
-#     props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
-#     props["Description"][0, 0] = ""
-#     props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
-#     props["DimensionNames"][0, 0] = np.array(
-#         [np.array(["Row"]), np.array(["Variables"])], dtype=object
-#     ).reshape((1, 2))
-#     props["DimensionNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
-#     props["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
-#     props["VariableDescriptions"][0, 0] = np.empty((0, 0), dtype=object)
-#     props["VariableUnits"][0, 0] = np.empty((0, 0), dtype=object)
-#     props["VariableContinuity"][0, 0] = np.empty((0, 0), dtype=object)
+    props["useVariableNamesOriginal"][0, 0] = np.bool_(False)
+    props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
+    props["CustomProps"][0, 0] = EmptyMatStruct(np.empty((0, 0), dtype=object))
+    props["VariableCustomProps"][0, 0] = EmptyMatStruct(np.empty((0, 0), dtype=object))
+    props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
+    props["incompatibilityMsg"][0, 0] = ""
+    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["Description"][0, 0] = ""
+    props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
+    props["DimensionNames"][0, 0] = np.array(
+        [np.array(["Row"]), np.array(["Variables"])], dtype=object
+    ).reshape((1, 2))
+    props["DimensionNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
+    props["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
+    props["VariableDescriptions"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableUnits"][0, 0] = np.empty((0, 0), dtype=object)
+    props["VariableContinuity"][0, 0] = np.empty((0, 0), dtype=object)
 
-#     return props
+    return props
 
 
-# def table_to_mat(df):
-#     """Converts a pandas DataFrame to a MATLAB table"""
+def table_to_mat(df):
+    """Converts a pandas DataFrame to a MATLAB table"""
 
-#     if not isinstance(df, pd.DataFrame):
-#         raise ValueError("Input must be a pandas DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
 
-#     data = np.empty((1, len(df.columns)), dtype=object)
-#     for i, col in enumerate(df.columns):
-#         if pd.api.types.is_string_dtype(df[col]):
-#             coldata = df[col].to_numpy(dtype="U")
-#         else:
-#             coldata = df[col].to_numpy().reshape(-1, 1)
-#         data[0, i] = coldata
+    data = np.empty((1, len(df.columns)), dtype=object)
+    for i, col in enumerate(df.columns):
+        if pd.api.types.is_string_dtype(df[col]):
+            coldata = df[col].to_numpy(dtype="U")
+        else:
+            coldata = df[col].to_numpy().reshape(-1, 1)
+        data[0, i] = coldata
 
-#     nrows = np.float64(df.shape[0])
-#     nvars = np.float64(df.shape[1])
+    nrows = np.float64(df.shape[0])
+    nvars = np.float64(df.shape[1])
 
-#     varnames = np.array([str(col) for col in df.columns], dtype=object)
+    varnames = np.array([str(col) for col in df.columns], dtype=object)
 
-#     if df.index.name is not None or not isinstance(df.index, pd.RangeIndex):
-#         rownames = np.array([str(idx) for idx in df.index], dtype=object)
-#     else:
-#         rownames = np.array([], dtype=object)
+    if df.index.name is not None or not isinstance(df.index, pd.RangeIndex):
+        rownames = np.array([str(idx) for idx in df.index], dtype=object)
+    else:
+        rownames = np.array([], dtype=object)
 
-#     # FIXME: Add table attributes
-#     extras = make_table_props()
-#     prop_map = {
-#         "data": data,
-#         "varnames": varnames,
-#         "nrows": nrows,
-#         "nvars": nvars,
-#         "rownames": rownames,
-#         "ndims": np.float64(2),
-#         "props": extras,
-#     }
+    # TODO: Add table attributes
+    extras = make_table_props()
+    prop_map = {
+        "data": data,
+        "varnames": varnames,
+        "nrows": nrows,
+        "nvars": nvars,
+        "rownames": rownames,
+        "ndims": np.float64(2),
+        "props": extras,
+    }
 
-#     return prop_map
+    return prop_map
 
 
 # def make_timetable_props():
