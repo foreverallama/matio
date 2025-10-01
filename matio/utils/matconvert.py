@@ -5,7 +5,11 @@ import numpy as np
 import pandas as pd
 
 from matio.utils.converters.matstring import mat_to_string, string_to_mat
-from matio.utils.converters.mattables import mat_to_table
+from matio.utils.converters.mattables import (
+    mat_to_categorical,
+    mat_to_table,
+    mat_to_timetable,
+)
 from matio.utils.converters.mattimes import (
     caldur_dtype,
     calendarduration_to_mat,
@@ -21,26 +25,26 @@ matlab_saveobj_ret_types = ["string", "timetable"]
 
 matlab_classdef_types = [
     "calendarDuration",
-    # "categorical",
+    "categorical",
     # "containers.Map",
     "datetime",
     # "dictionary",
     "duration",
     "string",
     "table",
-    # "timetable",
+    "timetable",
 ]
 
 MAT_TO_PY = {
     "calendarDuration": mat_to_calendarduration,
-    # "categorical": mat_to_categorical,
+    "categorical": mat_to_categorical,
     # "containers.Map": mat_to_containermap,
     "datetime": mat_to_datetime,
     # "dictionary": mat_to_dictionary,
     "duration": mat_to_duration,
     "string": mat_to_string,
     "table": mat_to_table,
-    # "timetable": mat_to_timetable,
+    "timetable": mat_to_timetable,
 }
 
 PY_TO_MAT = {
