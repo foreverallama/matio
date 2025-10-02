@@ -26,6 +26,8 @@ from matio.utils.matclass import (
 )
 from matio.utils.matheaders import (
     MAT_HDF_ATTRS,
+    MAT_HDF_COMPRESSION,
+    MAT_HDF_COMPRESSION_OPTS,
     MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MAT_HDF_USER_BLOCK_BYTES,
@@ -115,7 +117,13 @@ class MatWrite7:
             dset = parent.create_dataset(var_name, data=data_empty)
             self.add_empty_attribute(dset)
         else:
-            dset = parent.create_dataset(var_name, data=data.T)
+            dset = parent.create_dataset(
+                var_name,
+                data=data.T,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(dset, classname)
         if int_decode is not None and int_decode == IntegerDecodingHint.LOGICAL_HINT:
@@ -136,7 +144,13 @@ class MatWrite7:
         else:
             data = strings_to_chars(data)
             data = data.view(np.uint32).astype(np.uint16)
-            dset = parent.create_dataset(var_name, data=data.T)
+            dset = parent.create_dataset(
+                var_name,
+                data=data.T,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(dset, MatlabClasses.CHAR)
         self.add_int_decode_attr(dset, IntegerDecodingHint.UTF16_HINT)
@@ -265,10 +279,28 @@ class MatWrite7:
         data, classname, int_decode = mat_numeric(A.data, version=MAT_HDF_VERSION)
 
         sparse_group = parent.create_group(var_name)
-        sparse_group.create_dataset("jc", data=jc)
+        sparse_group.create_dataset(
+            "jc",
+            data=jc,
+            compression=MAT_HDF_COMPRESSION,
+            compression_opts=MAT_HDF_COMPRESSION_OPTS,
+            chunks=True,
+        )
         if data.size > 0:
-            sparse_group.create_dataset("data", data=data)
-            sparse_group.create_dataset("ir", data=ir)
+            sparse_group.create_dataset(
+                "data",
+                data=data,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
+            sparse_group.create_dataset(
+                "ir",
+                data=ir,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(sparse_group, classname)
         self.add_sparse_attr(sparse_group, A.shape[0])
@@ -307,8 +339,6 @@ class MatWrite7:
 
     def write_variable(self, var_name, data, group=None):
         """Writes a variable to the HDF5 file."""
-
-        # TODO: What compression and chunking is used in MAT-HDF?
 
         if group is None:
             parent = self.h5file

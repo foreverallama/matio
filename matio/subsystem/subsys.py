@@ -232,7 +232,8 @@ class MatSubsystem:
     def is_valid_opaque_object(self, metadata):
         """Checks if property value is a valid opaque object metadata array"""
 
-        # TODO: Add checks for other opaque objects
+        # Only know MCOS identifier
+        # Can include other types later
         return self.is_valid_mcos_object(metadata)
 
     def check_prop_for_opaque(self, prop):

@@ -292,7 +292,10 @@ def shape_from_metadata(metadata):
 def sanitize_input_lists(var_list, arg_name):
     """Sanitize input list of variable names"""
     if var_list is None:
-        return []
+        if arg_name == "variable_names":
+            return None
+        else:
+            return []
 
     if isinstance(var_list, str):
         return [var_list]
