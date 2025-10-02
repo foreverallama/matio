@@ -287,3 +287,17 @@ def shape_from_metadata(metadata):
         dims = metadata.shape
 
     return tuple(dims)
+
+
+def sanitize_input_lists(var_list, arg_name):
+    """Sanitize input list of variable names"""
+    if var_list is None:
+        return []
+
+    if isinstance(var_list, str):
+        return [var_list]
+
+    if not isinstance(var_list, (list, tuple)):
+        raise ValueError(f"{arg_name} must be a list of strings")
+
+    return list(var_list)

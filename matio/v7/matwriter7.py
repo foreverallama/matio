@@ -37,12 +37,14 @@ from matio.utils.matutils import mat_numeric, strings_to_chars, to_writeable
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
 
-def savemat7(file_path, mdict, global_vars, oned_as):
+def savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as):
     """Write data to MAT-5file."""
 
     with h5py.File(file_path, "w", userblock_size=MAT_HDF_USER_BLOCK_BYTES) as f:
         MW7 = MatWrite7(f, oned_as=oned_as)
-        MW7.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW7.subsystem = MatSubsystem(
+            byte_order=SYS_BYTE_ORDER, oned_as=oned_as, saveobj_classes=saveobj_classes
+        )
         MW7.subsystem.init_save()
         MW7.put_variables(mdict, global_vars)
 
@@ -306,7 +308,7 @@ class MatWrite7:
     def write_variable(self, var_name, data, group=None):
         """Writes a variable to the HDF5 file."""
 
-        # TODO: Check if MATLAB applies compression to datasets
+        # TODO: What compression and chunking is used in MAT-HDF?
 
         if group is None:
             parent = self.h5file

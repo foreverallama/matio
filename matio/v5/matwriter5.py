@@ -90,13 +90,15 @@ NDT_TAG_SMALL = MDTYPES[SYS_BYTE_ORDER]["dtypes"]["tag_smalldata"]
 NDT_ARRAY_FLAGS = MDTYPES[SYS_BYTE_ORDER]["dtypes"]["array_flags"]
 
 
-def savemat5(file_path, mdict, global_vars, oned_as, do_compression):
+def savemat5(file_path, mdict, global_vars, saveobj_classes, oned_as, do_compression):
     """Write data to MAT-5file."""
 
     with open(file_path, "wb") as f:
         write_file_header(f, version=MAT_5_VERSION)
         MW = MatFile5Writer(f, oned_as=oned_as)
-        MW.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW.subsystem = MatSubsystem(
+            byte_order=SYS_BYTE_ORDER, oned_as=oned_as, saveobj_classes=saveobj_classes
+        )
         MW.subsystem.init_save()
 
         MW.put_variables(mdict, global_vars, do_compression)

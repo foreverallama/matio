@@ -302,7 +302,6 @@ def table_to_mat(df):
     else:
         rownames = np.empty((0, 0), dtype=object)
 
-    # TODO: Add table attributes
     # All serialized data must be the exact same types (including shape) as expected by MATLAB
     # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
@@ -391,7 +390,6 @@ def timetable_to_mat(df):
         ("rowTimes", object),
     ]
 
-    # TODO: Add timetable attributes
     extras = make_timetable_props()
     timetable_dtype.extend((key, object) for key in extras)
 

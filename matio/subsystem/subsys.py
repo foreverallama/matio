@@ -43,7 +43,7 @@ class MatSubsystem:
         raw_data=False,
         add_table_attrs=False,
         oned_as="col",
-        saveobj_ret_classes=[],  # TODO: Allow as user arg
+        saveobj_classes=[],
     ):
         self.byte_order = "<u4" if byte_order[0] == "<" else ">u4"
         self.raw_data = raw_data
@@ -81,9 +81,7 @@ class MatSubsystem:
         self.class_id_counter = 0
         self.object_id_counter = 0
 
-        if isinstance(saveobj_ret_classes, str):
-            saveobj_ret_classes = [saveobj_ret_classes]
-        self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_ret_classes
+        self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_classes
 
     def init_save(self):
         """Initializes save with metadata for object ID = 0"""
@@ -390,7 +388,7 @@ class MatSubsystem:
             dyn_class_id = self.get_object_metadata(dyn_obj_id)[0]
             classname = self.get_classname(dyn_class_id)
             dynobj = MatlabOpaque(
-                None, type_system=OpaqueType.MCOS, classname=classname
+                properties=None, classname=classname, type_system=OpaqueType.MCOS
             )
             dynobj.properties = self.get_properties(dyn_obj_id)
             dyn_prop_map[f"{DYNAMIC_PROPERTY_PREFIX}{i + 1}"] = dynobj
@@ -734,7 +732,11 @@ class MatSubsystem:
             shape=(self.class_id_counter + 1, 1), dtype=np.int32
         )
 
-        fwrapper = MatlabOpaque(fwrap_data, OpaqueType.MCOS, MCOS_SUBSYSTEM_CLASS)
+        fwrapper = MatlabOpaque(
+            properties=fwrap_data,
+            classname=MCOS_SUBSYSTEM_CLASS,
+            type_system=OpaqueType.MCOS,
+        )
         return fwrapper
 
     def set_subsystem(self):
@@ -791,7 +793,7 @@ class MatSubsystem:
             value_idx.shape, order="F"
         )
 
-        return MatlabOpaque(metadata, type_system, classname)
+        return MatlabOpaque(metadata, classname, type_system)
 
     def load_mcos_object(self, metadata, type_system=OpaqueType.MCOS):
         """Loads MCOS object"""
@@ -824,7 +826,9 @@ class MatSubsystem:
                         obj  # Caching here is probably unnecessary but safer
                     )
                 else:
-                    obj = MatlabOpaque(None, type_system, classname)
+                    obj = MatlabOpaque(
+                        properties=None, classname=classname, type_system=type_system
+                    )
                     self.mcos_object_cache[object_id] = obj
                     obj.properties = self.get_properties(object_id)
             array_objs.append(obj)
@@ -833,7 +837,7 @@ class MatSubsystem:
             obj_arr = np.empty((nobjects,), dtype=object)
             obj_arr[:] = array_objs
             obj_arr = obj_arr.reshape(dims, order="F")
-            obj_arr = MatlabOpaqueArray(obj_arr, type_system, classname)
+            obj_arr = MatlabOpaqueArray(obj_arr, classname, type_system)
         else:
             obj_arr = array_objs[0]
 
@@ -848,7 +852,7 @@ class MatSubsystem:
                 MatReadWarning,
                 stacklevel=2,
             )
-            return MatlabOpaque(metadata, type_system, classname)
+            return MatlabOpaque(metadata, classname, type_system)
 
         if metadata.dtype.names:
             return self.load_mcos_enumeration(metadata, type_system)

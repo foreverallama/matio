@@ -135,9 +135,9 @@ def convert_py_to_mat(data, classname):
     prop_map = convert_func(data)
 
     obj = MatlabOpaque(
-        prop_map,
-        type_system=type_system,
+        properties=prop_map,
         classname=classname,
+        type_system=type_system,
     )
 
     return obj

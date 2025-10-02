@@ -106,11 +106,11 @@ class MatlabFunction(np.ndarray):
 class MatlabOpaque:
     """Subclass for a MATLAB opaque array."""
 
-    def __init__(self, props, type_system=None, classname=None):
+    def __init__(self, properties, classname, type_system=OpaqueType.MCOS):
         """Create a new instance of MatlabOpaque"""
-        self.properties = props
-        self.type_system = type_system
+        self.properties = properties
         self.classname = classname
+        self.type_system = type_system
 
     def __repr__(self):
         """String representation of the object"""
@@ -124,11 +124,11 @@ class MatlabOpaque:
 class MatlabOpaqueArray(np.ndarray):
     """Subclass for a MATLAB Opaque array."""
 
-    def __new__(cls, input_array, type_system=None, classnames=None):
+    def __new__(cls, input_array, classname, type_system=OpaqueType.MCOS):
         """Create a new instance of MatlabMCOSArray"""
         obj = np.asarray(input_array).view(cls)
+        obj.classname = classname
         obj.type_system = type_system
-        obj.classname = classnames
         return obj
 
     def __array_finalize__(self, obj):
@@ -140,11 +140,11 @@ class MatlabOpaqueArray(np.ndarray):
 class MatlabEnumerationArray(np.ndarray):
     """Subclass for a MATLAB Enumeration array."""
 
-    def __new__(cls, input_array, type_system=None, classname=None):
+    def __new__(cls, input_array, classname, type_system=OpaqueType.MCOS):
         """Create a new instance of MatlabEnumerationArray"""
         obj = np.asarray(input_array).view(cls)
-        obj.type_system = type_system
         obj.classname = classname
+        obj.type_system = type_system
         return obj
 
     def __array_finalize__(self, obj):
