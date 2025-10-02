@@ -809,6 +809,11 @@ class MatSubsystem:
         class_id = metadata[-1, 0]
         classname = self.get_classname(class_id)
 
+        if object_ids.size == 0:
+            return MatlabOpaque(
+                properties=None, classname=classname, type_system=type_system
+            )
+
         is_array = nobjects > 1
         array_objs = []
         for object_id in object_ids:
