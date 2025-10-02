@@ -4,6 +4,7 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
+from matio.utils.converters.matmap import containermap_to_mat, mat_to_containermap
 from matio.utils.converters.matstring import mat_to_string, string_to_mat
 from matio.utils.converters.mattables import (
     categorical_to_mat,
@@ -34,7 +35,7 @@ matlab_saveobj_ret_types = ["string", "timetable"]
 matlab_classdef_types = [
     "calendarDuration",
     "categorical",
-    # "containers.Map",
+    "containers.Map",
     "datetime",
     # "dictionary",
     "duration",
@@ -46,7 +47,7 @@ matlab_classdef_types = [
 MAT_TO_PY = {
     "calendarDuration": mat_to_calendarduration,
     "categorical": mat_to_categorical,
-    # "containers.Map": mat_to_containermap,
+    "containers.Map": mat_to_containermap,
     "datetime": mat_to_datetime,
     # "dictionary": mat_to_dictionary,
     "duration": mat_to_duration,
@@ -58,7 +59,7 @@ MAT_TO_PY = {
 PY_TO_MAT = {
     "calendarDuration": calendarduration_to_mat,
     "categorical": categorical_to_mat,
-    # "containers.Map": containermap_to_mat,
+    "containers.Map": containermap_to_mat,
     "datetime": datetime_to_mat,
     # "dictionary": dictionary_to_mat,
     "duration": duration_to_mat,
@@ -110,9 +111,7 @@ def guess_class_name(data):
     elif isinstance(data, pd.Series):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
     elif isinstance(data, MatlabContainerMap):
-        raise NotImplementedError(
-            "MatlabContainerMap to MATLAB containers.Map not yet supported"
-        )
+        return "containers.Map"
     elif isinstance(data, MatlabEnumerationArray):
         raise NotImplementedError("MatlabEnumerationArray is not yet supported")
     elif isinstance(data, (np.ndarray, np.generic)):

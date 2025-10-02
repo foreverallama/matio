@@ -184,7 +184,7 @@ class TestLoadMatlabCategorical:
 class TestSaveMatlabCategorical:
 
     def test_categorical_scalar(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical scalar to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_scalar"])
 
@@ -212,7 +212,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_array(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical array to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_array"])
 
@@ -240,7 +240,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_empty(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical empty to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_empty"])
 
@@ -268,7 +268,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_from_numeric(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical numeric to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_from_numeric"])
 
@@ -300,7 +300,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_unordered(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical unordered to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_unordered"])
 
@@ -330,7 +330,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_ordered(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical ordered to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_ordered"])
 
@@ -358,7 +358,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_missing(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical with missing values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_missing"])
 
@@ -386,7 +386,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_mixed_case(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical mixed case to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_mixed_case"])
 
@@ -418,7 +418,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_matlab_string(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical string to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_string"])
 
@@ -446,7 +446,7 @@ class TestSaveMatlabCategorical:
                 os.remove(temp_file_path)
 
     def test_categorical_3D(self, filename, version):
-        """Test writing numeric table to MAT-file"""
+        """Test writing categorical 3D to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["cat_3D"])
 

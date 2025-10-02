@@ -92,6 +92,13 @@ data = save_to_mat(file_path="temp.mat", mdict=mdict)
 
 ## Notes
 
+This package uses wrapper classes to represent Matlab object data to help distinguish from basic datatypes. These are as follows:
+
+- `MatlabOpaque`: A wrapper class for all opaque objects with three attributes: `classname`, `type_system`, `properties`. `properties` is a name-value pair dictionary for each property of the class saved to a MAT-file
+- `MatlabOpaqueArray`: A wrapper class subclassed from `numpy.ndarray` to represent object arrays. Each item in this array is a `MatlabOpaque` object. MATLAB creates a separate object instance for each object in an array. The same is followed here.
+- `MatlabEnumerationArray`: A wrapper class subclassed from `numpy.ndarray` to represent enumeration instance arrays. Each item in this array is of type `enum.Enum`.
+- `MatlabContainerMap`: A wrapper class subclassed from `collections.UserDict` to represent `container.Map` objects. During save, dictionaries are converted to a `struct`. Wrap dictionaries around `MatlabContainerMap` to write to `container.Map` instead.
+
 For conversion rules between MATLAB and Python datatypes, see the [documentation](./docs/field_contents.md).
 
 ## Contribution
