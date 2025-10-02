@@ -116,7 +116,7 @@ class TestLoadMatlabTimetable:
                 "data1": [1.0, 2.0, 3.0],
             },
             index=pd.Index(
-                np.array(["2020-01", "2020-04", "2020-07"], dtype="datetime64[M]"),
+                np.array(["2020-01", "2020-04", "2020-07"], dtype="datetime64[ms]"),
                 name="Time",
             ),
         )
@@ -143,7 +143,7 @@ class TestLoadMatlabTimetable:
                         "2020-01-01T00:00:01",
                         "2020-01-01T00:00:02",
                     ],
-                    dtype="datetime64[s]",
+                    dtype="datetime64[ms]",
                 ),
                 name="Time",
             ),
@@ -245,3 +245,261 @@ class TestLoadMatlabTimetable:
                 np.testing.assert_array_equal(value, attrs[key])
             else:
                 assert value == attrs[key]
+
+
+@pytest.mark.parametrize("filename, version", files)
+class TestSaveMatlabTimetable:
+
+    def test_timetable_datetime(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_datetime"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["timetable_datetime"])
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_datetime"],
+                mload["timetable_datetime"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_duration(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_duration"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["timetable_duration"])
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_duration"],
+                mload["timetable_duration"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_empty(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_empty"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["timetable_empty"])
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_empty"], mload["timetable_empty"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_from_duration(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with pytest.warns(MatConvertWarning):
+            mdict = load_from_mat(file_path, variable_names=["timetable_from_duration"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["timetable_from_duration"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_from_duration"],
+                mload["timetable_from_duration"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_from_starttime_calendarDuration(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["timetable_from_starttime_calendarDuration"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path,
+                variable_names=["timetable_from_starttime_calendarDuration"],
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_from_starttime_calendarDuration"],
+                mload["timetable_from_starttime_calendarDuration"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_from_starttime_datetime(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["timetable_from_starttime_datetime"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["timetable_from_starttime_datetime"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_from_starttime_datetime"],
+                mload["timetable_from_starttime_datetime"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_from_starttime_duration(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["timetable_from_starttime_duration"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["timetable_from_starttime_duration"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_from_starttime_duration"],
+                mload["timetable_from_starttime_duration"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_var_names(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_var_names"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["timetable_var_names"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_var_names"],
+                mload["timetable_var_names"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_timetable_multi_col(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_multi_col"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["timetable_multi_col"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_multi_col"],
+                mload["timetable_multi_col"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    @pytest.mark.xfail(reason="Writing attributes not implemented")
+    def test_timetable_with_attrs(self, filename, version):
+        """Test writing numeric timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["timetable_with_attrs"], add_table_attrs=True
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path,
+                variable_names=["timetable_with_attrs"],
+                add_table_attrs=True,
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["timetable_with_attrs"],
+                mload["timetable_with_attrs"],
+                check_like=True,
+            )
+
+            for key, value in mdict["timetable_with_attrs"].attrs.items():
+                assert key in mload["timetable_with_attrs"].attrs
+                if isinstance(value, np.ndarray):
+                    np.testing.assert_array_equal(
+                        value, mload["timetable_with_attrs"].attrs[key]
+                    )
+                else:
+                    assert value == mload["timetable_with_attrs"].attrs[key]
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

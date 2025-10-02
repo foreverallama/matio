@@ -6,13 +6,19 @@ import numpy as np
 import pandas as pd
 
 from matio.utils.converters.mattimes import caldur_dtype
-from matio.utils.matclass import EmptyMatStruct, MatConvertWarning
+from matio.utils.matclass import EmptyMatStruct, MatConvertError, MatConvertWarning
 
 TABLE_VERSION = 4
 MIN_TABLE_VERSION = 1
 
 TIMETABLE_VERSION = 6
 MIN_TIMETABLE_VERSION = 2
+
+# Pandas marks this as experimental
+# Using it here as its the closest match to MATLAB tables
+# FIXME: Update with pandas 3.0 release
+# https://pandas.pydata.org/docs/user_guide/migration-3-strings.html
+pd.options.future.infer_string = True
 
 
 def add_table_props(df, tab_props):
@@ -68,21 +74,26 @@ def add_timetable_props(df, tab_props):
 
 def to_dataframe(data, nvars, varnames):
     """Creates a dataframe from coldata and column names"""
+
+    def make_series(col, dtype_kind):
+        if dtype_kind == "T":
+            return pd.Series(col, dtype="str")
+        else:
+            return pd.Series(col)
+
     rows = {}
     for i in range(nvars):
         vname = varnames[0, i].item()
         coldata = data[0, i]
-
-        # If variable is multicolumn data
         if isinstance(coldata, np.ndarray):
             if coldata.shape[1] == 1:
-                rows[vname] = coldata[:, 0]
+                rows[vname] = make_series(coldata[:, 0], coldata.dtype.kind)
             else:
                 for j in range(coldata.shape[1]):
                     colname = f"{vname}_{j + 1}"
-                    rows[colname] = coldata[:, j]
+                    rows[colname] = make_series(coldata[:, j], coldata.dtype.kind)
         else:
-            rows[vname] = coldata
+            rows[vname] = pd.Series(coldata)
 
     df = pd.DataFrame(rows)
     return df
@@ -167,6 +178,9 @@ def get_row_times(row_times, num_rows):
             start = start.astype(start_dtype_new)
 
     times = (start + step * np.arange(num_rows)).ravel()
+    if times.dtype.kind == "M":
+        # MATLAB saves datetime as [ms] data
+        times = times.astype("datetime64[ms]")
     return times
 
 
@@ -247,13 +261,13 @@ def make_table_props():
 
     props["useVariableNamesOriginal"][0, 0] = np.bool_(False)
     props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
-    props["CustomProps"][0, 0] = EmptyMatStruct(np.empty((0, 0), dtype=object))
-    props["VariableCustomProps"][0, 0] = EmptyMatStruct(np.empty((0, 0), dtype=object))
+    props["CustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
+    props["VariableCustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
     props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
     props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
-    props["incompatibilityMsg"][0, 0] = ""
+    props["incompatibilityMsg"][0, 0] = np.empty((0, 0), dtype=np.str_)
     props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
-    props["Description"][0, 0] = ""
+    props["Description"][0, 0] = np.empty((0, 0), dtype=np.str_)
     props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
     props["DimensionNames"][0, 0] = np.array(
         [np.array(["Row"]), np.array(["Variables"])], dtype=object
@@ -270,13 +284,10 @@ def make_table_props():
 def table_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB table"""
 
-    if not isinstance(df, pd.DataFrame):
-        raise ValueError("Input must be a pandas DataFrame")
-
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
-        if pd.api.types.is_string_dtype(df[col]):
-            coldata = df[col].to_numpy(dtype="U")
+        if df[col].dtype == "str":
+            coldata = df[col].to_numpy(dtype=np.dtypes.StringDType()).reshape(-1, 1)
         else:
             coldata = df[col].to_numpy().reshape(-1, 1)
         data[0, i] = coldata
@@ -289,9 +300,11 @@ def table_to_mat(df):
     if df.index.name is not None or not isinstance(df.index, pd.RangeIndex):
         rownames = np.array([str(idx) for idx in df.index], dtype=object)
     else:
-        rownames = np.array([], dtype=object)
+        rownames = np.empty((0, 0), dtype=object)
 
     # TODO: Add table attributes
+    # All serialized data must be the exact same types (including shape) as expected by MATLAB
+    # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
     prop_map = {
         "data": data,
@@ -306,116 +319,108 @@ def table_to_mat(df):
     return prop_map
 
 
-# def make_timetable_props():
-#     """Creates default properties for a MATLAB timetable"""
+def make_timetable_props():
+    """Creates default properties for a MATLAB timetable"""
 
-#     arrayprops_dtype = [
-#         ("Description", object),
-#         ("UserData", object),
-#         ("TableCustomProperties", object),
-#     ]
-#     arrayprops = np.empty((1, 1), dtype=arrayprops_dtype)
-#     arrayprops["Description"][0, 0] = ""
-#     arrayprops["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
-#     arrayprops["TableCustomProperties"][0, 0] = EmptyStructMarker()
+    arrayprops_dtype = [
+        ("Description", object),
+        ("UserData", object),
+        ("TableCustomProperties", object),
+    ]
+    arrayprops = np.empty((1, 1), dtype=arrayprops_dtype)
+    arrayprops["Description"][0, 0] = np.empty((0, 0), dtype=np.str_)
+    arrayprops["UserData"][0, 0] = np.empty((0, 0), dtype=np.float64)
+    arrayprops["TableCustomProperties"][0, 0] = EmptyMatStruct(
+        np.empty((1, 1), dtype=object)
+    )
 
-#     return {
-#         "CustomProps": EmptyStructMarker(),
-#         "VariableCustomProps": EmptyStructMarker(),
-#         "versionSavedFrom": np.float64(TIMETABLE_VERSION),
-#         "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
-#         "incompatibilityMsg": "",
-#         "arrayProps": arrayprops,
-#         "numDims": np.float64(2),
-#         "useVarNamesOrig": np.bool_(False),
-#         "useDimNamesOrig": np.bool_(False),
-#         "dimNamesOrig": np.empty((0, 0), dtype=object),
-#         "varNamesOrig": np.empty((0, 0), dtype=object),
-#         "varDescriptions": np.empty((0, 0), dtype=object),
-#         "varUnits": np.empty((0, 0), dtype=object),
-#         "timeEvents": np.empty((0, 0), dtype=np.float64),
-#         "varContinuity": np.empty((0, 0), dtype=object),
-#     }
-
-
-# def timetable_to_mat(df):
-#     """Converts a pandas DataFrame to a MATLAB timetable"""
-
-#     if not isinstance(df, pd.DataFrame):
-#         raise ValueError("Input must be a pandas DataFrame")
-
-#     data = np.empty((1, len(df.columns)), dtype=object)
-#     for i, col in enumerate(df.columns):
-#         if pd.api.types.is_string_dtype(df[col]):
-#             coldata = df[col].to_numpy(dtype="U")
-#         else:
-#             coldata = df[col].to_numpy().reshape(-1, 1)
-#         data[0, i] = coldata
-
-#     nrows = np.float64(df.shape[0])
-#     nvars = np.float64(df.shape[1])
-
-#     varnames = np.array([str(col) for col in df.columns], dtype=object)
-#     dimnames = np.array(
-#         [np.array(["Time"]), np.array(["Variables"])], dtype=object
-#     ).reshape((1, 2))
-
-#     if isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
-#         rowtimes = df.index.to_numpy()
-#         if np.issubdtype(rowtimes.dtype, np.timedelta64):
-#             unit, _ = np.datetime_data(rowtimes.dtype)
-#             if unit not in ("s", "m", "h", "D", "Y"):
-#                 warnings.warn(
-#                     f"timetable_to_mat: MATLAB Duration arrays do not support timedelta64[{unit}]. Defaulting to 'ns'.",
-#                     UserWarning,
-#                 )
-#                 rowtimes = rowtimes.astype("timedelta64[ns]")
-#     else:
-#         raise ValueError(
-#             "cannot convert DataFrame to MATLAB Timetable: "
-#             "Requires datetime or timedelta row index"
-#         )
-
-#     # Define timetable struct dtype
-#     timetable_dtype = [
-#         ("data", object),
-#         ("dimNames", object),
-#         ("varNames", object),
-#         ("numRows", object),
-#         ("numVars", object),
-#         ("rowTimes", object),
-#     ]
-
-#     # FIXME: Add timetable attributes
-#     extras = make_timetable_props()
-#     timetable_dtype.extend((key, object) for key in extras)
-
-#     # Create 1x1 structured array
-#     timetable = np.empty((1, 1), dtype=timetable_dtype)
-#     timetable[0, 0]["data"] = data
-#     timetable[0, 0]["dimNames"] = dimnames
-#     timetable[0, 0]["varNames"] = varnames.reshape((1, -1))
-#     timetable[0, 0]["numRows"] = nrows
-#     timetable[0, 0]["numVars"] = nvars
-#     timetable[0, 0]["rowTimes"] = rowtimes.reshape((-1, 1))
-
-#     for key, value in extras.items():
-#         timetable[0, 0][key] = value
-
-#     return {"any": timetable}
+    return {
+        "CustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
+        "VariableCustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
+        "versionSavedFrom": np.float64(TIMETABLE_VERSION),
+        "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
+        "incompatibilityMsg": np.empty((0, 0), dtype=np.str_),
+        "arrayProps": arrayprops,
+        "numDims": np.float64(2),
+        "useVarNamesOrig": np.bool_(False),
+        "useDimNamesOrig": np.bool_(False),
+        "dimNamesOrig": np.empty((0, 0), dtype=object),
+        "varNamesOrig": np.empty((0, 0), dtype=object),
+        "varDescriptions": np.empty((0, 0), dtype=object),
+        "varUnits": np.empty((0, 0), dtype=object),
+        "timeEvents": np.empty((0, 0), dtype=np.float64),
+        "varContinuity": np.empty((0, 0), dtype=object),
+    }
 
 
-# def categorical_to_mat(cat):
-#     """Converts a pandas Categorical to a MATLAB categorical"""
+def timetable_to_mat(df):
+    """Converts a pandas DataFrame to a MATLAB timetable"""
 
-#     category_names = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
-#     codes = cat.codes.astype("int8") + 1  # 1-based indexing
-#     is_ordinal = np.bool_(cat.ordered)
-#     is_protected = np.bool_(False)  # not supported in pandas
+    data = np.empty((1, len(df.columns)), dtype=object)
+    for i, col in enumerate(df.columns):
+        if df[col].dtype == "str":
+            coldata = df[col].to_numpy(dtype=np.dtypes.StringDType()).reshape(-1, 1)
+        else:
+            coldata = df[col].to_numpy().reshape(-1, 1)
+        data[0, i] = coldata
 
-#     return {
-#         "categoryNames": category_names,
-#         "codes": codes,
-#         "isOrdinal": is_ordinal,
-#         "isProtected": is_protected,
-#     }
+    nrows = np.float64(df.shape[0])
+    nvars = np.float64(df.shape[1])
+
+    varnames = np.array([str(col) for col in df.columns], dtype=object)
+
+    dim1 = df.index.name if df.index.name is not None else "Time"
+    dimnames = np.array(
+        [np.array([dim1]), np.array(["Variables"])], dtype=object
+    ).reshape((1, 2))
+
+    if isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
+        rowtimes = df.index.to_numpy()
+    else:
+        raise MatConvertError(
+            "timetable_to_mat: DataFrame index must be DatetimeIndex or TimedeltaIndex."
+        )
+
+    # Define timetable struct dtype
+    timetable_dtype = [
+        ("data", object),
+        ("dimNames", object),
+        ("varNames", object),
+        ("numRows", object),
+        ("numVars", object),
+        ("rowTimes", object),
+    ]
+
+    # TODO: Add timetable attributes
+    extras = make_timetable_props()
+    timetable_dtype.extend((key, object) for key in extras)
+
+    # Create 1x1 structured array
+    timetable = np.empty((1, 1), dtype=timetable_dtype)
+    timetable[0, 0]["data"] = data
+    timetable[0, 0]["dimNames"] = dimnames
+    timetable[0, 0]["varNames"] = varnames.reshape((1, -1))
+    timetable[0, 0]["numRows"] = nrows
+    timetable[0, 0]["numVars"] = nvars
+    timetable[0, 0]["rowTimes"] = rowtimes.reshape((-1, 1))
+
+    for key, value in extras.items():
+        timetable[0, 0][key] = value
+
+    return {"any": timetable}
+
+
+def categorical_to_mat(cat):
+    """Converts a pandas Categorical to a MATLAB categorical"""
+
+    category_names = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
+    codes = cat.codes.astype("int8") + 1  # 1-based indexing
+    is_ordinal = np.bool_(cat.ordered)
+    is_protected = np.bool_(False)  # not supported in pandas
+
+    return {
+        "categoryNames": category_names,
+        "codes": codes,
+        "isOrdinal": is_ordinal,
+        "isProtected": is_protected,
+    }

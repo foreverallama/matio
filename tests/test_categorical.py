@@ -178,3 +178,295 @@ class TestLoadMatlabCategorical:
         np.testing.assert_array_equal(mdict["cat_3D"].codes, codes, strict=True)
         np.testing.assert_array_equal(mdict["cat_3D"].categories, cats, strict=True)
         np.testing.assert_array_equal(mdict["cat_3D"].ordered, ordered, strict=True)
+
+
+@pytest.mark.parametrize("filename, version", files)
+class TestSaveMatlabCategorical:
+
+    def test_categorical_scalar(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_scalar"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_scalar"])
+
+            np.testing.assert_array_equal(
+                mload["cat_scalar"].codes, mdict["cat_scalar"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_scalar"].categories,
+                mdict["cat_scalar"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_scalar"].ordered, mdict["cat_scalar"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_array(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_array"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_array"])
+
+            np.testing.assert_array_equal(
+                mload["cat_array"].codes, mdict["cat_array"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_array"].categories,
+                mdict["cat_array"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_array"].ordered, mdict["cat_array"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_empty(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_empty"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_empty"])
+
+            np.testing.assert_array_equal(
+                mload["cat_empty"].codes, mdict["cat_empty"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_empty"].categories,
+                mdict["cat_empty"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_empty"].ordered, mdict["cat_empty"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_from_numeric(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_from_numeric"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_from_numeric"])
+
+            np.testing.assert_array_equal(
+                mload["cat_from_numeric"].codes,
+                mdict["cat_from_numeric"].codes,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_from_numeric"].categories,
+                mdict["cat_from_numeric"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_from_numeric"].ordered,
+                mdict["cat_from_numeric"].ordered,
+                strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_unordered(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_unordered"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_unordered"])
+
+            np.testing.assert_array_equal(
+                mload["cat_unordered"].codes, mdict["cat_unordered"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_unordered"].categories,
+                mdict["cat_unordered"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_unordered"].ordered,
+                mdict["cat_unordered"].ordered,
+                strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_ordered(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_ordered"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_ordered"])
+
+            np.testing.assert_array_equal(
+                mload["cat_ordered"].codes, mdict["cat_ordered"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_ordered"].categories,
+                mdict["cat_ordered"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_ordered"].ordered, mdict["cat_ordered"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_missing(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_missing"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_missing"])
+
+            np.testing.assert_array_equal(
+                mload["cat_missing"].codes, mdict["cat_missing"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_missing"].categories,
+                mdict["cat_missing"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_missing"].ordered, mdict["cat_missing"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_mixed_case(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_mixed_case"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_mixed_case"])
+
+            np.testing.assert_array_equal(
+                mload["cat_mixed_case"].codes,
+                mdict["cat_mixed_case"].codes,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_mixed_case"].categories,
+                mdict["cat_mixed_case"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_mixed_case"].ordered,
+                mdict["cat_mixed_case"].ordered,
+                strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_matlab_string(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_string"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_string"])
+
+            np.testing.assert_array_equal(
+                mload["cat_string"].codes, mdict["cat_string"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_string"].categories,
+                mdict["cat_string"].categories,
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["cat_string"].ordered, mdict["cat_string"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_categorical_3D(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["cat_3D"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_3D"])
+
+            np.testing.assert_array_equal(
+                mload["cat_3D"].codes, mdict["cat_3D"].codes, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_3D"].categories, mdict["cat_3D"].categories, strict=True
+            )
+            np.testing.assert_array_equal(
+                mload["cat_3D"].ordered, mdict["cat_3D"].ordered, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

@@ -6,10 +6,12 @@ import pandas as pd
 
 from matio.utils.converters.matstring import mat_to_string, string_to_mat
 from matio.utils.converters.mattables import (
+    categorical_to_mat,
     mat_to_categorical,
     mat_to_table,
     mat_to_timetable,
     table_to_mat,
+    timetable_to_mat,
 )
 from matio.utils.converters.mattimes import (
     caldur_dtype,
@@ -55,14 +57,14 @@ MAT_TO_PY = {
 
 PY_TO_MAT = {
     "calendarDuration": calendarduration_to_mat,
-    # "categorical": categorical_to_mat,
+    "categorical": categorical_to_mat,
     # "containers.Map": containermap_to_mat,
     "datetime": datetime_to_mat,
     # "dictionary": dictionary_to_mat,
     "duration": duration_to_mat,
     "string": string_to_mat,
     "table": table_to_mat,
-    # "timetable": timetable_to_mat,
+    "timetable": timetable_to_mat,
 }
 
 
@@ -97,13 +99,14 @@ def guess_class_name(data):
     """Guess the MATLAB class name for a given Python object"""
 
     if isinstance(data, pd.DataFrame):
-        raise NotImplementedError(
-            "pandas.DataFrame to MATLAB table/timetable not yet supported"
-        )
+        if pd.api.types.is_datetime64_any_dtype(
+            data.index
+        ) or pd.api.types.is_timedelta64_dtype(data.index):
+            return "timetable"
+        else:
+            return "table"
     elif isinstance(data, pd.Categorical):
-        raise NotImplementedError(
-            "pandas.Categorical to MATLAB categorical not yet supported"
-        )
+        return "categorical"
     elif isinstance(data, pd.Series):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
     elif isinstance(data, MatlabContainerMap):
