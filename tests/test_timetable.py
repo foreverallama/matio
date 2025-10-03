@@ -26,7 +26,7 @@ class TestLoadMatlabTimetable:
             index=pd.Index(
                 np.array(
                     ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 name="Time",
             ),
@@ -57,7 +57,7 @@ class TestLoadMatlabTimetable:
         assert "timetable_empty" in mdict
 
         df = pd.DataFrame(
-            index=pd.DatetimeIndex([], dtype="datetime64[ms]", name="Time")
+            index=pd.DatetimeIndex([], dtype="datetime64[ns]", name="Time")
         )
         pd.testing.assert_frame_equal(mdict["timetable_empty"], df, check_like=True)
 
@@ -116,7 +116,7 @@ class TestLoadMatlabTimetable:
                 "data1": [1.0, 2.0, 3.0],
             },
             index=pd.Index(
-                np.array(["2020-01", "2020-04", "2020-07"], dtype="datetime64[ms]"),
+                np.array(["2020-01", "2020-04", "2020-07"], dtype="datetime64[ns]"),
                 name="Time",
             ),
         )
@@ -143,7 +143,7 @@ class TestLoadMatlabTimetable:
                         "2020-01-01T00:00:01",
                         "2020-01-01T00:00:02",
                     ],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 name="Time",
             ),
@@ -184,7 +184,7 @@ class TestLoadMatlabTimetable:
             index=pd.Index(
                 np.array(
                     ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 name="Time",
             ),
@@ -222,7 +222,7 @@ class TestLoadMatlabTimetable:
             index=pd.Index(
                 np.array(
                     ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 name="Date",
             ),

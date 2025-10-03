@@ -56,7 +56,7 @@ class TestLoadMatlabTable:
                         "2020-01-02T00:00:00.000",
                         "2020-01-03T00:00:00.000",
                     ],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 "Duration": np.array([30, 60, 90], dtype="timedelta64[s]"),
             }
@@ -88,7 +88,7 @@ class TestLoadMatlabTable:
                 "Var1": [
                     np.array([[1.0]]),
                     np.array(["text"]),
-                    np.array([["2023-01-01T00:00:00.000"]], dtype="datetime64[ms]"),
+                    np.array([["2023-01-01T00:00:00.000"]], dtype="datetime64[ns]"),
                 ],
             }
         )
@@ -137,7 +137,7 @@ class TestLoadMatlabTable:
                         "2023-01-02T00:00:00.000",
                         "2023-01-03T00:00:00.000",
                     ],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 "multicoldata_1": np.array([1.0, 2.0, 3.0]),
                 "multicoldata_2": np.array([4.0, 5.0, 6.0]),

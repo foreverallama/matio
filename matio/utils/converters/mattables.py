@@ -180,7 +180,7 @@ def get_row_times(row_times, num_rows):
     times = (start + step * np.arange(num_rows)).ravel()
     if times.dtype.kind == "M":
         # MATLAB saves datetime as [ms] data
-        times = times.astype("datetime64[ms]")
+        times = times.astype("datetime64[ns]")
     return times
 
 

@@ -605,9 +605,14 @@ class MatSubsystem:
                 arr_ids.append(object_id)
             dims = obj.shape
         else:
-            object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
-            arr_ids.append(object_id)
-            dims = (1, 1)
+            if isinstance(obj.properties, tuple):
+                # 0x0, 1x0, 0x1 objects
+                # FIXME
+                dims = obj.properties
+            else:
+                object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
+                arr_ids.append(object_id)
+                dims = (1, 1)
 
         return self.create_mcos_metadata(dims, arr_ids, class_id)
 
@@ -811,7 +816,7 @@ class MatSubsystem:
 
         if object_ids.size == 0:
             return MatlabOpaque(
-                properties=None, classname=classname, type_system=type_system
+                properties=tuple(dims), classname=classname, type_system=type_system
             )
 
         is_array = nobjects > 1

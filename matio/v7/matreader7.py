@@ -72,20 +72,23 @@ def whosmat7(file_path):
                 ncols = f[var]["jc"].size - 1
                 shape = (int(is_sparse), ncols)
                 class_name = "sparse"
-            elif object_decode == ObjectDecodingHint.OPAQUE_HINT:
-                if isinstance(f[var], h5py.Dataset):
-                    objmetadata = f[var][()]
-                    shape = shape_from_metadata(objmetadata)
-                else:
-                    if MAT_HDF_ATTRS.FIELDS in f[var].attrs:
-                        # Enumeration Array
-                        shape = f[var]["ValueIndices"].shape[::-1]
+            elif object_decode > 0:
+                if object_decode == ObjectDecodingHint.OPAQUE_HINT:
+                    if isinstance(f[var], h5py.Dataset):
+                        objmetadata = f[var][()].T
+                        shape = shape_from_metadata(objmetadata)
                     else:
-                        warnings.warn(
-                            f"Cannot determine shape of opaque object {var}",
-                            MatReadWarning,
-                        )
-                        shape = ()
+                        if MAT_HDF_ATTRS.FIELDS in f[var].attrs:
+                            # Enumeration Array
+                            shape = f[var]["ValueIndices"].shape[::-1]
+                        else:
+                            warnings.warn(
+                                f"Cannot determine shape of opaque object {var}",
+                                MatReadWarning,
+                            )
+                            shape = ()
+                else:
+                    shape = (1, 1)
             elif class_name == "struct":
                 keys = list(f[var].keys())
                 if len(keys) == 0:

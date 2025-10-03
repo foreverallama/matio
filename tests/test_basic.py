@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.matclass import MatWriteWarning
 
 files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
 
@@ -615,6 +616,70 @@ class TestSaveBasicDatatypes:
             )
             np.testing.assert_array_equal(
                 mdict["logical_empty"], mload["logical_empty"], strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("filename, version", files)
+class TestWriteNonSupportedNumeric:
+
+    def test_numpy_floats(self, filename, version):
+        """Test writing numpy float16 data to MAT-file"""
+        arr_16 = np.array([1, 2, 3], dtype=np.float16).reshape(1, 3)
+        arr_128 = np.array([1, 2, 3], dtype=np.float128).reshape(1, 3)
+        mdict = {"float16_array": arr_16, "float128_array": arr_128}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatWriteWarning, match="not supported"):
+                save_to_mat(temp_file_path, mdict, version=version)
+
+            mload = load_from_mat(temp_file_path, variable_names=None)
+
+            np.testing.assert_array_equal(
+                mload["float16_array"],
+                mdict["float16_array"].astype("float64"),
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["float128_array"],
+                mdict["float128_array"].astype("float64"),
+                strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_numpy_complex(self, filename, version):
+        """Test writing numpy complex64 and complex256 data to MAT-file"""
+        arr_c64 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64).reshape(1, 3)
+        arr_c256 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex256).reshape(1, 3)
+        mdict = {"complex64_array": arr_c64, "complex256_array": arr_c256}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatWriteWarning, match="not supported"):
+                save_to_mat(temp_file_path, mdict, version=version)
+
+            mload = load_from_mat(temp_file_path, variable_names=None)
+
+            np.testing.assert_array_equal(
+                mload["complex64_array"],
+                mdict["complex64_array"].astype("complex128"),
+                strict=True,
+            )
+            np.testing.assert_array_equal(
+                mload["complex256_array"],
+                mdict["complex256_array"].astype("complex128"),
+                strict=True,
             )
 
         finally:

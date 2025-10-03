@@ -260,8 +260,7 @@ class VarWriter5:
         elif isinstance(narr, MatlabObject):
             self.write_object(narr)
         elif isinstance(narr, MatlabFunction):
-            warnings.warn("Writing function handles is not supported", MatWriteWarning)
-            return
+            self.write_function_handle(narr)
         elif isinstance(narr, EmptyMatStruct):
             self.write_empty_struct(narr)
         elif isinstance(narr, (MatlabOpaque, MatlabOpaqueArray)):
@@ -398,6 +397,11 @@ class VarWriter5:
         self.write_header(matdims(arr, self.oned_as), mxTypes.mxOBJECT_CLASS)
         self.write_element(np.array(arr.classname, dtype="S"), mdtype=miTypes.miINT8)
         self._write_items(arr)
+
+    def write_function_handle(self, arr):
+        """Write MatlabFunction"""
+        self.write_header(matdims(arr, self.oned_as), mxTypes.mxFUNCTION_CLASS)
+        self.write(arr.view(np.ndarray))
 
     def write_opaque(self, arr):
         """Array Flags, Var Name, Type System, Class Name, Metadata"""

@@ -114,8 +114,8 @@ class MatlabOpaque:
 
     def __repr__(self):
         """String representation of the object"""
-        if self.properties is None:
-            shape = (0, 0)
+        if isinstance(self.properties, tuple):
+            shape = self.properties
         else:
             shape = (1, 1)
         return f"MatlabOpaque(classname={self.classname}, shape={shape})"
