@@ -606,8 +606,8 @@ class MatSubsystem:
         else:
             if isinstance(obj.properties, tuple):
                 # 0x0, 1x0, 0x1 objects
-                # FIXME
                 dims = obj.properties
+                class_id = self.set_class_id(classname)
             else:
                 object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
                 arr_ids.append(object_id)
