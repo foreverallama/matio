@@ -24,13 +24,23 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.11"
 
-      - name: Build release distributions
+      - name: Install build tools
         run: |
-          python -m pip install build twine
-          python -m build
-          twine check dist/*
+          python -m pip install --upgrade pip
+          pip install cibuildwheel build twine
+
+      - name: Build wheels
+        run: cibuildwheel --output-dir dist
+        env:
+          CIBW_BUILD: "cp311-* cp312-* cp313-*"
+
+      - name: Build sdist
+        run: python -m build --sdist --outdir dist
+
+      - name: Check distributions
+        run: twine check dist/*
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
