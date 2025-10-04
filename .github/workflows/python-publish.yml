@@ -17,7 +17,10 @@ permissions:
 
 jobs:
   release-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +40,7 @@ jobs:
           CIBW_BUILD: "cp311-* cp312-* cp313-*"
 
       - name: Build sdist
+        if: matrix.os == 'ubuntu-latest'
         run: python -m build --sdist --outdir dist
 
       - name: Check distributions
@@ -45,7 +49,7 @@ jobs:
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
-          name: release-dists
+          name: release-dists-${{ matrix.os }}
           path: dist/
 
   pypi-publish:
@@ -63,10 +67,22 @@ jobs:
       url: https://pypi.org/project/mat-io
 
     steps:
-      - name: Retrieve release distributions
+      - name: Retrieve release distributions (Linux)
         uses: actions/download-artifact@v4
         with:
-          name: release-dists
+          name: release-dists-ubuntu-latest
+          path: dist/
+
+      - name: Retrieve release distributions (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dists-windows-latest
+          path: dist/
+
+      - name: Retrieve release distributions (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dists-macos-latest
           path: dist/
 
       - name: Publish release distributions to PyPI
