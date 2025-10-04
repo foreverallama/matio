@@ -263,11 +263,10 @@ class VarWriter5:
             self.write_function_handle(narr)
         elif isinstance(narr, EmptyMatStruct):
             self.write_empty_struct(narr)
-        elif isinstance(narr, (MatlabOpaque, MatlabOpaqueArray)):
+        elif isinstance(
+            narr, (MatlabOpaque, MatlabOpaqueArray, MatlabEnumerationArray)
+        ):
             self.write_opaque(narr)
-        elif isinstance(narr, MatlabEnumerationArray):
-            warnings.warn("Writing enumerations is not supported", MatWriteWarning)
-            return
         elif narr.dtype.fields:  # struct array
             self.write_struct(narr)
         elif narr.dtype.hasobject:  # cell array
@@ -411,7 +410,10 @@ class VarWriter5:
         if arr.classname == MCOS_SUBSYSTEM_CLASS:
             self.write(arr.properties)
         else:
-            objmetadata = self.subsystem.set_object_metadata(arr)
+            if isinstance(arr, MatlabEnumerationArray):
+                objmetadata = self.subsystem.set_enumeration_metadata(arr)
+            else:
+                objmetadata = self.subsystem.set_object_metadata(arr)
             self.write(objmetadata)
 
     def write_canonical_empty(self, arr):

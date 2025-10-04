@@ -314,13 +314,19 @@ class MatWrite7:
         if data.classname == MCOS_SUBSYSTEM_CLASS:
             dset = self.write_cell_array(parent, var_name, data.properties)
         else:
-            metadata = self.subsystem.set_object_metadata(data)
-            dset = parent.create_dataset(var_name, data=metadata.T)
+            if isinstance(data, MatlabEnumerationArray):
+                metadata = self.subsystem.set_enumeration_metadata(data)
+                dset = self.write_struct_array(
+                    parent,
+                    var_name,
+                    metadata,
+                    object_decode=ObjectDecodingHint.OPAQUE_HINT,
+                )
+            else:
+                metadata = self.subsystem.set_object_metadata(data)
+                dset = parent.create_dataset(var_name, data=metadata.T)
 
-        if isinstance(data, MatlabOpaqueArray):
-            classname = data.flat[0].classname
-        else:
-            classname = data.classname
+        classname = data.classname
 
         dset.attrs.create(MAT_HDF_ATTRS.CLASS, np.bytes_(classname))
         dset.attrs.create(
@@ -351,18 +357,14 @@ class MatWrite7:
             dset = self.write_sparse_array(parent, var_name, data)
         elif isinstance(data, MatlabCanonicalEmpty):
             dset = self.write_canonical_empty(parent, var_name, data)
-        elif isinstance(data, (MatlabOpaque, MatlabOpaqueArray)):
+        elif isinstance(
+            data, (MatlabOpaque, MatlabOpaqueArray, MatlabEnumerationArray)
+        ):
             dset = self.write_opaque_object(parent, var_name, data)
         elif isinstance(data, MatlabFunction):
             dset = self.write_function_handle(parent, var_name, data)
         elif isinstance(data, MatlabObject):
             dset = self.write_matlab_object(parent, var_name, data)
-        elif isinstance(data, MatlabEnumerationArray):
-            warnings.warn(
-                f"MatlabEnumerationArray {data.classname} not supported for writing. Skipping.",
-                MatWriteWarning,
-            )
-            return None
         elif isinstance(data, EmptyMatStruct):
             dset = self.write_empty_struct(parent, var_name, data)
 

@@ -20,7 +20,9 @@ from matio.utils.matclass import (
     PropertyType,
 )
 from matio.utils.matconvert import (
+    ENUM_INSTANCE_DTYPE,
     convert_mat_to_py,
+    enum_to_opaque,
     mat_to_enum,
     matlab_classdef_types,
     matlab_saveobj_ret_types,
@@ -442,11 +444,11 @@ class MatSubsystem:
 
         # Add new class ID metadata
         namespace, _, cname = classname.rpartition(".")
+        cname_idx = self.set_mcos_name(cname)
         if namespace:
             namespace_idx = self.set_mcos_name(namespace)
         else:
             namespace_idx = 0
-        cname_idx = self.set_mcos_name(cname)
 
         metadata = [namespace_idx, cname_idx, 0, 0]
         self.class_id_metadata.extend(metadata)
@@ -457,7 +459,7 @@ class MatSubsystem:
         """Recursively serializes nested properties of an MCOS object"""
 
         if isinstance(prop_value, MatlabEnumerationArray):
-            raise NotImplementedError("MatlabEnumerationArray is not yet supported")
+            prop_value = self.set_enumeration_metadata(prop_value)
 
         elif (
             isinstance(prop_value, np.ndarray)
@@ -593,10 +595,7 @@ class MatSubsystem:
         """Sets metadata for a single MCOS object"""
 
         arr_ids = []
-        if isinstance(obj, MatlabOpaque):
-            classname = obj.classname
-        elif isinstance(obj, MatlabOpaqueArray):
-            classname = obj.flat[0].classname
+        classname = obj.classname
         saveobj_ret_type = classname in self.saveobj_class_names
 
         if isinstance(obj, MatlabOpaqueArray):
@@ -626,12 +625,7 @@ class MatSubsystem:
     def set_object_metadata(self, obj):
         """Sets metadata for a MatioOpaque object"""
 
-        if isinstance(obj, MatlabOpaqueArray):
-            obj0 = obj.flat[0]
-            type_system = obj0.type_system
-        else:
-            type_system = obj.type_system
-
+        type_system = obj.type_system
         if type_system != OpaqueType.MCOS:
             warnings.warn(
                 "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped",
@@ -640,6 +634,54 @@ class MatSubsystem:
             return np.empty((0, 0), dtype=np.uint8)
 
         return self.set_mcos_object_metadata(obj)
+
+    def set_enumeration_metadata(self, enum_array):
+        """Creates MCOS Enumeration metadata array"""
+
+        classname = enum_array.classname
+        classname_idx = self.set_class_id(classname)
+
+        value_names_idx = []
+        values = []
+        value_indices = []
+
+        for i, enum_member in enumerate(enum_array.ravel(order="F")):
+            value_name = enum_member.name
+
+            value_class = enum_to_opaque(classname, enum_member.value)
+            values.append(self.set_object_metadata(value_class))
+            value_indices.append(i)
+            value_names_idx.append(self.set_mcos_name(value_name))
+
+        prop_name = next(iter(enum_array[0, 0].value))
+        builtin_classname, _, _ = prop_name.rpartition(".")
+        if builtin_classname:
+            builtin_classname_idx = self.set_class_id(builtin_classname)
+        else:
+            builtin_classname_idx = 0
+
+        value_names_idx = np.array(value_names_idx, dtype=np.uint32).reshape(-1, 1)
+        values_arr = np.empty((len(values), 1), dtype=object)
+        values_arr[:, 0] = values
+        value_indices = np.array(value_indices, dtype=np.uint32).reshape(
+            enum_array.shape, order="F"
+        )
+
+        enum_instance_metadata = np.empty((1, 1), dtype=ENUM_INSTANCE_DTYPE)
+        enum_instance_metadata[0, 0]["EnumerationInstanceTag"] = np.array(
+            MCOS_MAGIC_NUMBER, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["ClassName"] = np.array(
+            classname_idx, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["BuiltinClassName"] = np.array(
+            builtin_classname_idx, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["ValueNames"] = value_names_idx
+        enum_instance_metadata[0, 0]["Values"] = values_arr
+        enum_instance_metadata[0, 0]["ValueIndices"] = value_indices
+
+        return enum_instance_metadata
 
     def set_fwrap_metadata(self):
         """Create FileWrapper Metadata Array"""

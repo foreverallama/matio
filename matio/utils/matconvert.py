@@ -4,6 +4,11 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
+from matio.utils.converters.matenum import (
+    ENUM_INSTANCE_DTYPE,
+    enum_to_opaque,
+    mat_to_enum,
+)
 from matio.utils.converters.matmap import containermap_to_mat, mat_to_containermap
 from matio.utils.converters.matstring import mat_to_string, string_to_mat
 from matio.utils.converters.mattables import (
@@ -112,8 +117,6 @@ def guess_class_name(data):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
     elif isinstance(data, MatlabContainerMap):
         return "containers.Map"
-    elif isinstance(data, MatlabEnumerationArray):
-        raise NotImplementedError("MatlabEnumerationArray is not yet supported")
     elif isinstance(data, (np.ndarray, np.generic)):
         if data.dtype.kind == "T":
             return "string"
@@ -141,16 +144,3 @@ def convert_py_to_mat(data, classname):
     )
 
     return obj
-
-
-def mat_to_enum(values, value_names, classname, shapes):
-    """Converts MATLAB enum to Python enum"""
-
-    enum_class = Enum(
-        classname,
-        {name: val.properties for name, val in zip(value_names, values)},
-    )
-
-    enum_members = [enum_class(val.properties) for val in values]
-    arr = np.array(enum_members, dtype=object).reshape(shapes, order="F")
-    return MatlabEnumerationArray(arr, type_system=OpaqueType.MCOS, classname=classname)
