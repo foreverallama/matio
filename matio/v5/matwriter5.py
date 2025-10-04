@@ -90,13 +90,15 @@ NDT_TAG_SMALL = MDTYPES[SYS_BYTE_ORDER]["dtypes"]["tag_smalldata"]
 NDT_ARRAY_FLAGS = MDTYPES[SYS_BYTE_ORDER]["dtypes"]["array_flags"]
 
 
-def savemat5(file_path, mdict, global_vars, oned_as, do_compression):
+def savemat5(file_path, mdict, global_vars, saveobj_classes, oned_as, do_compression):
     """Write data to MAT-5file."""
 
     with open(file_path, "wb") as f:
         write_file_header(f, version=MAT_5_VERSION)
         MW = MatFile5Writer(f, oned_as=oned_as)
-        MW.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW.subsystem = MatSubsystem(
+            byte_order=SYS_BYTE_ORDER, oned_as=oned_as, saveobj_classes=saveobj_classes
+        )
         MW.subsystem.init_save()
 
         MW.put_variables(mdict, global_vars, do_compression)
@@ -258,15 +260,13 @@ class VarWriter5:
         elif isinstance(narr, MatlabObject):
             self.write_object(narr)
         elif isinstance(narr, MatlabFunction):
-            warnings.warn("Writing function handles is not supported", MatWriteWarning)
-            return
+            self.write_function_handle(narr)
         elif isinstance(narr, EmptyMatStruct):
             self.write_empty_struct(narr)
-        elif isinstance(narr, (MatlabOpaque, MatlabOpaqueArray)):
+        elif isinstance(
+            narr, (MatlabOpaque, MatlabOpaqueArray, MatlabEnumerationArray)
+        ):
             self.write_opaque(narr)
-        elif isinstance(narr, MatlabEnumerationArray):
-            warnings.warn("Writing enumerations is not supported", MatWriteWarning)
-            return
         elif narr.dtype.fields:  # struct array
             self.write_struct(narr)
         elif narr.dtype.hasobject:  # cell array
@@ -397,6 +397,11 @@ class VarWriter5:
         self.write_element(np.array(arr.classname, dtype="S"), mdtype=miTypes.miINT8)
         self._write_items(arr)
 
+    def write_function_handle(self, arr):
+        """Write MatlabFunction"""
+        self.write_header(matdims(arr, self.oned_as), mxTypes.mxFUNCTION_CLASS)
+        self.write(arr.view(np.ndarray))
+
     def write_opaque(self, arr):
         """Array Flags, Var Name, Type System, Class Name, Metadata"""
         self.write_header(None, mxTypes.mxOPAQUE_CLASS)
@@ -405,7 +410,10 @@ class VarWriter5:
         if arr.classname == MCOS_SUBSYSTEM_CLASS:
             self.write(arr.properties)
         else:
-            objmetadata = self.subsystem.set_object_metadata(arr)
+            if isinstance(arr, MatlabEnumerationArray):
+                objmetadata = self.subsystem.set_enumeration_metadata(arr)
+            else:
+                objmetadata = self.subsystem.set_object_metadata(arr)
             self.write(objmetadata)
 
     def write_canonical_empty(self, arr):

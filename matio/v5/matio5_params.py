@@ -149,7 +149,7 @@ mclass_info = {
     mxTypes.mxOBJECT_CLASS: "object",
     mxTypes.mxCHAR_CLASS: "char",
     mxTypes.mxSPARSE_CLASS: "sparse",
-    mxTypes.mxFUNCTION_CLASS: "function",
+    mxTypes.mxFUNCTION_CLASS: "function_handle",
     mxTypes.mxOPAQUE_CLASS: "opaque",
 }
 

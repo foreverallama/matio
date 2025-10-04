@@ -19,7 +19,7 @@ class TestLoadMatlabDatetime:
         mdict = load_from_mat(file_path, variable_names=["dt_basic"])
         assert "dt_basic" in mdict
 
-        dt_scalar = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[ms]").reshape(
+        dt_scalar = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[ns]").reshape(
             1, 1
         )
 
@@ -42,7 +42,7 @@ class TestLoadMatlabDatetime:
                     "2025-04-06",
                 ]
             ],
-            dtype="datetime64[ms]",
+            dtype="datetime64[ns]",
         ).reshape(2, 3)
 
         np.testing.assert_array_equal(mdict["dt_array"], dt_array, strict=True)
@@ -53,7 +53,7 @@ class TestLoadMatlabDatetime:
         mdict = load_from_mat(file_path, variable_names=["dt_empty"])
         assert "dt_empty" in mdict
 
-        dt_empty = np.empty((0, 0), dtype="datetime64[ms]")
+        dt_empty = np.empty((0, 0), dtype="datetime64[ns]")
         np.testing.assert_array_equal(mdict["dt_empty"], dt_empty, strict=True)
 
     def test_datetime_fmt(self, filename, version):
@@ -64,7 +64,7 @@ class TestLoadMatlabDatetime:
             assert "dt_fmt" in mdict
 
             dt_fmt = np.array(
-                [["2025-04-01T12:00:00"]], dtype="datetime64[ms]"
+                [["2025-04-01T12:00:00"]], dtype="datetime64[ns]"
             ).reshape(1, 1)
 
             np.testing.assert_array_equal(mdict["dt_fmt"], dt_fmt, strict=True)
@@ -76,7 +76,7 @@ class TestLoadMatlabDatetime:
             mdict = load_from_mat(file_path, variable_names=["dt_tz"])
             assert "dt_tz" in mdict
 
-            dt_tz = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[ms]").reshape(
+            dt_tz = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[ns]").reshape(
                 1, 1
             )
 

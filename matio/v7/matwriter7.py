@@ -26,6 +26,8 @@ from matio.utils.matclass import (
 )
 from matio.utils.matheaders import (
     MAT_HDF_ATTRS,
+    MAT_HDF_COMPRESSION,
+    MAT_HDF_COMPRESSION_OPTS,
     MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MAT_HDF_USER_BLOCK_BYTES,
@@ -37,12 +39,14 @@ from matio.utils.matutils import mat_numeric, strings_to_chars, to_writeable
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
 
-def savemat7(file_path, mdict, global_vars, oned_as):
+def savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as):
     """Write data to MAT-5file."""
 
     with h5py.File(file_path, "w", userblock_size=MAT_HDF_USER_BLOCK_BYTES) as f:
         MW7 = MatWrite7(f, oned_as=oned_as)
-        MW7.subsystem = MatSubsystem(byte_order=SYS_BYTE_ORDER, oned_as=oned_as)
+        MW7.subsystem = MatSubsystem(
+            byte_order=SYS_BYTE_ORDER, oned_as=oned_as, saveobj_classes=saveobj_classes
+        )
         MW7.subsystem.init_save()
         MW7.put_variables(mdict, global_vars)
 
@@ -113,7 +117,13 @@ class MatWrite7:
             dset = parent.create_dataset(var_name, data=data_empty)
             self.add_empty_attribute(dset)
         else:
-            dset = parent.create_dataset(var_name, data=data.T)
+            dset = parent.create_dataset(
+                var_name,
+                data=data.T,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(dset, classname)
         if int_decode is not None and int_decode == IntegerDecodingHint.LOGICAL_HINT:
@@ -134,7 +144,13 @@ class MatWrite7:
         else:
             data = strings_to_chars(data)
             data = data.view(np.uint32).astype(np.uint16)
-            dset = parent.create_dataset(var_name, data=data.T)
+            dset = parent.create_dataset(
+                var_name,
+                data=data.T,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(dset, MatlabClasses.CHAR)
         self.add_int_decode_attr(dset, IntegerDecodingHint.UTF16_HINT)
@@ -263,10 +279,28 @@ class MatWrite7:
         data, classname, int_decode = mat_numeric(A.data, version=MAT_HDF_VERSION)
 
         sparse_group = parent.create_group(var_name)
-        sparse_group.create_dataset("jc", data=jc)
+        sparse_group.create_dataset(
+            "jc",
+            data=jc,
+            compression=MAT_HDF_COMPRESSION,
+            compression_opts=MAT_HDF_COMPRESSION_OPTS,
+            chunks=True,
+        )
         if data.size > 0:
-            sparse_group.create_dataset("data", data=data)
-            sparse_group.create_dataset("ir", data=ir)
+            sparse_group.create_dataset(
+                "data",
+                data=data,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
+            sparse_group.create_dataset(
+                "ir",
+                data=ir,
+                compression=MAT_HDF_COMPRESSION,
+                compression_opts=MAT_HDF_COMPRESSION_OPTS,
+                chunks=True,
+            )
 
         self.add_classname_attr(sparse_group, classname)
         self.add_sparse_attr(sparse_group, A.shape[0])
@@ -280,13 +314,19 @@ class MatWrite7:
         if data.classname == MCOS_SUBSYSTEM_CLASS:
             dset = self.write_cell_array(parent, var_name, data.properties)
         else:
-            metadata = self.subsystem.set_object_metadata(data)
-            dset = parent.create_dataset(var_name, data=metadata.T)
+            if isinstance(data, MatlabEnumerationArray):
+                metadata = self.subsystem.set_enumeration_metadata(data)
+                dset = self.write_struct_array(
+                    parent,
+                    var_name,
+                    metadata,
+                    object_decode=ObjectDecodingHint.OPAQUE_HINT,
+                )
+            else:
+                metadata = self.subsystem.set_object_metadata(data)
+                dset = parent.create_dataset(var_name, data=metadata.T)
 
-        if isinstance(data, MatlabOpaqueArray):
-            classname = data.flat[0].classname
-        else:
-            classname = data.classname
+        classname = data.classname
 
         dset.attrs.create(MAT_HDF_ATTRS.CLASS, np.bytes_(classname))
         dset.attrs.create(
@@ -306,8 +346,6 @@ class MatWrite7:
     def write_variable(self, var_name, data, group=None):
         """Writes a variable to the HDF5 file."""
 
-        # TODO: Check if MATLAB applies compression to datasets
-
         if group is None:
             parent = self.h5file
         else:
@@ -319,18 +357,14 @@ class MatWrite7:
             dset = self.write_sparse_array(parent, var_name, data)
         elif isinstance(data, MatlabCanonicalEmpty):
             dset = self.write_canonical_empty(parent, var_name, data)
-        elif isinstance(data, (MatlabOpaque, MatlabOpaqueArray)):
+        elif isinstance(
+            data, (MatlabOpaque, MatlabOpaqueArray, MatlabEnumerationArray)
+        ):
             dset = self.write_opaque_object(parent, var_name, data)
         elif isinstance(data, MatlabFunction):
             dset = self.write_function_handle(parent, var_name, data)
         elif isinstance(data, MatlabObject):
             dset = self.write_matlab_object(parent, var_name, data)
-        elif isinstance(data, MatlabEnumerationArray):
-            warnings.warn(
-                f"MatlabEnumerationArray {data.classname} not supported for writing. Skipping.",
-                MatWriteWarning,
-            )
-            return None
         elif isinstance(data, EmptyMatStruct):
             dset = self.write_empty_struct(parent, var_name, data)
 

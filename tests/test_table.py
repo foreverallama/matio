@@ -56,7 +56,7 @@ class TestLoadMatlabTable:
                         "2020-01-02T00:00:00.000",
                         "2020-01-03T00:00:00.000",
                     ],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 "Duration": np.array([30, 60, 90], dtype="timedelta64[s]"),
             }
@@ -88,7 +88,7 @@ class TestLoadMatlabTable:
                 "Var1": [
                     np.array([[1.0]]),
                     np.array(["text"]),
-                    np.array([["2023-01-01T00:00:00.000"]], dtype="datetime64[ms]"),
+                    np.array([["2023-01-01T00:00:00.000"]], dtype="datetime64[ns]"),
                 ],
             }
         )
@@ -137,7 +137,7 @@ class TestLoadMatlabTable:
                         "2023-01-02T00:00:00.000",
                         "2023-01-03T00:00:00.000",
                     ],
-                    dtype="datetime64[ms]",
+                    dtype="datetime64[ns]",
                 ),
                 "multicoldata_1": np.array([1.0, 2.0, 3.0]),
                 "multicoldata_2": np.array([4.0, 5.0, 6.0]),
@@ -209,3 +209,268 @@ class TestLoadMatlabTable:
                 )
             else:
                 assert mdict["table_with_attrs"].attrs[key] == value
+
+
+@pytest.mark.parametrize("filename, version", files)
+class TestSaveMatlabTable:
+
+    def test_table_numeric(self, filename, version):
+        """Test writing numeric table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_numeric"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_numeric"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_numeric"], mload["table_numeric"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_strings(self, filename, version):
+        """Test writing string table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_strings"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_strings"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_strings"], mload["table_strings"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_empty(self, filename, version):
+        """Test writing empty table to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_empty"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_empty"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_empty"], mload["table_empty"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_time(self, filename, version):
+        """Test writing timetable to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_time"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_time"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_time"], mload["table_time"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_nan(self, filename, version):
+        """Test writing table with NaN values to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_nan"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_nan"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_nan"], mload["table_nan"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_from_cell(self, filename, version):
+        """Test writing table created from cell array to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_from_cell"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_from_cell"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_from_cell"], mload["table_from_cell"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_var_names(self, filename, version):
+        """Test writing table with variable names to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_var_names"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_var_names"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_var_names"], mload["table_var_names"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_row_names(self, filename, version):
+        """Test writing table with row names to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_row_names"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_row_names"])
+
+            pd.testing.assert_frame_equal(
+                mdict["table_row_names"], mload["table_row_names"], check_like=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_multi_col_data(self, filename, version):
+        """Test writing table with multi-column data to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_multi_col_data"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["table_multi_col_data"]
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["table_multi_col_data"],
+                mload["table_multi_col_data"],
+                check_like=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_with_objects(self, filename, version):
+        """Test writing table with object data to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_with_objects"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_with_objects"])
+
+            col1_orig = mdict["table_with_objects"]["C"]
+            col1_load = mload["table_with_objects"]["C"]
+            for i in range(col1_orig.size):
+                assert isinstance(col1_load[i], np.ndarray)
+                assert col1_load[i].dtype.hasobject
+                assert set(col1_load[i].dtype.names) == {"field1", "field2"}
+                np.testing.assert_array_equal(
+                    col1_load[i]["field1"][0, 0], col1_orig[i]["field1"][0, 0]
+                )
+                np.testing.assert_array_equal(
+                    col1_load[i]["field2"][0, 0], col1_orig[i]["field2"][0, 0]
+                )
+
+            col2_orig = mdict["table_with_objects"]["Var2"]
+            col2_load = mload["table_with_objects"]["Var2"]
+            for i in range(col2_orig.size):
+                assert isinstance(col2_load[i], MatlabOpaque)
+                assert col2_load[i].classname == col2_orig[i].classname
+                assert col2_load[i].type_system == col2_orig[i].type_system
+                np.testing.assert_array_equal(
+                    col2_load[i].properties["a"], col2_orig[i].properties["a"]
+                )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    @pytest.mark.xfail(reason="Writing attributes not implemented")
+    def test_table_with_attrs(self, filename, version):
+        """Test writing table with attributes to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["table_with_attrs"], add_table_attrs=True
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version, do_compression=False)
+            mload = load_from_mat(
+                temp_file_path,
+                variable_names=["table_with_attrs"],
+                add_table_attrs=True,
+            )
+
+            pd.testing.assert_frame_equal(
+                mdict["table_with_attrs"],
+                mload["table_with_attrs"],
+                check_like=True,
+            )
+
+            for key in mdict["table_with_attrs"].attrs.keys():
+                assert key in mload["table_with_attrs"].attrs
+                val_orig = mdict["table_with_attrs"].attrs[key]
+                val_load = mload["table_with_attrs"].attrs[key]
+                if isinstance(val_orig, np.ndarray):
+                    np.testing.assert_array_equal(val_orig, val_load)
+                else:
+                    assert val_orig == val_load
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

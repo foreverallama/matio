@@ -20,7 +20,9 @@ from matio.utils.matclass import (
     PropertyType,
 )
 from matio.utils.matconvert import (
+    ENUM_INSTANCE_DTYPE,
     convert_mat_to_py,
+    enum_to_opaque,
     mat_to_enum,
     matlab_classdef_types,
     matlab_saveobj_ret_types,
@@ -43,7 +45,7 @@ class MatSubsystem:
         raw_data=False,
         add_table_attrs=False,
         oned_as="col",
-        saveobj_ret_classes=[],  # TODO: Allow as user arg
+        saveobj_classes=[],
     ):
         self.byte_order = "<u4" if byte_order[0] == "<" else ">u4"
         self.raw_data = raw_data
@@ -81,9 +83,7 @@ class MatSubsystem:
         self.class_id_counter = 0
         self.object_id_counter = 0
 
-        if isinstance(saveobj_ret_classes, str):
-            saveobj_ret_classes = [saveobj_ret_classes]
-        self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_ret_classes
+        self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_classes
 
     def init_save(self):
         """Initializes save with metadata for object ID = 0"""
@@ -234,7 +234,8 @@ class MatSubsystem:
     def is_valid_opaque_object(self, metadata):
         """Checks if property value is a valid opaque object metadata array"""
 
-        # TODO: Add checks for other opaque objects
+        # Only know MCOS identifier
+        # Can include other types later
         return self.is_valid_mcos_object(metadata)
 
     def check_prop_for_opaque(self, prop):
@@ -390,7 +391,7 @@ class MatSubsystem:
             dyn_class_id = self.get_object_metadata(dyn_obj_id)[0]
             classname = self.get_classname(dyn_class_id)
             dynobj = MatlabOpaque(
-                None, type_system=OpaqueType.MCOS, classname=classname
+                properties=None, classname=classname, type_system=OpaqueType.MCOS
             )
             dynobj.properties = self.get_properties(dyn_obj_id)
             dyn_prop_map[f"{DYNAMIC_PROPERTY_PREFIX}{i + 1}"] = dynobj
@@ -443,11 +444,11 @@ class MatSubsystem:
 
         # Add new class ID metadata
         namespace, _, cname = classname.rpartition(".")
+        cname_idx = self.set_mcos_name(cname)
         if namespace:
             namespace_idx = self.set_mcos_name(namespace)
         else:
             namespace_idx = 0
-        cname_idx = self.set_mcos_name(cname)
 
         metadata = [namespace_idx, cname_idx, 0, 0]
         self.class_id_metadata.extend(metadata)
@@ -458,7 +459,7 @@ class MatSubsystem:
         """Recursively serializes nested properties of an MCOS object"""
 
         if isinstance(prop_value, MatlabEnumerationArray):
-            raise NotImplementedError("MatlabEnumerationArray is not yet supported")
+            prop_value = self.set_enumeration_metadata(prop_value)
 
         elif (
             isinstance(prop_value, np.ndarray)
@@ -594,10 +595,7 @@ class MatSubsystem:
         """Sets metadata for a single MCOS object"""
 
         arr_ids = []
-        if isinstance(obj, MatlabOpaque):
-            classname = obj.classname
-        elif isinstance(obj, MatlabOpaqueArray):
-            classname = obj.flat[0].classname
+        classname = obj.classname
         saveobj_ret_type = classname in self.saveobj_class_names
 
         if isinstance(obj, MatlabOpaqueArray):
@@ -606,9 +604,14 @@ class MatSubsystem:
                 arr_ids.append(object_id)
             dims = obj.shape
         else:
-            object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
-            arr_ids.append(object_id)
-            dims = (1, 1)
+            if isinstance(obj.properties, tuple):
+                # 0x0, 1x0, 0x1 objects
+                dims = obj.properties
+                class_id = self.set_class_id(classname)
+            else:
+                object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
+                arr_ids.append(object_id)
+                dims = (1, 1)
 
         return self.create_mcos_metadata(dims, arr_ids, class_id)
 
@@ -622,12 +625,7 @@ class MatSubsystem:
     def set_object_metadata(self, obj):
         """Sets metadata for a MatioOpaque object"""
 
-        if isinstance(obj, MatlabOpaqueArray):
-            obj0 = obj.flat[0]
-            type_system = obj0.type_system
-        else:
-            type_system = obj.type_system
-
+        type_system = obj.type_system
         if type_system != OpaqueType.MCOS:
             warnings.warn(
                 "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped",
@@ -636,6 +634,54 @@ class MatSubsystem:
             return np.empty((0, 0), dtype=np.uint8)
 
         return self.set_mcos_object_metadata(obj)
+
+    def set_enumeration_metadata(self, enum_array):
+        """Creates MCOS Enumeration metadata array"""
+
+        classname = enum_array.classname
+        classname_idx = self.set_class_id(classname)
+
+        value_names_idx = []
+        values = []
+        value_indices = []
+
+        for i, enum_member in enumerate(enum_array.ravel(order="F")):
+            value_name = enum_member.name
+
+            value_class = enum_to_opaque(classname, enum_member.value)
+            values.append(self.set_object_metadata(value_class))
+            value_indices.append(i)
+            value_names_idx.append(self.set_mcos_name(value_name))
+
+        prop_name = next(iter(enum_array[0, 0].value))
+        builtin_classname, _, _ = prop_name.rpartition(".")
+        if builtin_classname:
+            builtin_classname_idx = self.set_class_id(builtin_classname)
+        else:
+            builtin_classname_idx = 0
+
+        value_names_idx = np.array(value_names_idx, dtype=np.uint32).reshape(-1, 1)
+        values_arr = np.empty((len(values), 1), dtype=object)
+        values_arr[:, 0] = values
+        value_indices = np.array(value_indices, dtype=np.uint32).reshape(
+            enum_array.shape, order="F"
+        )
+
+        enum_instance_metadata = np.empty((1, 1), dtype=ENUM_INSTANCE_DTYPE)
+        enum_instance_metadata[0, 0]["EnumerationInstanceTag"] = np.array(
+            MCOS_MAGIC_NUMBER, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["ClassName"] = np.array(
+            classname_idx, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["BuiltinClassName"] = np.array(
+            builtin_classname_idx, dtype=np.uint32
+        ).reshape(1, 1)
+        enum_instance_metadata[0, 0]["ValueNames"] = value_names_idx
+        enum_instance_metadata[0, 0]["Values"] = values_arr
+        enum_instance_metadata[0, 0]["ValueIndices"] = value_indices
+
+        return enum_instance_metadata
 
     def set_fwrap_metadata(self):
         """Create FileWrapper Metadata Array"""
@@ -734,7 +780,11 @@ class MatSubsystem:
             shape=(self.class_id_counter + 1, 1), dtype=np.int32
         )
 
-        fwrapper = MatlabOpaque(fwrap_data, OpaqueType.MCOS, MCOS_SUBSYSTEM_CLASS)
+        fwrapper = MatlabOpaque(
+            properties=fwrap_data,
+            classname=MCOS_SUBSYSTEM_CLASS,
+            type_system=OpaqueType.MCOS,
+        )
         return fwrapper
 
     def set_subsystem(self):
@@ -791,7 +841,7 @@ class MatSubsystem:
             value_idx.shape, order="F"
         )
 
-        return MatlabOpaque(metadata, type_system, classname)
+        return MatlabOpaque(metadata, classname, type_system)
 
     def load_mcos_object(self, metadata, type_system=OpaqueType.MCOS):
         """Loads MCOS object"""
@@ -805,6 +855,11 @@ class MatSubsystem:
 
         class_id = metadata[-1, 0]
         classname = self.get_classname(class_id)
+
+        if object_ids.size == 0:
+            return MatlabOpaque(
+                properties=tuple(dims), classname=classname, type_system=type_system
+            )
 
         is_array = nobjects > 1
         array_objs = []
@@ -824,7 +879,9 @@ class MatSubsystem:
                         obj  # Caching here is probably unnecessary but safer
                     )
                 else:
-                    obj = MatlabOpaque(None, type_system, classname)
+                    obj = MatlabOpaque(
+                        properties=None, classname=classname, type_system=type_system
+                    )
                     self.mcos_object_cache[object_id] = obj
                     obj.properties = self.get_properties(object_id)
             array_objs.append(obj)
@@ -833,7 +890,7 @@ class MatSubsystem:
             obj_arr = np.empty((nobjects,), dtype=object)
             obj_arr[:] = array_objs
             obj_arr = obj_arr.reshape(dims, order="F")
-            obj_arr = MatlabOpaqueArray(obj_arr, type_system, classname)
+            obj_arr = MatlabOpaqueArray(obj_arr, classname, type_system)
         else:
             obj_arr = array_objs[0]
 
@@ -848,7 +905,7 @@ class MatSubsystem:
                 MatReadWarning,
                 stacklevel=2,
             )
-            return MatlabOpaque(metadata, type_system, classname)
+            return MatlabOpaque(metadata, classname, type_system)
 
         if metadata.dtype.names:
             return self.load_mcos_enumeration(metadata, type_system)

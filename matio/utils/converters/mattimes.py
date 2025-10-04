@@ -21,7 +21,7 @@ def get_tz_offset(tz):
         tzinfo = ZoneInfo(tz)
         utc_offset = tzinfo.utcoffset(datetime.now())
         if utc_offset is not None:
-            offset = int(utc_offset.total_seconds() * 1000)
+            offset = int(utc_offset.total_seconds() * 1e9)
             warnings.warn(
                 f"MATLAB datetime with timezone '{tz}' converted to UTC by applying an offset of {offset / 1000 / 60 / 60:.2f} hours. "
                 "NumPy datetime64 does not support time zones, so the original timezone information is lost.",
@@ -45,15 +45,13 @@ def mat_to_datetime(props, **_kwargs):
 
     data = props.get("data", None)
     if data is None or data.size == 0:
-        return np.empty((0, 0), dtype="datetime64[ms]")
+        return np.empty((0, 0), dtype="datetime64[ns]")
 
     tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
         offset = get_tz_offset(tz.item())
     else:
         offset = 0
-
-    millis = data.real + data.imag * 1e3 + offset
 
     fmt = props.get("fmt", None)
     if fmt is not None and fmt.size > 0:
@@ -63,7 +61,15 @@ def mat_to_datetime(props, **_kwargs):
             stacklevel=2,
         )
 
-    return millis.astype("datetime64[ms]")
+    # * Does MATLAB handle sub-ms precision?
+    # I seem to recall that MATLAB encodes sub-ms precision in the imaginary part of complex numbers.
+    # But I can't seem to replicate this, maybe it was specific to a certain version?
+
+    ms_frac, ms_int_float = np.modf(data)
+    ns_int = ms_int_float.astype(np.int64) * 1000_000
+    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
+    total_ns = ns_int + ns_frac + offset
+    return total_ns.astype("datetime64[ns]")
 
 
 def mat_to_duration(props, **_kwargs):
@@ -141,22 +147,22 @@ def mat_to_calendarduration(props, **_kwargs):
 def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
 
-    # TODO: Allow python datetime input
+    unit = np.datetime_data(arr.dtype)[0]
 
-    millis = arr.astype("datetime64[ms]").astype(np.float64)
+    # For sub-millisecond precision, preserve in decimal portion
+    if unit in ["us", "ns", "ps", "fs", "as"]:
+        dt_int = arr.astype(np.int64)
 
-    if "us" not in str(arr.dtype) and "ns" not in str(arr.dtype):
-        data = arr.astype("datetime64[ms]").astype(np.float64)
+        unit_to_ms = {"us": 1e-3, "ns": 1e-6, "ps": 1e-9, "fs": 1e-12, "as": 1e-15}
+
+        conversion_factor = unit_to_ms[unit]
+        millis = dt_int.astype(np.float64) * conversion_factor
     else:
-        # For sub-ms precision
-        millis = arr.astype("datetime64[ms]").astype(np.float64)
-        us = arr.astype("datetime64[us]").astype(np.float64)
-        frac_ms = (us % 1000) / 1000.0
-        data = millis + 1j * frac_ms
+        millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
 
     tz = np.empty((0, 0), dtype=np.str_)
     fmt = np.empty((0, 0), dtype=np.str_)
-    prop_map = {"data": data, "tz": tz, "fmt": fmt}
+    prop_map = {"data": millis, "tz": tz, "fmt": fmt}
 
     return prop_map
 
