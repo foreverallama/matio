@@ -65,18 +65,11 @@ def mat_to_datetime(props, **_kwargs):
     # I seem to recall that MATLAB encodes sub-ms precision in the imaginary part of complex numbers.
     # But I can't seem to replicate this, maybe it was specific to a certain version?
 
-    frac_ms = data - np.floor(data)
-    sub_ns_mask = np.abs(frac_ms) < 1e-6
-    if np.any((frac_ms != 0) & ~sub_ns_mask):
-        warnings.warn(
-            "mat_to_datetime: sub-ns precision will be lost when converting to numpy datetime64[ns].",
-            MatConvertWarning,
-            stacklevel=2,
-        )
-
-    ns = (data * 1000_000).astype("int64")
-    ns += offset
-    return ns.astype("datetime64[ns]")
+    ms_frac, ms_int_float = np.modf(data)
+    ns_int = ms_int_float.astype(np.int64) * 1000_000
+    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
+    total_ns = ns_int + ns_frac + offset
+    return total_ns.astype("datetime64[ns]")
 
 
 def mat_to_duration(props, **_kwargs):
@@ -154,17 +147,18 @@ def mat_to_calendarduration(props, **_kwargs):
 def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
 
-    arr_ms = arr.astype("datetime64[ms]")
-    int_ms = arr_ms.astype(np.int64)
-    sub_ms = (arr - arr_ms).astype("timedelta64[ns]").astype(np.float64) / 1e6
-    millis = int_ms.astype(np.float64) + sub_ms
+    unit = np.datetime_data(arr.dtype)[0]
 
-    # Optional warnings for sub-ns precision
-    if np.any(np.abs(sub_ms) > 1e-3):  # >1 ps
-        warnings.warn(
-            "Sub-ns fractional precision detected. "
-            "MATLAB float64 milliseconds may lose extreme sub-ns info."
-        )
+    # For sub-millisecond precision, preserve in decimal portion
+    if unit in ["us", "ns", "ps", "fs", "as"]:
+        dt_int = arr.astype(np.int64)
+
+        unit_to_ms = {"us": 1e-3, "ns": 1e-6, "ps": 1e-9, "fs": 1e-12, "as": 1e-15}
+
+        conversion_factor = unit_to_ms[unit]
+        millis = dt_int.astype(np.float64) * conversion_factor
+    else:
+        millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
 
     tz = np.empty((0, 0), dtype=np.str_)
     fmt = np.empty((0, 0), dtype=np.str_)
