@@ -33,12 +33,18 @@ def mat_to_string(props, byte_order, **_kwargs):
     pos = 0
     encoding = "utf-16-le" if byte_order[0] == "<" else "utf-16-be"
     for char_count in char_counts:
+        if char_count == 0xFFFFFFFFFFFFFFFF:
+            strings.append(np.nan)
+            print("here")
+            continue
         byte_length = char_count * 2  # UTF-16 encoding
         extracted_string = byte_data[pos : pos + byte_length].decode(encoding)
         strings.append(np.str_(extracted_string))
         pos += byte_length
 
-    arr = np.array(strings, dtype=np.dtypes.StringDType()).reshape(shape, order="F")
+    arr = np.array(strings, dtype=np.dtypes.StringDType(na_object=np.nan)).reshape(
+        shape, order="F"
+    )
     return arr
 
 

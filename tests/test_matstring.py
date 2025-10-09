@@ -18,7 +18,9 @@ class TestLoadMatlabString:
         mdict = load_from_mat(file_path, variable_names=["string_scalar"])
         assert "string_scalar" in mdict
 
-        str_scalar = np.array([["Hello"]], dtype=np.dtypes.StringDType())
+        str_scalar = np.array(
+            [["Hello"]], dtype=np.dtypes.StringDType(na_object=np.nan)
+        )
         np.testing.assert_array_equal(mdict["string_scalar"], str_scalar, strict=True)
 
     def test_string_array(self, filename, version):
@@ -29,7 +31,7 @@ class TestLoadMatlabString:
 
         str_array = np.array(
             ["Apple", "Banana", "Cherry", "Date", "Fig", "Grapes"],
-            dtype=np.dtypes.StringDType(),
+            dtype=np.dtypes.StringDType(na_object=np.nan),
         ).reshape(2, 3)
         np.testing.assert_array_equal(mdict["string_array"], str_array, strict=True)
 
@@ -39,7 +41,7 @@ class TestLoadMatlabString:
         mdict = load_from_mat(file_path, variable_names=["string_empty"])
         assert "string_empty" in mdict
 
-        str_empty = np.array([[""]], dtype=np.dtypes.StringDType())
+        str_empty = np.array([[""]], dtype=np.dtypes.StringDType(na_object=np.nan))
         np.testing.assert_array_equal(mdict["string_empty"], str_empty, strict=True)
 
 

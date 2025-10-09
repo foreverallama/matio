@@ -363,20 +363,6 @@ class MatSubsystem:
 
         return save_prop_map
 
-    def get_dyn_object_id(self, normobj_id):
-        """Gets the object ID from normobj ID for dynamicprops objects"""
-
-        num_objects = len(self.object_id_metadata) // 6
-
-        for object_id in range(num_objects):
-            block_start = object_id * 6
-            block_nobj_id = self.object_id_metadata[block_start + 4]
-
-            if block_nobj_id == normobj_id:
-                return object_id
-
-        return None
-
     def get_dynamic_properties(self, dep_id):
         """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
 

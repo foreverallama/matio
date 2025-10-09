@@ -66,7 +66,9 @@ class TestLoadMatlabUserDefined:
         assert mdict["obj_with_default_val"].type_system == "MCOS"
 
         prop_dict = {
-            "a": np.array([["Default String"]], dtype=np.dtypes.StringDType()),
+            "a": np.array(
+                [["Default String"]], dtype=np.dtypes.StringDType(na_object=np.nan)
+            ),
             "b": np.array([[10]], dtype=np.float64),
         }
 
