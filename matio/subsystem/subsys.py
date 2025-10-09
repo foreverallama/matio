@@ -501,9 +501,8 @@ class MatSubsystem:
             if prop_name.startswith(DYNAMIC_PROPERTY_PREFIX):
                 dynobj_id, _ = self.set_object_id(prop_value)
                 dynprop_ids.append(dynobj_id)
-                obj_prop_metadata[
-                    0
-                ] -= 1  # Dynamic Props are not counted as class props
+                obj_prop_metadata[0] -= 1
+                # Dynamic Props are not counted as class props
                 continue
 
             if prop_name[0] in "_0123456789":
