@@ -13,6 +13,7 @@ from matio.utils.matclass import (
     MatlabEnumerationArray,
     MatlabOpaque,
     MatlabOpaqueArray,
+    MatlabOpaqueProperty,
     MatReadError,
     MatReadWarning,
     MatWriteWarning,
@@ -338,36 +339,29 @@ class MatSubsystem:
         for prop_idx, prop_type, prop_value in prop_field_idxs:
             prop_name = self.mcos_names[prop_idx - 1]
             if prop_type == PropertyType.MATLAB_ENUMERATION:
-                save_prop_map[prop_name] = self.mcos_names[prop_value - 1]
+                save_prop_map[prop_name] = MatlabOpaqueProperty(
+                    self.mcos_names[prop_value - 1],
+                    ptype=PropertyType.MATLAB_ENUMERATION,
+                )
             elif prop_type == PropertyType.PROPERTY_VALUE:
                 save_prop_map[prop_name] = self.check_prop_for_opaque(
                     self.mcos_props_saved[prop_value]
                 )
             elif prop_type == PropertyType.INTEGER_VALUE:
-                save_prop_map[prop_name] = prop_value
+                save_prop_map[prop_name] = MatlabOpaqueProperty(
+                    prop_value, ptype=PropertyType.INTEGER_VALUE
+                )
             else:
                 warnings.warn(
                     f'Unknown property type {prop_type} for property "{prop_name}"',
                     MatReadWarning,
                     stacklevel=3,
                 )
-                save_prop_map[prop_name] = prop_value
+                save_prop_map[prop_name] = MatlabOpaqueProperty(
+                    prop_value, ptype=prop_type
+                )
 
         return save_prop_map
-
-    def get_dyn_object_id(self, normobj_id):
-        """Gets the object ID from normobj ID for dynamicprops objects"""
-
-        num_objects = len(self.object_id_metadata) // 6
-
-        for object_id in range(num_objects):
-            block_start = object_id * 6
-            block_nobj_id = self.object_id_metadata[block_start + 4]
-
-            if block_nobj_id == normobj_id:
-                return object_id
-
-        return None
 
     def get_dynamic_properties(self, dep_id):
         """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
@@ -387,13 +381,12 @@ class MatSubsystem:
 
         dyn_prop_map = {}
         for i, dyn_prop_id in enumerate(dyn_prop_type2_ids):
-            dyn_obj_id = self.get_dyn_object_id(dyn_prop_id)
-            dyn_class_id = self.get_object_metadata(dyn_obj_id)[0]
+            dyn_class_id = self.get_object_metadata(dyn_prop_id)[0]
             classname = self.get_classname(dyn_class_id)
             dynobj = MatlabOpaque(
                 properties=None, classname=classname, type_system=OpaqueType.MCOS
             )
-            dynobj.properties = self.get_properties(dyn_obj_id)
+            dynobj.properties = self.get_properties(dyn_prop_id)
             dyn_prop_map[f"{DYNAMIC_PROPERTY_PREFIX}{i + 1}"] = dynobj
 
         return dyn_prop_map
@@ -502,13 +495,14 @@ class MatSubsystem:
         nprops = len(prop_map)
         obj_prop_metadata.extend([nprops])
 
+        dynprop_ids = [0]
+
         for prop_name, prop_value in prop_map.items():
             if prop_name.startswith(DYNAMIC_PROPERTY_PREFIX):
-                warnings.warn(
-                    f"Dynamic property '{prop_name}' cannot be serialized. Skipping",
-                    MatWriteWarning,
-                    stacklevel=3,
-                )
+                dynobj_id, _ = self.set_object_id(prop_value)
+                dynprop_ids.append(dynobj_id)
+                obj_prop_metadata[0] -= 1
+                # Dynamic Props are not counted as class props
                 continue
 
             if prop_name[0] in "_0123456789":
@@ -519,18 +513,41 @@ class MatSubsystem:
             field_name_idx = self.set_mcos_name(prop_name)
             prop_value = self.serialize_nested_props(prop_value)
 
-            cell_number_idx = len(self.mcos_props_saved)
-            self.mcos_props_saved.append(prop_value)
-            obj_prop_metadata.extend(
-                [field_name_idx, PropertyType.PROPERTY_VALUE, cell_number_idx]
-            )
+            prop_vals = [field_name_idx, 0, 0]
+            if isinstance(prop_value, MatlabOpaqueProperty):
+                if prop_value.ptype == PropertyType.MATLAB_ENUMERATION:
+                    prop_vals[1] = PropertyType.MATLAB_ENUMERATION
+                    prop_vals[2] = self.set_mcos_name(prop_value.item())
+                elif prop_value.ptype == PropertyType.INTEGER_VALUE:
+                    prop_vals[1] = PropertyType.INTEGER_VALUE
+                    prop_vals[2] = prop_value.item()
+                else:
+                    warnings.warn(
+                        f"Unknown property type {prop_value.ptype} for property '{prop_name}'. Saving as raw integer value",
+                        MatWriteWarning,
+                        stacklevel=3,
+                    )
+                    prop_vals[1] = prop_value.ptype
+                    prop_vals[2] = prop_value.item()
+            else:
+                cell_number_idx = len(self.mcos_props_saved)
+                self.mcos_props_saved.append(prop_value)
+                prop_vals[1] = PropertyType.PROPERTY_VALUE
+                prop_vals[2] = cell_number_idx
+
+            obj_prop_metadata.extend(prop_vals)
 
         if len(obj_prop_metadata) % 2 == 1:
             obj_prop_metadata.append(0)  # Padding
 
-        # TODO: Add dynamicprop support
-        dynprop_entry = [0, 0]
-        self.dynprop_metadata.extend(dynprop_entry)
+        if len(dynprop_ids) > 1:
+            ndynprops = len(dynprop_ids) - 1
+            dynprop_ids[0] = ndynprops
+            if len(dynprop_ids) % 2 == 1:
+                dynprop_ids.append(0)  # Padding
+        else:
+            dynprop_ids.append(0)  # No dynamic props
+        self.dynprop_metadata.extend(dynprop_ids)
 
         ndeps = self.object_id_counter - object_id
         return ndeps

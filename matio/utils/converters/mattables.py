@@ -287,7 +287,11 @@ def table_to_mat(df):
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
         if df[col].dtype == "str":
-            coldata = df[col].to_numpy(dtype=np.dtypes.StringDType()).reshape(-1, 1)
+            coldata = (
+                df[col]
+                .to_numpy(dtype=np.dtypes.StringDType(na_object=np.nan))
+                .reshape(-1, 1)
+            )
         else:
             coldata = df[col].to_numpy().reshape(-1, 1)
         data[0, i] = coldata
@@ -358,7 +362,11 @@ def timetable_to_mat(df):
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
         if df[col].dtype == "str":
-            coldata = df[col].to_numpy(dtype=np.dtypes.StringDType()).reshape(-1, 1)
+            coldata = (
+                df[col]
+                .to_numpy(dtype=np.dtypes.StringDType(na_object=np.nan))
+                .reshape(-1, 1)
+            )
         else:
             coldata = df[col].to_numpy().reshape(-1, 1)
         data[0, i] = coldata

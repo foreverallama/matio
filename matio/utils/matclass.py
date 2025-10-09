@@ -153,6 +153,20 @@ class MatlabEnumerationArray(np.ndarray):
         self.classname = getattr(obj, "classname", None)
 
 
+class MatlabOpaqueProperty(np.ndarray):
+    """Subclass for special Matlab Opaque properties."""
+
+    def __new__(cls, input_array, ptype):
+        """Create a new instance of MatlabObject"""
+        obj = np.asarray(input_array).view(cls)
+        obj.ptype = ptype
+        return obj
+
+    def __array_finalize__(self, obj):
+        """Finalize the array, copying the classname."""
+        self.ptype = getattr(obj, "ptype", None)
+
+
 class MatlabContainerMap(UserDict):
     """Class to represent a MATLAB containers.Map object."""
 
