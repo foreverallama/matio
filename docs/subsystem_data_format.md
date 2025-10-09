@@ -92,25 +92,24 @@ The data in this cell is stored as a `mxUINT8` data element. However, the actual
 - The start of this region is indicated by the first offset value
 - This region consists of blocks of **four** 32-bit integers in the format `(handle_class_name_index, class_name_index, 0, 0)`
 - The value `class_name_index` points to the class name in the list `names` obtained above
-- The value `namespace_index` points to the namespace in the list of `names` obtained above. For more information, see [namespaces](https://in.mathworks.com/help/matlab/matlab_oop/namespaces.html)
+- The value `namespace_index` points to the namespace in the list of `names` obtained above. For more information, see [namespaces](https://www.mathworks.com/help/matlab/matlab_oop/namespaces.html)
 - The first block is always all zeros
 - The blocks are ordered by `classID`
 
 #### Region 3: Object Identifiers
 
 - The start of this region is indicated by the third offset value
-- This region consists of blocks of **six** 32-bit integers in the format `(classID, 0, 0, type1_ID, type2_ID, object_dependency_id)`
+- This region consists of blocks of **six** 32-bit integers in the format `(classID, 0, 0, saveobj_ID, normalobj_id, object_dependency_id)`
 - These blocks are ordered by `objectID`
 - The first block is always all zeros
 - `classID` is the same values assigned to the object array in the normal MAT-file
-- `object_dependency_id` is used to identify nested objects. The value in this field indicates the `object_id` **upto** which it depends on.
-- `type1ID` and `type2ID` are linked to different types of objects. For example, `string` is a `type1` object, whereas `datetime` is a `type2` object
-- Each `type1` and `type2` object is assigned a unique ID, in order of `objectID`, starting from one
+- `object_dependency_id` is used to identify nested objects. The value in this field indicates the `object_id` **upto** which it depends on
+- `saveobj_ID` is set if the class defines a `saveobj` method which returns a type different from an object of the same class. Otherwise `normalobj_id` is set
 
 #### Region 4: Type 2 Object Property Identifiers
 
 - The start of this region is indicated by the fourth offset value
-- This region consists of blocks of 32-bit integers, in order of `type2_id`
+- This region consists of blocks of 32-bit integers, in order of `normalobj_id`
 - Each block is padded to an 8 byte boundary
 - The first block is always all zeros
 - The size of each block is determined by the first 32-bit integer.
@@ -123,14 +122,14 @@ The data in this cell is stored as a `mxUINT8` data element. However, the actual
     - `field_type = 2` indicates an attribute like `Hidden`, `Constant`, etc.
   - `field_value` depends on `field_type`
     - If `field_type = 0`, `field_value` contains the index of the field name in linking metadata. These fields store the field name as a character array. The name refers to an enumeration.
-    - If `field_type = 1`, `field_value` contains the index of the cell in the cell array containing the property contents. The indexing here starts from zero. However, it should be noted that the 0th index points to Cell 3 of the cell array.
+    - If `field_type = 1`, `field_value` contains the index of the cell in the cell array containing the property contents. The indexing here starts from zero. However, it should be noted that the 0th index points to Cell 3 of the cell array
     - If `field_type = 2`, `field_value` contains the actual value itself. MATLAB internally decodes this based on the attribute type
 
 #### Region 2: Type 1 Object Property Identifiers
 
-This region is structured exactly the same as _Region 4_, but is for Type 1 objects. The start of this region is indicated by the second offset value. Type 1 objects use a `saveobj` method that defines how the object is saved to a MAT-file. If the contents being saved does not correspond to an object of the same class, then it is indicated as a `Type 1` object.
+This region is structured exactly the same as _Region 4_, but is for objects with custom `saveobj` methods. The start of this region is indicated by the second offset value. If the contents being saved does not correspond to an object of the same class, then it is flagged. For example, if a class `MyClass` uses a `saveobj` method that returns a `struct`, then it is flagged with a `saveobj_ID`.
 
-For example, if a class `MyClass` uses a `saveobj` method that returns a `struct`, then it is saved as a `Type 1` object. Objects of this type are stored using a property name `any`. So far, the following MATLAB datatypes have been observed to use this type:
+Objects of this type are stored using a property name `any`. So far, the following MATLAB datatypes have been observed to use this type:
 
 - `string`
 - `timetable`
@@ -143,7 +142,7 @@ This region links objects to any dynamic properties it contains (probably eventl
 - The start of this region is indicated by the fifth offset value
 - This region consists of blocks of 32-bit integers, in order of `dependency_id`
 - Each block is of the form `(num_dynamic_properties, prop_id_1, prop_id_2 ...., prop_id_N)`
-- Here, `prop_id` points to the `type2_id` of the dynamic property
+- Here, `prop_id` points to the `obj_id` of the dynamic property object
 - Each block is padded to 8 byte boundary
 - The first block is all zeros
 
@@ -155,7 +154,7 @@ The last offset points to the end of this cell.
 
 ### Cell 2 - Padding
 
-Cell 2 is always tagged as `miMATRIX` of `0 bytes`. This is most likely used to pad between metadata cells and field content cells. It's actual purpose is unknown.
+Cell 2 is always tagged as `miMATRIX` of `0 bytes`. It's probably reserved.
 
 ### Field Content Cells
 
