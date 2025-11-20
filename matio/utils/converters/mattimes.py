@@ -1,8 +1,6 @@
 """Utility functions for converting MATLAB datetime, duration, and calendarDuration"""
 
 import warnings
-from datetime import datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import numpy as np
 
@@ -15,31 +13,6 @@ caldur_dtype = [
 ]
 
 
-def get_tz_offset(tz):
-    """Get timezone offset in milliseconds (default UTC)"""
-    try:
-        tzinfo = ZoneInfo(tz)
-        utc_offset = tzinfo.utcoffset(datetime.now())
-        if utc_offset is not None:
-            offset = int(utc_offset.total_seconds() * 1e9)
-            warnings.warn(
-                f"MATLAB datetime with timezone '{tz}' converted to UTC by applying an offset of {offset / 1000 / 60 / 60:.2f} hours. "
-                "NumPy datetime64 does not support time zones, so the original timezone information is lost.",
-                MatConvertWarning,
-                stacklevel=2,
-            )
-        else:
-            offset = 0
-    except ZoneInfoNotFoundError as e:
-        warnings.warn(
-            f"mat_to_datetime: Could not get timezone offset for {tz}: {e}. Defaulting to UTC.",
-            MatConvertWarning,
-            stacklevel=2,
-        )
-        offset = 0
-    return offset
-
-
 def mat_to_datetime(props, **_kwargs):
     """Convert MATLAB datetime to Numpy datetime64 array"""
 
@@ -49,9 +22,12 @@ def mat_to_datetime(props, **_kwargs):
 
     tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
-        offset = get_tz_offset(tz.item())
-    else:
-        offset = 0
+        warnings.warn(
+            f"MATLAB datetime was saved with timezone '{tz}'."
+            "NumPy datetime64 does not support time zones, so the timezone information will be lost.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
 
     fmt = props.get("fmt", None)
     if fmt is not None and fmt.size > 0:
@@ -68,7 +44,7 @@ def mat_to_datetime(props, **_kwargs):
     ms_frac, ms_int_float = np.modf(data)
     ns_int = ms_int_float.astype(np.int64) * 1000_000
     ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
-    total_ns = ns_int + ns_frac + offset
+    total_ns = ns_int + ns_frac
     return total_ns.astype("datetime64[ns]")
 
 

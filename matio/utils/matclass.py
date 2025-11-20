@@ -104,13 +104,16 @@ class MatlabFunction(np.ndarray):
 
 
 class MatlabOpaque:
-    """Subclass for a MATLAB opaque array."""
+    """Subclass for a MATLAB opaque object."""
 
-    def __init__(self, properties, classname, type_system=OpaqueType.MCOS):
+    def __init__(
+        self, properties, classname, type_system=OpaqueType.MCOS, class_alias=None
+    ):
         """Create a new instance of MatlabOpaque"""
         self.properties = properties
         self.classname = classname
         self.type_system = type_system
+        self.class_alias = class_alias
 
     def __repr__(self):
         """String representation of the object"""
@@ -118,7 +121,7 @@ class MatlabOpaque:
             shape = self.properties
         else:
             shape = (1, 1)
-        return f"MatlabOpaque(classname={self.classname}, shape={shape})"
+        return f"MatlabOpaque(classname={self.classname})"
 
 
 class MatlabOpaqueArray(np.ndarray):

@@ -12,9 +12,11 @@
     - [Region 2: Type 1 Object Property Identifiers](#region-2-type-1-object-property-identifiers)
     - [Region 5: Dynamic Property Metadata](#region-5-dynamic-property-metadata)
     - [Other Regions](#other-regions)
-  - [Cell 2 - Padding](#cell-2---padding)
+  - [Cell 2](#cell-2)
   - [Field Content Cells](#field-content-cells)
   - [Remaining Cells](#remaining-cells)
+    - [Default Property Values](#default-property-values)
+    - [Class Alias Metadata](#class-alias-metadata)
 - [Data Element 2: Character Array](#data-element-2-character-array)
 
 <!--TOC-->
@@ -75,7 +77,7 @@ This cell array is what we need to look at closely. The cell array has a dimensi
 | . | . | . |
 | N + 3 | N | Object Property Contents |
 | N + 4 | - | Unknown |
-| N + 5 | - | Unknown |
+| N + 5 | - | Class Alias Metadata |
 | N + 6 | - | Default Class Properties |
 
 ### Cell 1 - Linking Metadata
@@ -152,7 +154,7 @@ The 6th and 7th offset values indicate other metadata regions whose purpose is u
 
 The last offset points to the end of this cell.
 
-### Cell 2 - Padding
+### Cell 2
 
 Cell 2 is always tagged as `miMATRIX` of `0 bytes`. It's probably reserved.
 
@@ -162,11 +164,17 @@ Field contents are stored from Cell 3 onwards. The data element used to store fi
 
 ### Remaining Cells
 
-There are always three more cells at the end of the array, which appear after all the field content cells. These cells contain some data related to each class. The purpose of these cells is partially unknown.
+There are always three more cells at the end of the array, which appear after all the field content cells. These cells contain data shared by all instances of a class.
 
-- Cell[-3] is a cell array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. Each cell is written in place as a struct. The contents of this struct is unknown, and is usually empty. The first cell is always an empty struct array.
-- Cell[-1] has the same format as Cell[-3]. This cell contains a list of default property values assigned within the class. The fields of each struct are the property names, and the field contents correspond to the default property values.
-- Cell[-2] is instead a `mxINT32` array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. The first integer is always zero. Its purpose is unknown, and is usually all zeros. Modifying these values does not seem to affect reading/writing of MAT-files.
+#### Default Property Values
+
+`Cell[-1]` contains a list of default property values assigned within the class. It is written in as a cell array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. Each cell is written in place as a struct. The fields of each struct are the property names, and the field contents correspond to the default property values.
+
+`Cell[-3]` is similar to `Cell[-1]`, but its purpose is unknown.
+
+#### Class Alias Metadata
+
+`Cell[-2]` is a `mxINT32` array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. The first integer is always zero. It contains the indices to the current alias of each class. The index points to a string in the list of MCOS property and class names in Cell 1. A value of 0 indicates that no other aliases are present. The alias of a class can be accessed through the `class_alias` attribute of `MatlabOpaque`. More information about class aliasing can be found [here](https://in.mathworks.com/help/matlab/matlab_oop/class-aliasing.html).
 
 ## Data Element 2: Character Array
 
