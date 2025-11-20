@@ -12,10 +12,6 @@ files = [
     ("test_function_handles_v73.mat", "v7.3"),
 ]
 
-# Notes
-# During load, fallback subdtype is 'ms'
-# However, during save, fallback is 's' as required by MATLAB
-
 
 @pytest.mark.parametrize("filename, version", files)
 class TestLoadMatlabFunctionHandles:

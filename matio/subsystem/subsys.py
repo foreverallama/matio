@@ -72,7 +72,7 @@ class MatSubsystem:
 
         # Class Template Data
         self._c3 = None  # Unknown Class Template
-        self._c2 = None  # Unknown Class Template
+        self.mcos_class_alias_metadata = []
         self.mcos_props_defaults = None
 
         self._handle_data = None
@@ -92,6 +92,7 @@ class MatSubsystem:
         self.version = FILEWRAPPER_VERSION
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.dynprop_metadata.extend([0, 0])
+        self.mcos_class_alias_metadata.append(0)
 
         # These metadata fields are written per object before unrolling
         # nested properties. Each list represents one object which is mutable
@@ -194,11 +195,11 @@ class MatSubsystem:
             self.mcos_props_saved = fwrap_data[2:-1, 0]
         elif self.version == 3:
             self.mcos_props_saved = fwrap_data[2:-2, 0]
-            self._c2 = fwrap_data[-2, 0]
+            self.mcos_class_alias_metadata = fwrap_data[-2, 0]
         else:
             self.mcos_props_saved = fwrap_data[2:-3, 0]
             self._c3 = fwrap_data[-3, 0]
-            self._c2 = fwrap_data[-2, 0]
+            self.mcos_class_alias_metadata = fwrap_data[-2, 0]
 
         self.mcos_props_defaults = fwrap_data[-1, 0]
 
@@ -272,6 +273,17 @@ class MatSubsystem:
             prop = self.load_opaque_object(prop, type_system=OpaqueType.MCOS)
 
         return prop
+
+    def get_class_alias(self, class_id):
+        """Extracts class alias for a given object from its class ID."""
+
+        class_alias_idx = self.mcos_class_alias_metadata[class_id].item()
+        if class_alias_idx != 0:
+            class_alias = self.mcos_names[class_alias_idx - 1]
+        else:
+            class_alias = None
+
+        return class_alias
 
     def get_classname(self, class_id):
         """Extracts class name with namespace qualifier for a given object from its class ID."""
@@ -384,7 +396,10 @@ class MatSubsystem:
             dyn_class_id = self.get_object_metadata(dyn_prop_id)[0]
             classname = self.get_classname(dyn_class_id)
             dynobj = MatlabOpaque(
-                properties=None, classname=classname, type_system=OpaqueType.MCOS
+                properties=None,
+                classname=classname,
+                type_system=OpaqueType.MCOS,
+                class_alias=self.get_class_alias(dyn_class_id),
             )
             dynobj.properties = self.get_properties(dyn_prop_id)
             dyn_prop_map[f"{DYNAMIC_PROPERTY_PREFIX}{i + 1}"] = dynobj
@@ -425,7 +440,7 @@ class MatSubsystem:
             self.num_names += 1
             return self.num_names
 
-    def set_class_id(self, classname):
+    def set_class_id(self, classname, class_alias=None):
         """Sets the class ID for a given class name (including namespace)"""
 
         for class_id in range(1, self.class_id_counter + 1):
@@ -445,6 +460,9 @@ class MatSubsystem:
 
         metadata = [namespace_idx, cname_idx, 0, 0]
         self.class_id_metadata.extend(metadata)
+
+        class_alias_idx = self.set_mcos_name(class_alias) if class_alias else 0
+        self.mcos_class_alias_metadata.append(class_alias_idx)
 
         return self.class_id_counter
 
@@ -557,12 +575,12 @@ class MatSubsystem:
 
         if obj.properties is None:
             # Deleted object
-            class_id = self.set_class_id(obj.classname)
+            class_id = self.set_class_id(obj.classname, obj.class_alias)
             obj_id = 0
             return obj_id, class_id
 
         if obj in self.mcos_object_cache:
-            class_id = self.set_class_id(obj.classname)
+            class_id = self.set_class_id(obj.classname, obj.class_alias)
             return self.mcos_object_cache[obj], class_id
 
         self.object_id_counter += 1
@@ -594,7 +612,7 @@ class MatSubsystem:
 
         ndeps = self.serialize_object_props(obj.properties, obj_prop_metadata)
 
-        class_id = self.set_class_id(obj.classname)
+        class_id = self.set_class_id(obj.classname, obj.class_alias)
         obj_id_metadata[0] = class_id
         if saveobj_ret_type:
             obj_id_metadata[3] = saveobj_id
@@ -624,7 +642,7 @@ class MatSubsystem:
             if isinstance(obj.properties, tuple):
                 # 0x0, 1x0, 0x1 objects
                 dims = obj.properties
-                class_id = self.set_class_id(classname)
+                class_id = self.set_class_id(classname, obj.class_alias)
             else:
                 object_id, class_id = self.set_object_id(obj, saveobj_ret_type)
                 arr_ids.append(object_id)
@@ -793,9 +811,9 @@ class MatSubsystem:
         fwrap_data[-3, 0] = u3_arr
         fwrap_data[-1, 0] = u3_arr
 
-        fwrap_data[-2, 0] = np.zeros(
-            shape=(self.class_id_counter + 1, 1), dtype=np.int32
-        )
+        fwrap_data[-2, 0] = np.array(
+            self.mcos_class_alias_metadata, dtype=np.uint32
+        ).reshape(-1, 1)
 
         fwrapper = MatlabOpaque(
             properties=fwrap_data,
@@ -858,7 +876,12 @@ class MatSubsystem:
             value_idx.shape, order="F"
         )
 
-        return MatlabOpaque(metadata, classname, type_system)
+        return MatlabOpaque(
+            metadata,
+            classname,
+            type_system,
+            self.get_class_alias(metadata[0, 0]["ClassName"].item()),
+        )
 
     def load_mcos_object(self, metadata, type_system=OpaqueType.MCOS):
         """Loads MCOS object"""
@@ -872,10 +895,14 @@ class MatSubsystem:
 
         class_id = metadata[-1, 0]
         classname = self.get_classname(class_id)
+        class_alias = self.get_class_alias(class_id)
 
         if object_ids.size == 0:
             return MatlabOpaque(
-                properties=tuple(dims), classname=classname, type_system=type_system
+                properties=tuple(dims),
+                classname=classname,
+                type_system=type_system,
+                class_alias=class_alias,
             )
 
         is_array = nobjects > 1
@@ -900,6 +927,7 @@ class MatSubsystem:
                         properties=None, classname=classname, type_system=type_system
                     )
                     self.mcos_object_cache[object_id] = obj
+                    obj.class_alias = class_alias
                     obj.properties = self.get_properties(object_id)
             array_objs.append(obj)
 

@@ -72,11 +72,11 @@ class TestLoadMatlabDatetime:
     def test_datetime_tz(self, filename, version):
         """Test reading datetime with timezone data from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        with pytest.warns(MatConvertWarning, match="converted to UTC"):
+        with pytest.warns(MatConvertWarning, match="does not support time zones"):
             mdict = load_from_mat(file_path, variable_names=["dt_tz"])
             assert "dt_tz" in mdict
 
-            dt_tz = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[ns]").reshape(
+            dt_tz = np.array([["2025-04-01T16:00:00"]], dtype="datetime64[ns]").reshape(
                 1, 1
             )
 
