@@ -89,6 +89,7 @@ Opaque objects are returned as an instance of class `MatlabOpaque` with the foll
 - `classname`: The class name, including [namespace qualifiers](https://www.mathworks.com/help/matlab/matlab_oop/namespaces.html) (if any).
 - `type_system`: An interal MATLAB type identifier. Usually `MCOS`, but could also be `java` or `handle`.
 - `properties`: A dictionary containing the property names and property values.
+- `class_alias`: This is an optional attribute containing [class aliases](https://www.mathworks.com/help/matlab/matlab_oop/class-aliasing.html), if any.
 
 If the `raw_data` parameter is set to `False`, then `load_from_mat` converts these objects into a corresponding Pythonic datatype, if available. For a list of conversion rules between MATLAB and Python datatypes, see the [documentation](./docs/field_contents.md).
 
