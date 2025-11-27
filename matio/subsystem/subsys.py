@@ -277,6 +277,9 @@ class MatSubsystem:
     def get_class_alias(self, class_id):
         """Extracts class alias for a given object from its class ID."""
 
+        if self.version < 3:
+            return None
+
         class_alias_idx = self.mcos_class_alias_metadata[class_id].item()
         if class_alias_idx != 0:
             class_alias = self.mcos_names[class_alias_idx - 1]
