@@ -194,7 +194,12 @@ class MatWrite7:
         """Writes a struct array to the HDF5 file."""
 
         fields = data.dtype.names
-        if data.size <= 1:
+        if data.size == 0:
+            # Handle empty struct arrays with fields
+            empty_data = self.get_empty_array(data.shape)
+            struct_group = parent.create_dataset(var_name, data=empty_data)
+            self.add_empty_attribute(struct_group)
+        elif data.size == 1:
             struct_group = parent.create_group(var_name)
             if fields is not None:
                 for field in fields:
