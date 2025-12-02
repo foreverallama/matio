@@ -381,11 +381,11 @@ class MatSubsystem:
     def get_dynamic_properties(self, dep_id):
         """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
 
-        if self.dynprop_metadata.size == 0:
-            # Newer versions don't write dynamic property metadata if there's none
+        if dep_id == 0:
+            # Newer versions don't write dynamic property metadata for some builtin types like string
             return {}
 
-        offset = self.dynprop_metadata[0]
+        offset = 0
         for i in range(dep_id):
             nprops = self.dynprop_metadata[offset]
             offset += 1 + nprops

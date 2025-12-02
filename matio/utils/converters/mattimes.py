@@ -37,14 +37,16 @@ def mat_to_datetime(props, **_kwargs):
             stacklevel=2,
         )
 
-    # * Does MATLAB handle sub-ms precision?
-    # I seem to recall that MATLAB encodes sub-ms precision in the imaginary part of complex numbers.
-    # But I can't seem to replicate this, maybe it was specific to a certain version?
+    if np.iscomplexobj(data):
+        # Not sure what the complex part represents
+        # probably holding some type of sub-ms precision which might be lost?
+        total_ns = (data.real + data.imag) * 1e6
+    else:
+        ms_frac, ms_int_float = np.modf(data)
+        ns_int = ms_int_float.astype(np.int64) * 1000_000
+        ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
+        total_ns = ns_int + ns_frac
 
-    ms_frac, ms_int_float = np.modf(data)
-    ns_int = ms_int_float.astype(np.int64) * 1000_000
-    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
-    total_ns = ns_int + ns_frac
     return total_ns.astype("datetime64[ns]")
 
 
