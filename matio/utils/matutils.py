@@ -246,7 +246,7 @@ def to_writeable(source, oned_as="col"):
                     )
                     warnings.warn(msg, MatWriteWarning, stacklevel=2)
         if dtype:
-            return np.array([tuple(values)], dtype)
+            return np.array([tuple(values)], dtype).reshape((1, 1))
         else:
             return EmptyMatStruct(np.array([]))
 
