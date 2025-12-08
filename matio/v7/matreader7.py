@@ -298,7 +298,7 @@ class MatRead7:
                 metadata = self.read_struct(obj)
                 if metadata[0, 0][ENUMERATION_INSTANCE_TAG] != MCOS_MAGIC_NUMBER:
                     return metadata
-                return self.subsystem.load_mcos_enumeration(metadata, type_system)
+                return self.subsystem.load_opaque_object(metadata, type_system)
             else:
                 metadata = obj[()].T
         else:

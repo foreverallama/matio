@@ -9,6 +9,7 @@ from matio.utils.matclass import (
     ENUMERATION_INSTANCE_TAG,
     MCOS_SUBSYSTEM_CLASS,
     EmptyMatStruct,
+    MatConvertWarning,
     MatlabCanonicalEmpty,
     MatlabEnumerationArray,
     MatlabOpaque,
@@ -104,13 +105,21 @@ class MatSubsystem:
     def load_subsystem(self, subsystem_data):
         """Parse and cache subsystem data"""
 
-        for field in subsystem_data.dtype.names:
-            if field == OpaqueType.JAVA:
-                self._java_data = subsystem_data[0, 0][field]
-            if field == OpaqueType.HANDLE:
-                self._handle_data = subsystem_data[0, 0][field]
-            if field == OpaqueType.MCOS:
-                self.load_mcos_data(subsystem_data[0, 0][field])
+        try:
+            for field in subsystem_data.dtype.names:
+                if field == OpaqueType.JAVA:
+                    self._java_data = subsystem_data[0, 0][field]
+                if field == OpaqueType.HANDLE:
+                    self._handle_data = subsystem_data[0, 0][field]
+                if field == OpaqueType.MCOS:
+                    self.load_mcos_data(subsystem_data[0, 0][field])
+        except Exception as e:
+            warnings.warn(
+                f"Failed to parse subsystem data. Opaque objects will be skipped: {e}",
+                MatReadWarning,
+                stacklevel=2,
+            )
+            self.version = None  # Indicate failure
 
     def load_fwrap_metadata(self, fwrap_metadata):
         """Parse and cache FileWrapper__ metadata"""
@@ -866,12 +875,19 @@ class MatSubsystem:
                 enum_vals.append(obj_array)
 
         if not self.raw_data:
-            return mat_to_enum(
-                enum_vals,
-                value_names,
-                classname,
-                value_idx.shape,
-            )
+            try:
+                return mat_to_enum(
+                    enum_vals,
+                    value_names,
+                    classname,
+                    value_idx.shape,
+                )
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to convert MCOS enumeration of class {classname} to native Python enum type. Loading MatlabOpaque instead: {e}",
+                    MatConvertWarning,
+                    stacklevel=2,
+                )
 
         metadata[0, 0]["BuiltinClassName"] = builtin_class_name
         metadata[0, 0]["ClassName"] = classname
@@ -920,15 +936,26 @@ class MatSubsystem:
             else:
                 if not self.raw_data and classname in matlab_classdef_types:
                     obj_props = self.get_properties(object_id)
-                    obj = convert_mat_to_py(
-                        obj_props,
-                        classname,
-                        byte_order=self.byte_order,
-                        add_table_attrs=self.add_table_attrs,
-                    )
-                    self.mcos_object_cache[object_id] = (
-                        obj  # Caching here is probably unnecessary but safer
-                    )
+                    try:
+                        obj = convert_mat_to_py(
+                            obj_props,
+                            classname,
+                            byte_order=self.byte_order,
+                            add_table_attrs=self.add_table_attrs,
+                        )
+                    except Exception as e:
+                        warnings.warn(
+                            f"Failed to convert MCOS object of class {classname} to native Python type. Loading as MatlabOpaque instead: {e}",
+                            MatConvertWarning,
+                            stacklevel=2,
+                        )
+                        obj = MatlabOpaque(
+                            properties=obj_props,
+                            classname=classname,
+                            type_system=type_system,
+                            class_alias=class_alias,
+                        )
+                    self.mcos_object_cache[object_id] = obj
                 else:
                     obj = MatlabOpaque(
                         properties=None, classname=classname, type_system=type_system
@@ -951,15 +978,30 @@ class MatSubsystem:
     def load_opaque_object(self, metadata, type_system, classname=None):
         """Loads opaque object"""
 
-        if type_system != OpaqueType.MCOS:
+        try:
+
+            if self.version is None:
+                # Subsystem not initialized properly
+                # Don't warn again
+                return metadata
+
+            if type_system != OpaqueType.MCOS:
+                warnings.warn(
+                    f"Opaque object of type {type_system} is not supported",
+                    MatReadWarning,
+                    stacklevel=2,
+                )
+                return MatlabOpaque(metadata, classname, type_system)
+
+            if metadata.dtype.names:
+                return self.load_mcos_enumeration(metadata, type_system)
+            else:
+                return self.load_mcos_object(metadata, type_system)
+
+        except Exception as e:
             warnings.warn(
-                f"Opaque object of type {type_system} is not supported",
+                f"Failed to load object instance of class {classname}. Returning metadata: {e}",
                 MatReadWarning,
                 stacklevel=2,
             )
             return MatlabOpaque(metadata, classname, type_system)
-
-        if metadata.dtype.names:
-            return self.load_mcos_enumeration(metadata, type_system)
-        else:
-            return self.load_mcos_object(metadata, type_system)
