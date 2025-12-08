@@ -78,6 +78,14 @@ data.struct_nested = deep_struct;
 data.struct_no_fields = struct;
 data.struct_empty = struct([]);
 
+% Struct with large number of fields
+struct_large = struct();
+for solveID = 1:526 % Total char >= 4096
+    fieldName = sprintf('field%d', solveID);
+    struct_large.(fieldName) = 1;
+end
+data.struct_large = struct_large;
+
 
 %% Sparse Arrays
 
