@@ -87,6 +87,32 @@ class MatSubsystem:
 
         self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_classes
 
+    def check_unknowns(self, cell2):
+        """Log warnings for unknown metadata regions"""
+
+        if (
+            self._u6_metadata.size > 0
+            or np.any(self._u7_metadata)
+            or not isinstance(cell2, MatlabCanonicalEmpty)
+        ):
+            warnings.warn(
+                "Encountered unknown metadata in MAT-file subsystem. "
+                "This may indicate a new or unsupported data structure. "
+                "Please report this on GitHub so we can investigate and extend support.",
+                MatReadWarning,
+                stacklevel=3,
+            )
+
+        if self._c3 is not None:
+            if any(subarray.size > 0 for subarray in self._c3.flat):
+                warnings.warn(
+                    "Encountered unknown class template data in MAT-file subsystem. "
+                    "This may indicate a new or unsupported data structure. "
+                    "Please report this on GitHub so we can investigate and extend support.",
+                    MatReadWarning,
+                    stacklevel=3,
+                )
+
     def init_save(self):
         """Initializes save with metadata for object ID = 0"""
 
@@ -211,6 +237,7 @@ class MatSubsystem:
             self.mcos_class_alias_metadata = fwrap_data[-2, 0]
 
         self.mcos_props_defaults = fwrap_data[-1, 0]
+        self.check_unknowns(fwrap_data[1, 0])
 
     def is_valid_mcos_enumeration(self, metadata):
         """Checks if property value is a valid MCOS enumeration metadata array"""
@@ -302,7 +329,15 @@ class MatSubsystem:
 
         namespace_idx = self.class_id_metadata[class_id * 4]
         classname_idx = self.class_id_metadata[class_id * 4 + 1]
+
         # Remaining two fields are unknowns
+        _x1, _x2 = self.class_id_metadata[class_id * 4 + 2 : class_id * 4 + 4]
+        if _x1 != 0 or _x2 != 0:
+            warnings.warn(
+                "Unknown fields in class ID metadata are non-zero. This may indicate a new or unsupported data structure. Please report this on GitHub so we can investigate and extend support.",
+                MatReadWarning,
+                stacklevel=3,
+            )
 
         if namespace_idx == 0:
             namespace = ""
@@ -315,10 +350,17 @@ class MatSubsystem:
     def get_object_metadata(self, object_id):
         """Extracts object dependency IDs for a given object."""
 
-        class_id, _, _, saveobj_id, normobj_id, dep_id = self.object_id_metadata[
+        class_id, _x1, _x2, saveobj_id, normobj_id, dep_id = self.object_id_metadata[
             object_id * 6 : object_id * 6 + 6
         ]
         # Ignored fields are unknowns
+        if _x1 != 0 or _x2 != 0:
+            warnings.warn(
+                "Unknown fields in object ID metadata are non-zero. This may indicate a new or unsupported data structure. Please report this on GitHub so we can investigate and extend support.",
+                MatReadWarning,
+                stacklevel=3,
+            )
+
         return class_id, saveobj_id, normobj_id, dep_id
 
     def get_default_properties(self, class_id):
