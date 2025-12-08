@@ -78,6 +78,21 @@ data.struct_nested = deep_struct;
 data.struct_no_fields = struct;
 data.struct_empty = struct([]);
 
+% Struct with large number of fields
+struct_large = struct();
+for ii = 1:526 % Total char >= 4096 writes as reference
+    fieldName = sprintf('field%d', ii);
+    struct_large.(fieldName) = 1;
+end
+data.struct_large = struct_large;
+
+% Above is not necessarily > 64 KB for HDF5
+struct_even_larger = struct();
+for ii = 1:4093
+    fieldName = sprintf('s%d', ii);
+    struct_even_larger.(fieldName) = 2;
+end
+data.struct_even_larger = struct_even_larger;
 
 %% Sparse Arrays
 

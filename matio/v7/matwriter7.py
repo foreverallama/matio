@@ -235,13 +235,24 @@ class MatWrite7:
         # field names in attributes
         dt = h5py.special_dtype(vlen=np.dtype("S1"))
         matlab_fields = np.empty(shape=(len(fields),), dtype=dt)
+
+        total_characters = 0
         for i, field_name in enumerate(fields):
-            matlab_fields[i] = np.array(
+            encoded_field = np.array(
                 [c.encode("ascii") for c in field_name], dtype="S1"
             )
+            matlab_fields[i] = encoded_field
+            total_characters += len(field_name)
 
         if matlab_fields.size > 0:
-            struct_group.attrs.create(MAT_HDF_ATTRS.FIELDS, matlab_fields)
+            # If total length of fields >= 4096 then its written as a reference
+            if total_characters < 4096:
+                struct_group.attrs.create(MAT_HDF_ATTRS.FIELDS, matlab_fields)
+            else:
+                # Write as a dset under #refs# group
+                fields_refname = self._next_refname()
+                parent = self.h5file.require_group(self.refs_group)
+                parent.create_dataset(fields_refname, data=matlab_fields, dtype=dt)
 
         return struct_group
 

@@ -198,8 +198,11 @@ class MatRead7:
         fields = list(obj.keys())
         field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
         if field_order is not None:
-            # For maximum compatibility with scipy.io
-            fields = ["".join(x.astype(str)) for x in field_order]
+            if isinstance(field_order, h5py.Reference):
+                # MATLAB writes large field lists as a reference to dset
+                fields = ["".join(x.astype(str)) for x in self.h5stream[field_order]]
+            else:
+                fields = ["".join(x.astype(str)) for x in field_order]
 
         if self.is_struct_matrix(obj):
             is_scalar = False
