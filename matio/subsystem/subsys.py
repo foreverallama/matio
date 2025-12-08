@@ -980,11 +980,6 @@ class MatSubsystem:
 
         try:
 
-            if self.version is None:
-                # Subsystem not initialized properly
-                # Don't warn again
-                return metadata
-
             if type_system != OpaqueType.MCOS:
                 warnings.warn(
                     f"Opaque object of type {type_system} is not supported",
@@ -992,6 +987,11 @@ class MatSubsystem:
                     stacklevel=2,
                 )
                 return MatlabOpaque(metadata, classname, type_system)
+
+            if self.version is None:
+                # FileWrapper not initialized properly
+                # Don't warn again
+                return metadata
 
             if metadata.dtype.names:
                 return self.load_mcos_enumeration(metadata, type_system)
