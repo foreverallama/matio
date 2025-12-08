@@ -204,6 +204,34 @@ class TestLoadStructCell:
         np.testing.assert_array_equal(cell[0, 0][0, 1]["a"][0, 0], cell2a, strict=True)
         np.testing.assert_array_equal(cell[0, 0][0, 1]["b"][0, 0], cell2b, strict=True)
 
+    def test_struct_large(self, filename, version):
+        """Test reading Large Struct from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["struct_large", "struct_even_larger"]
+        )
+
+        struct_large_fields = {f"field{i}" for i in range(1, 527)}
+        struct_larger_fields = {f"s{i}" for i in range(1, 4094)}
+
+        struct_large = mdict["struct_large"]
+        assert set(struct_large.dtype.names) == struct_large_fields
+
+        struct_even_larger = mdict["struct_even_larger"]
+        assert set(struct_even_larger.dtype.names) == struct_larger_fields
+
+        # Check random entry
+        np.testing.assert_array_equal(
+            struct_large["field200"][0, 0],
+            np.array([[1]], dtype=np.float64).reshape(1, 1),
+            strict=True,
+        )
+        np.testing.assert_array_equal(
+            struct_even_larger["s2048"][0, 0],
+            np.array([[2]], dtype=np.float64).reshape(1, 1),
+            strict=True,
+        )
+
 
 @pytest.mark.parametrize("filename, version", files)
 class TestSaveStructCell:
@@ -508,6 +536,32 @@ class TestSaveStructCell:
                     cell_ml[0, 0][0, 1][name][0, 0],
                     strict=True,
                 )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_struct_large(self, filename, version):
+        """Test writing struct large to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["struct_even_larger"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["struct_even_larger"])
+
+            assert set(mload["struct_even_larger"].dtype.names) == set(
+                mdict["struct_even_larger"].dtype.names
+            )
+            # for name in mload["struct_even_larger"].dtype.names:
+            #     np.testing.assert_array_equal(
+            #         mdict["struct_even_larger"][name][0, 0],
+            #         mload["struct_even_larger"][name][0, 0],
+            #         strict=True,
+            #     )
 
         finally:
             if os.path.exists(temp_file_path):
