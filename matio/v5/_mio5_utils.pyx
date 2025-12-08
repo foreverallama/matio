@@ -695,7 +695,7 @@ cdef class VarReader5:
         if mdtype != miMATRIX:
             raise TypeError('Expecting matrix here')
         if byte_count == 0:
-            return MatlabCanonicalEmpty
+            return MatlabCanonicalEmpty()
         header = self.read_header(False)
         return self.array_from_header(header, process)
 

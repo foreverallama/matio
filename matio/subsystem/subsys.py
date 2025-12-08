@@ -87,15 +87,19 @@ class MatSubsystem:
 
         self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_classes
 
-    def check_unknowns(self):
+    def check_unknowns(self, cell2):
         """Log warnings for unknown metadata regions"""
 
-        if self._u6_metadata.size > 0 or np.any(self._u7_metadata):
+        if (
+            self._u6_metadata.size > 0
+            or np.any(self._u7_metadata)
+            or not isinstance(cell2, MatlabCanonicalEmpty)
+        ):
             warnings.warn(
                 "Encountered unknown metadata in MAT-file subsystem. "
                 "This may indicate a new or unsupported data structure. "
                 "Please report this on GitHub so we can investigate and extend support.",
-                MatConvertWarning,
+                MatReadWarning,
                 stacklevel=3,
             )
 
@@ -105,7 +109,7 @@ class MatSubsystem:
                     "Encountered unknown class template data in MAT-file subsystem. "
                     "This may indicate a new or unsupported data structure. "
                     "Please report this on GitHub so we can investigate and extend support.",
-                    MatConvertWarning,
+                    MatReadWarning,
                     stacklevel=3,
                 )
 
@@ -233,7 +237,7 @@ class MatSubsystem:
             self.mcos_class_alias_metadata = fwrap_data[-2, 0]
 
         self.mcos_props_defaults = fwrap_data[-1, 0]
-        self.check_unknowns()
+        self.check_unknowns(fwrap_data[1, 0])
 
     def is_valid_mcos_enumeration(self, metadata):
         """Checks if property value is a valid MCOS enumeration metadata array"""
@@ -331,7 +335,7 @@ class MatSubsystem:
         if _x1 != 0 or _x2 != 0:
             warnings.warn(
                 "Unknown fields in class ID metadata are non-zero. This may indicate a new or unsupported data structure. Please report this on GitHub so we can investigate and extend support.",
-                MatConvertWarning,
+                MatReadWarning,
                 stacklevel=3,
             )
 
@@ -353,7 +357,7 @@ class MatSubsystem:
         if _x1 != 0 or _x2 != 0:
             warnings.warn(
                 "Unknown fields in object ID metadata are non-zero. This may indicate a new or unsupported data structure. Please report this on GitHub so we can investigate and extend support.",
-                MatConvertWarning,
+                MatReadWarning,
                 stacklevel=3,
             )
 
