@@ -91,8 +91,8 @@ class MatSubsystem:
         """Log warnings for unknown metadata regions"""
 
         if (
-            self._u6_metadata.size > 0
-            or np.any(self._u7_metadata)
+            (self._u6_metadata is not None and self._u6_metadata.size > 0)
+            or (self._u7_metadata is not None and np.any(self._u7_metadata))
             or not isinstance(cell2, MatlabCanonicalEmpty)
         ):
             warnings.warn(
