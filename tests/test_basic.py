@@ -7,6 +7,10 @@ import pytest
 from matio import load_from_mat, save_to_mat
 from matio.utils.matclass import MatWriteWarning
 
+# Check for availability of extended precision types in numpy
+HAS_FLOAT128 = hasattr(np, "float128")
+HAS_COMPLEX256 = hasattr(np, "complex256")
+
 files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
 
 
@@ -626,6 +630,9 @@ class TestSaveBasicDatatypes:
 @pytest.mark.parametrize("filename, version", files)
 class TestWriteNonSupportedNumeric:
 
+    @pytest.mark.skipif(
+        not HAS_FLOAT128, reason="np.float128 not available on this platform"
+    )
     def test_numpy_floats(self, filename, version):
         """Test writing numpy float16 data to MAT-file"""
         arr_16 = np.array([1, 2, 3], dtype=np.float16).reshape(1, 3)
@@ -656,6 +663,9 @@ class TestWriteNonSupportedNumeric:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    @pytest.mark.skipif(
+        not HAS_COMPLEX256, reason="np.complex256 not available on this platform"
+    )
     def test_numpy_complex(self, filename, version):
         """Test writing numpy complex64 and complex256 data to MAT-file"""
         arr_c64 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64).reshape(1, 3)
