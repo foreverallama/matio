@@ -49,7 +49,7 @@ class MatSubsystem:
         oned_as="col",
         saveobj_classes=[],
     ):
-        self.byte_order = "<u4" if byte_order[0] == "<" else ">u4"
+        self.byte_order = "<i4" if byte_order[0] == "<" else ">i4"
         self.raw_data = raw_data
         self.add_table_attrs = add_table_attrs
         self.oned_as = oned_as
@@ -432,7 +432,7 @@ class MatSubsystem:
     def get_dynamic_properties(self, dep_id):
         """Returns dynamicproperties (as dict) for a given object based on dependency ID"""
 
-        if dep_id == 0:
+        if self.dynprop_metadata.size == 0:
             # Newer versions don't write dynamic property metadata for some builtin types like string
             return {}
 
@@ -468,10 +468,8 @@ class MatSubsystem:
         """Returns the properties as a dict for a given object ID"""
 
         if object_id == 0:
-            # Matlab uses an object ID=0
-            # MATLAB seems to keep references to deleted objects
-            # Observed this in fig files I think? Don't remember
-            # objectID=0 may be a placeholder for such cases
+            # MATLAB keeps (weak?) references to objects for some reason
+            # Deleted objects are represented with objID = 0
             return None
 
         class_id, saveobj_id, normobj_id, dep_id = self.get_object_metadata(object_id)
