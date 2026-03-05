@@ -18,30 +18,34 @@ from matio.utils.matconvert import convert_py_to_mat, guess_class_name
 from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION
 
 
-def chars_to_strings(in_arr):
-    """Convert a numpy array of characters to an array of strings.
-    Notes:
-    Scipy basically just collapses the last axis into the string length.
+def decode_char_arrays(arr, codec, char_axis=1):
     """
-    arr = in_arr
-    ndim = arr.ndim
-    last_dim = arr.shape[-1]
+    Decode char arrays to numpy unicode strings.
+    Notes:
+    Char arrays are stored as uint8/uint16 integer arrays.
+    Array dimensions may not represent string length however.
+    Typically, char arrays are used as strings with axis=1 representing characters.
+    So we decode along axis=1, and collapse that axis into the string length.
+    """
+    arr = np.moveaxis(arr, char_axis, -1)
+    char_len = arr.shape[-1]
+    if char_len == 0:
+        return np.empty(arr.shape[:-1], dtype="<U0")
 
-    # Handle empty last axis
-    if last_dim == 0:
-        new_dt_str = arr.dtype.str
-        if ndim == 2:
-            out_shape = (0,)
-        else:
-            out_shape = arr.shape[:-2] + (0,)
-    else:
-        # Construct new dtype with last_dim as string length
-        new_dt_str = arr.dtype.str[:-1] + str(last_dim)
-        out_shape = arr.shape[:-1]
+    # Slice with contiguous byte lengths and decode each row
+    flat = arr.reshape(-1, char_len)
+    flat = np.ascontiguousarray(flat)
+    row_bytes = flat.dtype.itemsize * char_len
+    buf = flat.tobytes()
+    decoded = [
+        buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
+        for i in range(0, len(buf), row_bytes)
+    ]
 
-    arr = np.ascontiguousarray(arr)
-    arr = arr.view(new_dt_str)
-    return arr.reshape(out_shape)
+    # Determine max string length for dtype and create output array
+    max_len = max(len(s) for s in decoded) if decoded else 0
+    out = np.array(decoded, dtype=f"<U{max_len}")
+    return out.reshape(arr.shape[:-1])
 
 
 def _get_string_arr_dtype(arr, num=1):
