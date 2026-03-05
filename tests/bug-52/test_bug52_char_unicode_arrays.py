@@ -39,8 +39,6 @@ def test_load_char(filename, version):
 @pytest.mark.parametrize("filename, version", files)
 def test_write_char(filename, version):
     """Test writing char data to MAT-file"""
-    if version == "v7":
-        pytest.skip("MATLAB v7 does not support Unicode characters")
     file_path = os.path.join(os.path.dirname(__file__), filename)
     mdict = load_from_mat(file_path)
 

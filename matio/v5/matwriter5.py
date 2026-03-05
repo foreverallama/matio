@@ -309,27 +309,12 @@ class VarWriter5:
             self.write_smalldata_element(arr, miTypes.miUTF8, 0)
             return
 
-        # Convert string to char array
         arr = strings_to_chars(arr)
-        # We have to write the shape directly, because we are going
-        # recode the characters, and the resulting stream of chars
-        # may have a different length
-        shape = arr.shape
-        self.write_header(shape, mxTypes.mxCHAR_CLASS)
-        if arr.dtype.kind == "U" and arr.size:
-            # Make one long string from all the characters. We need to
-            # transpose here, because we're flattening the array, before
-            # we write the bytes. The bytes have to be written in
-            # Fortran order.
-            n_chars = math.prod(shape)
-            st_arr = np.ndarray(
-                shape=(), dtype=_get_string_arr_dtype(arr, n_chars), buffer=arr.T.copy()
-            )  # Fortran order
-            # Recode with codec to give byte string
-            st = st_arr.item().encode(codec)
-            # Reconstruct as 1-D byte array
-            arr = np.ndarray(shape=(len(st),), dtype="S1", buffer=st)
-        self.write_element(arr, mdtype=miTypes.miUTF8)
+        self.write_header(arr.shape, mxTypes.mxCHAR_CLASS)
+        if arr.dtype == np.uint16:
+            self.write_element(arr, mdtype=miTypes.miUTF16)
+        else:
+            self.write_element(arr, mdtype=miTypes.miUTF8)
 
     def write_sparse(self, arr):
         """Sparse matrices are 2D"""
