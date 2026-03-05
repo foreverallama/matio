@@ -142,9 +142,8 @@ class MatWrite7:
             dset = parent.create_dataset(var_name, data=data_empty)
             self.add_empty_attribute(dset)
         else:
-            # TODO: Update logic for bugfix
             data = strings_to_chars(data)
-            data = data.view(np.uint32).astype(np.uint16)
+            data = data.astype(np.uint16)
             dset = parent.create_dataset(
                 var_name,
                 data=data.T,
