@@ -26,7 +26,7 @@ from matio.utils.matheaders import (
     MCOS_MAGIC_NUMBER,
 )
 from matio.utils.matutils import (
-    chars_to_strings,
+    decode_char_arrays,
     matlab_class_to_dtype,
     shape_from_metadata,
 )
@@ -156,9 +156,6 @@ class MatRead7:
         decode_type = obj.attrs.get(MAT_HDF_ATTRS.INT_DECODE, None)
         raw = obj[()].T
 
-        if is_empty:
-            return chars_to_strings(np.empty(shape=raw, dtype=np.str_))
-
         if decode_type == IntegerDecodingHint.UTF16_HINT:
             codec = "utf-16"
         else:
@@ -169,8 +166,10 @@ class MatRead7:
             )
             codec = "utf-8"
 
-        decoded_arr = np.array(list(raw.tobytes().decode(codec))).reshape(raw.shape)
-        return chars_to_strings(decoded_arr)
+        if is_empty:
+            return decode_char_arrays(np.empty(shape=raw, dtype=np.uint16), codec)
+        else:
+            return decode_char_arrays(raw, codec)
 
     def is_struct_matrix(self, hdf5_group):
         """Check if the HDF5 struct group is a struct matrix or scalar"""

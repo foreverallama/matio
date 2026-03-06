@@ -18,30 +18,34 @@ from matio.utils.matconvert import convert_py_to_mat, guess_class_name
 from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION
 
 
-def chars_to_strings(in_arr):
-    """Convert a numpy array of characters to an array of strings.
-    Notes:
-    Scipy basically just collapses the last axis into the string length.
+def decode_char_arrays(arr, codec, char_axis=1):
     """
-    arr = in_arr
-    ndim = arr.ndim
-    last_dim = arr.shape[-1]
+    Decode char arrays to numpy unicode strings.
+    Notes:
+    Char arrays are stored as uint8/uint16 integer arrays.
+    Array dimensions may not represent string length however.
+    Typically, char arrays are used as strings with axis=1 representing characters.
+    So we decode along axis=1, and collapse that axis into the string length.
+    """
+    arr = np.moveaxis(arr, char_axis, -1)
+    char_len = arr.shape[-1]
+    if char_len == 0:
+        return np.empty(arr.shape[:-1], dtype="<U0")
 
-    # Handle empty last axis
-    if last_dim == 0:
-        new_dt_str = arr.dtype.str
-        if ndim == 2:
-            out_shape = (0,)
-        else:
-            out_shape = arr.shape[:-2] + (0,)
-    else:
-        # Construct new dtype with last_dim as string length
-        new_dt_str = arr.dtype.str[:-1] + str(last_dim)
-        out_shape = arr.shape[:-1]
+    # Slice with contiguous byte lengths and decode each row
+    flat = arr.reshape(-1, char_len)
+    flat = np.ascontiguousarray(flat)
+    row_bytes = flat.dtype.itemsize * char_len
+    buf = flat.tobytes()
+    decoded = [
+        buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
+        for i in range(0, len(buf), row_bytes)
+    ]
 
-    arr = np.ascontiguousarray(arr)
-    arr = arr.view(new_dt_str)
-    return arr.reshape(out_shape)
+    # Determine max string length for dtype and create output array
+    max_len = max(len(s) for s in decoded) if decoded else 0
+    out = np.array(decoded, dtype=f"<U{max_len}")
+    return out.reshape(arr.shape[:-1])
 
 
 def _get_string_arr_dtype(arr, num=1):
@@ -53,24 +57,36 @@ def _get_string_arr_dtype(arr, num=1):
 
 
 def strings_to_chars(arr):
-    """Convert numpy string array to char array.
-    Notes:
-    Expands 1D numpy string arrays to char arrays.
-    Basically inverse of chars_to_strings in scipy.
+    """Convert numpy string array into matlab integer array"""
 
-    2D numpy string arrays will be treated as MATLAB strings instead
-    """
-    dims = list(arr.shape)
-    if not dims:
-        dims = [1]
-    dims.append(int(arr.dtype.str[2:]))
-    arr = np.ndarray(shape=dims, dtype=_get_string_arr_dtype(arr), buffer=arr)
-    empties = [arr == np.array("", dtype=arr.dtype)]
-    if not np.any(empties):
-        return arr
-    arr = arr.copy()
-    arr[tuple(empties)] = " "
-    return arr
+    flat = arr.ravel(order="F")
+    encoded = [None] * len(flat)
+
+    # Track max utf-16 code units, value per string
+    max_units = 0
+    max_val = 0
+    for i, s in enumerate(flat):
+        # Encode string into utf-16
+        units = np.frombuffer(s.encode("utf-16-le"), dtype=np.uint16)
+        encoded[i] = units
+
+        u_len = len(units)
+        if u_len > max_units:
+            max_units = u_len
+        if u_len:
+            u_max = units.max()
+            if u_max > max_val:
+                max_val = u_max
+
+    out = np.zeros((len(flat), max_units), dtype=np.uint16)
+    for i, units in enumerate(encoded):
+        out[i, : len(units)] = units  # pad with zeros if shorter than max_units
+
+    if max_val <= 255:
+        out = out.astype(np.uint8)
+
+    reshaped = out.reshape(arr.shape + (max_units,), order="F")
+    return np.moveaxis(reshaped, -1, 1)  # Move char axis to position 1
 
 
 def matlab_class_to_dtype(matlab_class, current_dtype):

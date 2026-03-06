@@ -97,7 +97,7 @@ from matio.utils.matclass import (
     MatlabFunction,
     MatlabObject,
 )
-from matio.utils.matutils import chars_to_strings
+from matio.utils.matutils import decode_char_arrays
 
 from matio.v5 cimport _streams
 
@@ -739,7 +739,6 @@ cdef class VarReader5:
             arr = self.read_sparse(header)
         elif mc == mxCHAR_CLASS:
             arr = self.read_char(header)
-            arr = chars_to_strings(arr)
         elif mc == mxCELL_CLASS:
             arr = self.read_cells(header)
         elif mc == mxSTRUCT_CLASS:
@@ -857,24 +856,9 @@ cdef class VarReader5:
             &mdtype, &byte_count, <void **>&data_ptr, True)
         # There are mat files in the wild that have 0 byte count strings, but
         # maybe with non-zero length.
-        if byte_count == 0:
-            arr = np.array(' ' * length, dtype='U')
-            return np.ndarray(shape=header.dims,
-                              dtype='U1',
-                              buffer=arr,
-                              order='F')
-        # Character data can be of apparently numerical types,
-        # specifically np.uint8, np.int8, np.uint16.  np.unit16 can have
-        # a length 1 type encoding, like ascii, or length 2 type
-        # encoding
-        dt = <cnp.dtype>self.dtypes[mdtype]
+
         if mdtype == miUINT16:
             codec = self.uint16_codec
-            if self.codecs['uint16_len'] == 1: # need LSBs only
-                arr = np.ndarray(shape=(length,),
-                                  dtype=dt,
-                                  buffer=data)
-                data = arr.astype(np.uint8).tobytes()
         elif mdtype == miINT8 or mdtype == miUINT8:
             codec = 'ascii'
         elif mdtype in self.codecs: # encoded char data
@@ -884,15 +868,14 @@ cdef class VarReader5:
         else:
             raise ValueError('Type %d does not appear to be char type'
                              % mdtype)
-        uc_str = data.decode(codec, 'replace')
-        # cast to array to deal with 2, 4 byte width characters
-        arr = np.array(uc_str, dtype='U')
-        # could take this to numpy C-API level, but probably not worth
-        # it
-        return np.ndarray(shape=header.dims,
-                          dtype='U1',
-                          buffer=arr,
-                          order='F')
+
+        if byte_count == 0:
+            return decode_char_arrays(np.empty(header.dims, dtype='U1'), "utf8")
+
+        dt = <cnp.dtype>self.dtypes[mdtype]
+        raw = np.ndarray(shape=(length,), dtype=dt, buffer=data)
+        raw = raw.reshape(header.dims, order='F')
+        return decode_char_arrays(raw, codec)
 
     cpdef cnp.ndarray read_cells(self, VarHeader5 header):
         ''' Read cell array from stream '''
