@@ -877,7 +877,9 @@ cdef class VarReader5:
 
         if mdtype == miUINT16:
             arr = np.ascontiguousarray(arr)
-            arr = arr.byteswap().view(np.uint8)
+            if arr.dtype.byteorder == '<' or (arr.dtype.byteorder == '=' and np.little_endian):
+                arr = arr.byteswap()
+            arr = arr.view(np.uint8)
 
         return decode_char_arrays(arr, codec, mdtype)
 
