@@ -60,3 +60,36 @@ def test_write_char(filename, version):
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+# Using some old files from MAT.jl
+
+simple_string = np.array(["the quick brown fox"])
+empty_string = np.empty((0,), dtype="U1")
+concatenated_strings = np.array(["this is a string      ", "this is another string"])
+accented_string = np.array(["thé qüîck browñ fòx"])
+
+files_old = ["chars2_v7.mat", "chars2_hdf.mat", "chars2_v6.mat"]
+
+
+@pytest.mark.parametrize("filename", files_old)
+def test_load_old_char(filename):
+    """Test reading char data from older MAT-files"""
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    mdict = load_from_mat(file_path)
+    assert set(mdict.keys()) == {
+        "simple_string",
+        "empty_string",
+        "concatenated_strings",
+        "accented_string",
+        "cell_strings",
+    }
+
+    np.testing.assert_array_equal(mdict["simple_string"], simple_string, strict=True)
+    np.testing.assert_array_equal(mdict["empty_string"], empty_string, strict=True)
+    np.testing.assert_array_equal(
+        mdict["concatenated_strings"], concatenated_strings, strict=True
+    )
+    np.testing.assert_array_equal(
+        mdict["accented_string"], accented_string, strict=True
+    )

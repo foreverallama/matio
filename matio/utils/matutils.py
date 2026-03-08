@@ -18,7 +18,7 @@ from matio.utils.matconvert import convert_py_to_mat, guess_class_name
 from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION
 
 
-def decode_char_arrays(arr, codec, char_axis=1):
+def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     """
     Decode char arrays to numpy unicode strings.
     Notes:
@@ -37,10 +37,22 @@ def decode_char_arrays(arr, codec, char_axis=1):
     flat = np.ascontiguousarray(flat)
     row_bytes = flat.dtype.itemsize * char_len
     buf = flat.tobytes()
-    decoded = [
-        buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
-        for i in range(0, len(buf), row_bytes)
-    ]
+    if mdtype == 4:
+        # All vals are packed as 16-bit integers
+        # This includes UTF-8 encoded characters as well
+        # We can just keep any non-zero MSBs
+        # * Can char arrays contain NULL characters?
+        decoded = [
+            buf[i : i + row_bytes]
+            .replace(b"\x00", b"")
+            .decode(codec, errors="surrogatepass")
+            for i in range(0, len(buf), row_bytes)
+        ]
+    else:
+        decoded = [
+            buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
+            for i in range(0, len(buf), row_bytes)
+        ]
 
     # Determine max string length for dtype and create output array
     max_len = max(len(s) for s in decoded) if decoded else 0
