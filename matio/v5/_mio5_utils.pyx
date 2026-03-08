@@ -848,8 +848,7 @@ cdef class VarReader5:
         cdef:
             cnp.uint32_t mdtype, byte_count
             char *data_ptr
-            object data, codec
-            cnp.ndarray arr
+            object data, codec, arr
             cnp.dtype dt
         cdef size_t length = self.size_from_header(header)
         data = self.read_element(
@@ -857,10 +856,13 @@ cdef class VarReader5:
         # There are mat files in the wild that have 0 byte count strings, but
         # maybe with non-zero length.
 
+        if byte_count == 0:
+            return decode_char_arrays(np.empty(header.dims, dtype='U1'))
+
         if mdtype == miUINT16:
-            codec = self.uint16_codec
+            codec = "utf-8"
         elif mdtype == miINT8 or mdtype == miUINT8:
-            codec = 'ascii'
+            codec = 'utf-8'
         elif mdtype in self.codecs: # encoded char data
             codec = self.codecs[mdtype]
             if not codec:
@@ -869,13 +871,15 @@ cdef class VarReader5:
             raise ValueError('Type %d does not appear to be char type'
                              % mdtype)
 
-        if byte_count == 0:
-            return decode_char_arrays(np.empty(header.dims, dtype='U1'), "utf8")
-
         dt = <cnp.dtype>self.dtypes[mdtype]
-        raw = np.ndarray(shape=(length,), dtype=dt, buffer=data)
-        raw = raw.reshape(header.dims, order='F')
-        return decode_char_arrays(raw, codec)
+        arr = np.ndarray(shape=(length,), dtype=dt, buffer=data)
+        arr = arr.reshape(header.dims, order='F')
+
+        if mdtype == miUINT16:
+            arr = np.ascontiguousarray(arr)
+            arr = arr.byteswap().view(np.uint8)
+
+        return decode_char_arrays(arr, codec, mdtype)
 
     cpdef cnp.ndarray read_cells(self, VarHeader5 header):
         ''' Read cell array from stream '''

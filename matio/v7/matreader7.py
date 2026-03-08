@@ -156,6 +156,9 @@ class MatRead7:
         decode_type = obj.attrs.get(MAT_HDF_ATTRS.INT_DECODE, None)
         raw = obj[()].T
 
+        if is_empty:
+            return decode_char_arrays(np.empty(shape=raw, dtype=np.uint16))
+
         if decode_type == IntegerDecodingHint.UTF16_HINT:
             codec = "utf-16"
         else:
@@ -166,10 +169,7 @@ class MatRead7:
             )
             codec = "utf-8"
 
-        if is_empty:
-            return decode_char_arrays(np.empty(shape=raw, dtype=np.uint16), codec)
-        else:
-            return decode_char_arrays(raw, codec)
+        return decode_char_arrays(raw, codec)
 
     def is_struct_matrix(self, hdf5_group):
         """Check if the HDF5 struct group is a struct matrix or scalar"""
