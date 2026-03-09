@@ -60,15 +60,7 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     return out.reshape(arr.shape[:-1])
 
 
-def _get_string_arr_dtype(arr, num=1):
-    """Return dtype for given number of items per element"""
-    if arr.dtype.kind == "U":
-        return np.dtype(f"U{num}")
-    elif arr.dtype.kind == "S":
-        return np.dtype(f"S{num}")
-
-
-def strings_to_chars(arr):
+def encode_char_arrays(arr):
     """Convert numpy string array into matlab integer array"""
 
     flat = arr.ravel(order="F")

@@ -64,13 +64,7 @@ from matio.utils.matheaders import (
     write_subsystem_offset,
     write_version,
 )
-from matio.utils.matutils import (
-    _get_string_arr_dtype,
-    mat_numeric,
-    matdims,
-    strings_to_chars,
-    to_writeable,
-)
+from matio.utils.matutils import encode_char_arrays, mat_numeric, matdims, to_writeable
 
 # Constants and helper objects
 from matio.v5.matio5_params import (
@@ -309,7 +303,7 @@ class VarWriter5:
             self.write_smalldata_element(arr, miTypes.miUTF8, 0)
             return
 
-        arr = strings_to_chars(arr)
+        arr = encode_char_arrays(arr)
         self.write_header(arr.shape, mxTypes.mxCHAR_CLASS)
         if arr.dtype == np.uint16:
             self.write_element(arr, mdtype=miTypes.miUTF16)

@@ -34,7 +34,7 @@ from matio.utils.matheaders import (
     MAT_HDF_VERSION,
     write_file_header,
 )
-from matio.utils.matutils import mat_numeric, strings_to_chars, to_writeable
+from matio.utils.matutils import encode_char_arrays, mat_numeric, to_writeable
 
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
@@ -142,7 +142,7 @@ class MatWrite7:
             dset = parent.create_dataset(var_name, data=data_empty)
             self.add_empty_attribute(dset)
         else:
-            data = strings_to_chars(data)
+            data = encode_char_arrays(data)
             data = data.astype(np.uint16)
             dset = parent.create_dataset(
                 var_name,
