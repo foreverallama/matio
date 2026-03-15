@@ -876,6 +876,9 @@ cdef class VarReader5:
         arr = arr.reshape(header.dims, order='F')
 
         if mdtype == miUINT16:
+            # Each encoding is utf-8 packed into uint16 integer
+            # A two byte utf-8 is one single uint16 integer
+            # View as uint8, byteswap preserves order of code unit
             arr = np.ascontiguousarray(arr)
             if arr.dtype.byteorder == '<' or (arr.dtype.byteorder == '=' and np.little_endian):
                 arr = arr.byteswap()

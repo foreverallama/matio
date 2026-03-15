@@ -18,6 +18,8 @@ char_f = np.array(["😀𝄞𐍈🚀", "𝄞𐍈🚀😀", "𐍈🚀😀𝄞", "
     (3, 2), order="F"
 )
 char_g = np.array(["ABC", "DEF"])
+char_h = np.array(["A\0B\0C\0D"])
+char_i = np.array(["A\0B\0C\0D\0"])
 
 
 @pytest.mark.parametrize("filename, version", files)
@@ -25,7 +27,7 @@ def test_load_char(filename, version):
     """Test reading char data from MAT-file"""
     file_path = os.path.join(os.path.dirname(__file__), filename)
     mdict = load_from_mat(file_path)
-    assert set(mdict.keys()) == {"a", "b", "c", "d", "e", "f", "g"}
+    assert set(mdict.keys()) == {"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 
     np.testing.assert_array_equal(mdict["a"], char_a, strict=True)
     np.testing.assert_array_equal(mdict["b"], char_b, strict=True)
@@ -34,6 +36,13 @@ def test_load_char(filename, version):
     np.testing.assert_array_equal(mdict["e"], char_e, strict=True)
     np.testing.assert_array_equal(mdict["f"], char_f, strict=True)
     np.testing.assert_array_equal(mdict["g"], char_g, strict=True)
+    np.testing.assert_array_equal(mdict["h"], char_h, strict=True)
+    try:
+        np.testing.assert_array_equal(mdict["i"], char_i, strict=True)
+    except AssertionError:
+        pytest.xfail(
+            "NumPy does not preserve trailing NULL characters in MATLAB char arrays"
+        )
 
 
 @pytest.mark.parametrize("filename, version", files)
@@ -45,21 +54,28 @@ def test_write_char(filename, version):
     with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
         temp_file_path = tmpfile.name
 
-    try:
-        save_to_mat(temp_file_path, mdict, version=version)
-        mload = load_from_mat(temp_file_path)
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
 
-        np.testing.assert_array_equal(mload["a"], char_a, strict=True)
-        np.testing.assert_array_equal(mload["b"], char_b, strict=True)
-        np.testing.assert_array_equal(mload["c"], char_c, strict=True)
-        np.testing.assert_array_equal(mload["d"], char_d, strict=True)
-        np.testing.assert_array_equal(mload["e"], char_e, strict=True)
-        np.testing.assert_array_equal(mload["f"], char_f, strict=True)
-        np.testing.assert_array_equal(mload["g"], char_g, strict=True)
+            np.testing.assert_array_equal(mload["a"], char_a, strict=True)
+            np.testing.assert_array_equal(mload["b"], char_b, strict=True)
+            np.testing.assert_array_equal(mload["c"], char_c, strict=True)
+            np.testing.assert_array_equal(mload["d"], char_d, strict=True)
+            np.testing.assert_array_equal(mload["e"], char_e, strict=True)
+            np.testing.assert_array_equal(mload["f"], char_f, strict=True)
+            np.testing.assert_array_equal(mload["g"], char_g, strict=True)
+            np.testing.assert_array_equal(mload["h"], char_h, strict=True)
+            try:
+                np.testing.assert_array_equal(mload["i"], char_i, strict=True)
+            except AssertionError:
+                pytest.xfail(
+                    "NumPy does not preserve trailing NULL characters in MATLAB char arrays"
+                )
 
-    finally:
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
 
 
 # Using some old files from MAT.jl
