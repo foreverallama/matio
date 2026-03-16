@@ -109,3 +109,13 @@ def test_load_old_char(filename):
     np.testing.assert_array_equal(
         mdict["accented_string"], accented_string, strict=True
     )
+
+
+def test_load_old_char_null(filename="char_array_old_null.mat"):
+    """Test reading char data with trailing NULL characters from older MAT-files"""
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    simple_string = np.array(["t\0e\0q\0i\0k\0b\0o\0n\0f\0x"])
+
+    mdict = load_from_mat(file_path)
+    assert "simple_string" in mdict
+    np.testing.assert_array_equal(mdict["simple_string"], simple_string, strict=True)
