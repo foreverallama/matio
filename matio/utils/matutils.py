@@ -38,16 +38,19 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     row_bytes = flat.dtype.itemsize * char_len
     buf = flat.tobytes()
     if mdtype == 4:
-        # FIXME: MATLAB char arrays can contain null characters
-        # this logic strips nulls
-        # We should probably preserve them
-        # but this case is very rare and needs an old MATLAB version to test with.
-        decoded = [
-            buf[i : i + row_bytes]
-            .replace(b"\x00", b"")
-            .decode(codec, errors="surrogatepass")
-            for i in range(0, len(buf), row_bytes)
-        ]
+        # Remove MSB if zero, otherwise keep both bytes for surrogate pairs
+        # Construct new byte array for each array and decode
+        # Bit expesive, but just legacy support for some old MAT-file versions
+        decoded = []
+        for i in range(0, len(buf), row_bytes):
+            row = buf[i : i + row_bytes]
+            out = bytearray()
+            for msb, lsb in zip(row[::2], row[1::2]):
+                if msb == 0:
+                    out.append(lsb)
+                else:
+                    out.extend((msb, lsb))
+            decoded.append(out.decode(codec, errors="surrogatepass"))
     else:
         decoded = [
             buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
