@@ -23,44 +23,37 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     Decode char arrays to numpy unicode strings.
     Notes:
     Char arrays are stored as uint8/uint16 integer arrays.
-    Array dimensions may not represent string length however.
-    Typically, char arrays are used as strings with axis=1 representing characters.
-    So we decode along axis=1, and collapse that axis into the string length.
+    Read rows as strings and decode with specified codec.
+    Reshape back to original shape with char (row) axis removed.
     """
-    arr = np.moveaxis(arr, char_axis, -1)
-    char_len = arr.shape[-1]
-    if char_len == 0:
-        return np.empty(arr.shape[:-1], dtype="<U0")
+    char_dims = arr.shape
+    out_dims = char_dims[:char_axis] + char_dims[char_axis + 1 :]
 
-    # Slice with contiguous byte lengths and decode each row
-    flat = arr.reshape(-1, char_len)
-    flat = np.ascontiguousarray(flat)
-    row_bytes = flat.dtype.itemsize * char_len
-    buf = flat.tobytes()
-    if mdtype == 4:
-        # Remove MSB if zero, otherwise keep both bytes for surrogate pairs
-        # Construct new byte array for each array and decode
-        # Bit expesive, but just legacy support for some old MAT-file versions
-        decoded = []
-        for i in range(0, len(buf), row_bytes):
-            row = buf[i : i + row_bytes]
-            out = bytearray()
-            for msb, lsb in zip(row[::2], row[1::2]):
+    if arr.size == 0:
+        return np.empty(out_dims, dtype="<U0")
+
+    char_len = char_dims[char_axis]
+
+    # Move char axis to end and flatten
+    arr2 = np.moveaxis(arr, char_axis, -1)
+    flat = arr2.reshape(-1, char_len)
+
+    strings = []
+    for char_data in flat:
+        if mdtype == 4:
+            row = bytearray()
+            for msb, lsb in zip(char_data[::2], char_data[1::2]):
                 if msb == 0:
-                    out.append(lsb)
+                    row.append(lsb)
                 else:
-                    out.extend((msb, lsb))
-            decoded.append(out.decode(codec, errors="surrogatepass"))
-    else:
-        decoded = [
-            buf[i : i + row_bytes].decode(codec, errors="surrogatepass")
-            for i in range(0, len(buf), row_bytes)
-        ]
+                    row.extend((msb, lsb))
+        else:
+            row = char_data.tobytes()
 
-    # Determine max string length for dtype and create output array
-    max_len = max(len(s) for s in decoded) if decoded else 0
-    out = np.array(decoded, dtype=f"<U{max_len}")
-    return out.reshape(arr.shape[:-1])
+        strings.append(row.decode(codec, errors="surrogatepass"))
+
+    out = np.array(strings, dtype=np.str_)
+    return out.reshape(out_dims)
 
 
 def encode_char_arrays(arr):
