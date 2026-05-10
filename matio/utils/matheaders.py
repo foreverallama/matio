@@ -24,6 +24,8 @@ MAT_FILE_VERSIONS_STR = {
 }
 
 MAT4_HEADER_SIZE_BYTES = 4
+MAT4_HEADER_MOPT_MAX_VAL = 4052
+
 MAT5_HEADER_SIZE_BYTES = 128
 MAT5_MAX_ARR_BYTES = 2**32
 MAT5_MAX_STRUCT_FIELDNAME_LEN = 64
@@ -83,7 +85,18 @@ def read_mat_header(file_path):
         # v4 files may not have size MAT5_HEADER_SIZE_BYTES, so we check for v4 first
         data = f.read(MAT4_HEADER_SIZE_BYTES)
         if check_mat_v4_version(data):
-            return 0, MAT_FILE_VERSIONS.V4, None
+            data_le = np.frombuffer(data[:4], dtype="<i4")[0]
+            data_be = np.frombuffer(data[:4], dtype=">i4")[0]
+            if 0 <= data_le <= MAT4_HEADER_MOPT_MAX_VAL:
+                byte_order = "<"
+            elif 0 <= data_be <= MAT4_HEADER_MOPT_MAX_VAL:
+                byte_order = ">"
+            else:
+                raise MatReadError(
+                    "Could not determine byte order for MAT-file v4 header"
+                )
+
+            return 0, MAT_FILE_VERSIONS.V4, byte_order
 
         f.seek(0)  # Reset position
         data = f.read(MAT5_HEADER_SIZE_BYTES)
