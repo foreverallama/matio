@@ -59,7 +59,7 @@ from matio.utils.matclass import (
 from matio.utils.matheaders import (
     MAT5_MAX_ARR_BYTES,
     MAT5_MAX_STRUCT_FIELDNAME_LEN,
-    MAT_5_VERSION,
+    MAT_FILE_VERSIONS,
     write_file_header,
     write_subsystem_offset,
     write_version,
@@ -88,7 +88,7 @@ def savemat5(file_path, mdict, global_vars, saveobj_classes, oned_as, do_compres
     """Write data to MAT-5file."""
 
     with open(file_path, "wb") as f:
-        write_file_header(f, version=MAT_5_VERSION)
+        write_file_header(f, version=MAT_FILE_VERSIONS.V5)
         MW = MatFile5Writer(f, oned_as=oned_as)
         MW.subsystem = MatSubsystem(
             byte_order=SYS_BYTE_ORDER, oned_as=oned_as, saveobj_classes=saveobj_classes
@@ -116,7 +116,7 @@ def write_subsystem(subsystem, oned_as):
 
     subsys_stream = BytesIO()
     subsys_stream.seek(0)
-    write_version(subsys_stream, MAT_5_VERSION)
+    write_version(subsys_stream, MAT_FILE_VERSIONS.V5)
     subsys_stream.write(b"\x00" * 4)  # Padding
 
     MW = MatFile5Writer(subsys_stream, oned_as=oned_as)
@@ -276,7 +276,7 @@ class VarWriter5:
         is_complex = arr.dtype.kind == "c"
         is_logical = arr.dtype.kind == "b"
 
-        arr, _, _ = mat_numeric(arr, version=MAT_5_VERSION)
+        arr, _, _ = mat_numeric(arr, version=MAT_FILE_VERSIONS.V5)
         mclass = NP_TO_MXTYPES[arr.dtype.str[1:]]
 
         self.write_header(

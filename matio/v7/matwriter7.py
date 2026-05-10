@@ -25,13 +25,13 @@ from matio.utils.matclass import (
     ObjectDecodingHint,
 )
 from matio.utils.matheaders import (
+    MAT_FILE_VERSIONS,
     MAT_HDF_ATTRS,
     MAT_HDF_COMPRESSION,
     MAT_HDF_COMPRESSION_OPTS,
     MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MAT_HDF_USER_BLOCK_BYTES,
-    MAT_HDF_VERSION,
     write_file_header,
 )
 from matio.utils.matutils import encode_char_arrays, mat_numeric, to_writeable
@@ -56,7 +56,7 @@ def savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as):
 
     with open(file_path, "r+b") as f:
         f.seek(0)
-        write_file_header(f, version=MAT_HDF_VERSION)
+        write_file_header(f, version=MAT_FILE_VERSIONS.HDF)
 
     return
 
@@ -111,7 +111,7 @@ class MatWrite7:
     def write_numeric_dset(self, parent, var_name, data):
         """Writes a numeric dataset to the HDF5 file."""
 
-        data, classname, int_decode = mat_numeric(data, version=MAT_HDF_VERSION)
+        data, classname, int_decode = mat_numeric(data, version=MAT_FILE_VERSIONS.HDF)
         if data.size == 0:
             data_empty = self.get_empty_array(data.shape)
             dset = parent.create_dataset(var_name, data=data_empty)
@@ -292,7 +292,7 @@ class MatWrite7:
         ir = A.indices.astype("uint64")
         jc = A.indptr.astype("uint64")
 
-        data, classname, int_decode = mat_numeric(A.data, version=MAT_HDF_VERSION)
+        data, classname, int_decode = mat_numeric(A.data, version=MAT_FILE_VERSIONS.HDF)
 
         sparse_group = parent.create_group(var_name)
         sparse_group.create_dataset(

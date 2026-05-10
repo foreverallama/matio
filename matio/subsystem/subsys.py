@@ -29,7 +29,7 @@ from matio.utils.matconvert import (
     matlab_classdef_types,
     matlab_saveobj_ret_types,
 )
-from matio.utils.matheaders import MAT_HDF_VERSION, MCOS_MAGIC_NUMBER
+from matio.utils.matheaders import MAT_FILE_VERSIONS, MCOS_MAGIC_NUMBER
 from matio.utils.matutils import to_writeable
 
 SYSTEM_BYTE_ORDER = "<" if np.little_endian else ">"

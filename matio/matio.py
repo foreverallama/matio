@@ -3,12 +3,7 @@
 from scipy.sparse import coo_matrix, issparse
 
 from matio.utils.matclass import MatReadError, MatWriteError
-from matio.utils.matheaders import (
-    MAT_5_VERSION,
-    MAT_HDF_VERSION,
-    MAT_VERSIONS,
-    read_mat_header,
-)
+from matio.utils.matheaders import MAT_FILE_VERSIONS, MAT_VERSIONS, read_mat_header
 from matio.utils.matutils import sanitize_input_lists
 from matio.v5 import loadmat5, savemat5, whosmat5
 from matio.v7 import loadmat7, savemat7, whosmat7
@@ -27,7 +22,7 @@ def load_from_mat(
     subsystem_offset, ver, byte_order = read_mat_header(file_path)
     variable_names = sanitize_input_lists(variable_names, "variable_names")
 
-    if ver == MAT_5_VERSION:
+    if ver == MAT_FILE_VERSIONS.V5:
         matfile_dict = loadmat5(
             file_path,
             subsystem_offset,
@@ -36,7 +31,7 @@ def load_from_mat(
             raw_data,
             add_table_attrs,
         )
-    elif ver == MAT_HDF_VERSION:
+    elif ver == MAT_FILE_VERSIONS.HDF:
         matfile_dict = loadmat7(
             file_path, byte_order, variable_names, raw_data, add_table_attrs
         )
@@ -63,9 +58,9 @@ def whosmat(file_path):
 
     _, ver, byte_order = read_mat_header(file_path)
 
-    if ver == MAT_5_VERSION:
+    if ver == MAT_FILE_VERSIONS.V5:
         vars = whosmat5(file_path, byte_order)
-    elif ver == MAT_HDF_VERSION:
+    elif ver == MAT_FILE_VERSIONS.HDF:
         vars = whosmat7(file_path)
 
     return vars
@@ -91,9 +86,9 @@ def save_to_mat(
             f"Unknown MAT-file version '{version}' specified. Supported versions are: {list(MAT_VERSIONS.keys())}"
         )
 
-    if ver_int == MAT_5_VERSION:
+    if ver_int == MAT_FILE_VERSIONS.V5:
         savemat5(
             file_path, mdict, global_vars, saveobj_classes, oned_as, do_compression
         )
-    elif ver_int == MAT_HDF_VERSION:
+    elif ver_int == MAT_FILE_VERSIONS.HDF:
         savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as)
