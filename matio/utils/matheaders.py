@@ -17,7 +17,7 @@ class MAT_FILE_VERSIONS(IntEnum):
     HDF = 2
 
 
-MAT_VERSIONS = {
+MAT_FILE_VERSIONS_STR = {
     "v7": MAT_FILE_VERSIONS.V5,
     "v7.3": MAT_FILE_VERSIONS.HDF,
     "v4": MAT_FILE_VERSIONS.V4,
@@ -83,7 +83,7 @@ def read_mat_header(file_path):
         # v4 files may not have size MAT5_HEADER_SIZE_BYTES, so we check for v4 first
         data = f.read(MAT4_HEADER_SIZE_BYTES)
         if check_mat_v4_version(data):
-            raise NotImplementedError("MAT-file v4 is not supported")
+            return 0, MAT_FILE_VERSIONS.V4, None
 
         f.seek(0)  # Reset position
         data = f.read(MAT5_HEADER_SIZE_BYTES)

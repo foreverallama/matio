@@ -2,8 +2,12 @@
 
 from scipy.sparse import coo_matrix, issparse
 
-from matio.utils.matclass import MatReadError, MatWriteError
-from matio.utils.matheaders import MAT_FILE_VERSIONS, MAT_VERSIONS, read_mat_header
+from matio.utils.matclass import MatWriteError
+from matio.utils.matheaders import (
+    MAT_FILE_VERSIONS,
+    MAT_FILE_VERSIONS_STR,
+    read_mat_header,
+)
 from matio.utils.matutils import sanitize_input_lists
 from matio.v5 import loadmat5, savemat5, whosmat5
 from matio.v7 import loadmat7, savemat7, whosmat7
@@ -35,6 +39,8 @@ def load_from_mat(
         matfile_dict = loadmat7(
             file_path, byte_order, variable_names, raw_data, add_table_attrs
         )
+    elif ver == MAT_FILE_VERSIONS.V4:
+        raise NotImplementedError("MAT-file v4 is not supported")
 
     if len(matfile_dict["__globals__"]) == 0:
         del matfile_dict["__globals__"]
@@ -62,6 +68,8 @@ def whosmat(file_path):
         vars = whosmat5(file_path, byte_order)
     elif ver == MAT_FILE_VERSIONS.HDF:
         vars = whosmat7(file_path)
+    elif ver == MAT_FILE_VERSIONS.V4:
+        raise NotImplementedError("MAT-file v4 is not supported")
 
     return vars
 
@@ -80,10 +88,10 @@ def save_to_mat(
     global_vars = sanitize_input_lists(global_vars, "global_vars")
     saveobj_classes = sanitize_input_lists(saveobj_classes, "saveobj_classes")
 
-    ver_int = MAT_VERSIONS.get(version)
+    ver_int = MAT_FILE_VERSIONS_STR.get(version)
     if ver_int is None:
         raise MatWriteError(
-            f"Unknown MAT-file version '{version}' specified. Supported versions are: {list(MAT_VERSIONS.keys())}"
+            f"Unknown MAT-file version '{version}' specified. Supported versions are: {list(MAT_FILE_VERSIONS_STR.keys())}"
         )
 
     if ver_int == MAT_FILE_VERSIONS.V5:
@@ -92,3 +100,5 @@ def save_to_mat(
         )
     elif ver_int == MAT_FILE_VERSIONS.HDF:
         savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as)
+    elif ver_int == MAT_FILE_VERSIONS.V4:
+        raise NotImplementedError("Writing to MAT-file v4 is not supported.")
