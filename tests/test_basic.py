@@ -695,3 +695,97 @@ class TestWriteNonSupportedNumeric:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("filename", ["test_basic_v4.mat"])
+class TestLoadMatlabV4Basic:
+
+    def test_load_numeric(self, filename):
+        """Test reading double data from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+
+        var_names = [
+            "double_scalar",
+            "double_array",
+            "i16",
+            "i32",
+            "u16",
+            "u8",
+            "fp32",
+            "fp64",
+            "fp_small",
+            "numeric_empty",
+        ]
+
+        mdict = load_from_mat(file_path, variable_names=var_names)
+        assert set(mdict.keys()) == set(var_names)
+
+        double_scalar = np.array([[3.14]], dtype=np.float64)
+        double_array = np.array(
+            [[1.1, 2.2, 3.3, 4.4, 5.5, 6.6]], dtype=np.float64
+        ).reshape(2, 3)
+        numeric_empty = np.empty((0, 0))
+        fp_small = np.ones((9999, 1), dtype=np.float64)
+
+        N = 10002
+        fp32 = 0.5 * np.ones((N, 1), dtype=np.float64)
+        fp64 = np.pi * np.ones((N, 1), dtype=np.float64)
+        i32 = 70000 * np.ones((N, 1), dtype=np.float64)
+        i16 = -1000 * np.ones((N, 1), dtype=np.float64)
+        u16 = 50000 * np.ones((N, 1), dtype=np.float64)
+        u8 = 200 * np.ones((N, 1), dtype=np.float64)
+
+        np.testing.assert_array_equal(
+            mdict["double_scalar"], double_scalar, strict=True
+        )
+        np.testing.assert_array_equal(mdict["double_array"], double_array, strict=True)
+        np.testing.assert_array_equal(
+            mdict["numeric_empty"], numeric_empty, strict=True
+        )
+        np.testing.assert_array_equal(mdict["fp_small"], fp_small, strict=True)
+        np.testing.assert_array_equal(mdict["fp32"], fp32, strict=True)
+        np.testing.assert_array_equal(mdict["fp64"], fp64, strict=True)
+        np.testing.assert_array_equal(mdict["i32"], i32, strict=True)
+        np.testing.assert_array_equal(mdict["i16"], i16, strict=True)
+        np.testing.assert_array_equal(mdict["u16"], u16, strict=True)
+        np.testing.assert_array_equal(mdict["u8"], u8, strict=True)
+
+    def test_load_char(self, filename):
+        """Test reading char data from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+
+        var_names = ["char_scalar", "char_array", "char_empty"]
+        mdict = load_from_mat(file_path, variable_names=var_names)
+        assert set(mdict.keys()) == set(var_names)
+
+        char_scalar = np.array(["Hello"], dtype=np.str_).reshape(
+            1,
+        )
+        char_array = np.array(["ab", "cd", "ef"], dtype=np.str_).reshape(
+            3,
+        )
+        char_empty = np.empty((0,), dtype=np.str_)
+
+        np.testing.assert_array_equal(mdict["char_scalar"], char_scalar, strict=True)
+        np.testing.assert_array_equal(mdict["char_array"], char_array, strict=True)
+        np.testing.assert_array_equal(mdict["char_empty"], char_empty, strict=True)
+
+    def test_load_complex(self, filename):
+        """Test reading complex data from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+
+        var_names = ["complex_scalar", "complex_array"]
+        mdict = load_from_mat(file_path, variable_names=var_names)
+        assert set(mdict.keys()) == set(var_names)
+
+        complex_scalar = np.array([[1.0 + 2.0j]], dtype=np.complex128).reshape(1, 1)
+        complex_array = np.array(
+            [[1.0 + 2.0j, 2.0 + 4.0j, 4.0 + 8.0j]], dtype=np.complex128
+        ).reshape(3, 1)
+
+        np.testing.assert_array_equal(
+            mdict["complex_scalar"], complex_scalar, strict=True
+        )
+        np.testing.assert_array_equal(
+            mdict["complex_array"], complex_array, strict=True
+        )

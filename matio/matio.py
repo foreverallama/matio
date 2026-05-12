@@ -9,6 +9,7 @@ from matio.utils.matheaders import (
     read_mat_header,
 )
 from matio.utils.matutils import sanitize_input_lists
+from matio.v4 import loadmat4, whosmat4
 from matio.v5 import loadmat5, savemat5, whosmat5
 from matio.v7 import loadmat7, savemat7, whosmat7
 
@@ -40,9 +41,9 @@ def load_from_mat(
             file_path, byte_order, variable_names, raw_data, add_table_attrs
         )
     elif ver == MAT_FILE_VERSIONS.V4:
-        raise NotImplementedError("MAT-file v4 is not supported")
+        matfile_dict = loadmat4(file_path, byte_order, variable_names)
 
-    if len(matfile_dict["__globals__"]) == 0:
+    if "__globals__" in matfile_dict and len(matfile_dict["__globals__"]) == 0:
         del matfile_dict["__globals__"]
 
     if spmatrix:
@@ -69,7 +70,7 @@ def whosmat(file_path):
     elif ver == MAT_FILE_VERSIONS.HDF:
         vars = whosmat7(file_path)
     elif ver == MAT_FILE_VERSIONS.V4:
-        raise NotImplementedError("MAT-file v4 is not supported")
+        vars = whosmat4(file_path, byte_order)
 
     return vars
 
