@@ -32,7 +32,6 @@ The `matio` package attempts to convert some common MATLAB datatypes into a Pyth
 | `table`                           | `pandas.DataFrame`                          |
 | `timetable`                       | `pandas.DataFrame` with datetime or duration index      |
 | `containers.Map`                  | `MatlabContainerMap` instance subclassed from `collections.UserDict` |
-| `dictionary`                      | TODO                                     |
 | `categorical`                     | `pandas.Categorical`                        |
 | Enumeration Instance Arrays       | `MatlabEnumerationArray` instance where each element is `enum.Enum`    |
 | Object Scalar                     | `MatlabOpaque` instance with property map `dict` |
@@ -166,7 +165,7 @@ Objects of this class contain a single property `data` which is defined as a `st
 4. `Key`
 5. `Value`
 
-Since keys can be of any MATLAB datatype, including object instances, `matio.load_from_mat` converts this into a tuple `(keys, values)`. Each value in the tuple contains all the keys and values for the dictionary. These values are not split up as MATLAB optimizes on object representation.
+Since keys of MATLAB dictionaries can be of any MATLAB datatype, `matio.load_from_mat` does not currently use a Pythonic representation and instead returns raw data for variables of this type.
 
 ## `categorical`
 
