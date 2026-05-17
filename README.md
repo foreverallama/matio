@@ -76,7 +76,7 @@ from matio import whosmat
 
 file_path = "path/to/your/file.mat"
 vars = whosmat(file_path)
-# Returns (variable_name, dims, datatype/classname)
+# Returns {variable_name: dims, classname}
 print(vars)
 ```
 
