@@ -190,7 +190,7 @@ class MatFile5Reader:
         """List variables from stream"""
         self.mat_stream.seek(MAT5_HEADER_SIZE_BYTES)
         self.initialize_read()
-        vars = []
+        vars = {}
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
             name = hdr.name.decode("ascii")
@@ -213,9 +213,9 @@ class MatFile5Reader:
                     elif hdr.is_logical:
                         info = "logical"
 
-            vars.append((name, shape, info))
-
+            vars[name] = (shape, info)
             self.mat_stream.seek(next_position)
+
         return vars
 
     def read_opaque_class_shape(self, hdr):

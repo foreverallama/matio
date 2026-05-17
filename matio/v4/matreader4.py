@@ -282,10 +282,33 @@ class MatFile4Reader:
 
         return mdict
 
+    def _read_sparse_array_shape(self, header):
+        """Read shape of sparse array.
+        Used in whosmat.
+        Does not read the entire sparse array data, only the last row which contains the shape of the output matrix.
+        Data buffer is stored in column-major layout.
+        """
+        mrows = header.dims[0]
+        dtype = header.dtype
+        itemsize = header.dtype.itemsize
+
+        cur_pos = self.mat_stream.tell()
+        pos_out_row = cur_pos + (mrows - 1) * itemsize
+        post_out_col = cur_pos + (2 * mrows - 1) * itemsize
+
+        self.mat_stream.seek(pos_out_row)
+        out_row = np.frombuffer(self.mat_stream.read(itemsize), dtype=dtype, count=1)[0]
+
+        self.mat_stream.seek(post_out_col)
+        out_col = np.frombuffer(self.mat_stream.read(itemsize), dtype=dtype, count=1)[0]
+
+        shape = (int(out_row), int(out_col))
+        return shape
+
     def list_variables(self):
         """List variables from stream"""
         self.mat_stream.seek(0)
-        vars = []
+        vars = {}
         while not self.end_of_stream():
             header = self.read_var_header()
             name = header.name
@@ -295,7 +318,12 @@ class MatFile4Reader:
                 self.mat_stream.seek(next_pos)
                 continue
 
-            shape = tuple(int(s) for s in header.dims)
-            vars.append((name, shape, header.classname))
+            if header.mat_datatype == MAT_V4_DATATYPE.SPARSE:
+                shape = self._read_sparse_array_shape(header)
+            else:
+                shape = tuple(int(s) for s in header.dims)
+
+            vars[name] = (shape, header.classname)
             self.mat_stream.seek(next_pos)
+
         return vars

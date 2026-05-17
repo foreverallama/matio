@@ -53,7 +53,7 @@ def whosmat7(file_path):
     """Lists variables in MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        vars = []
+        vars = {}
         for var in f:
             if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
                 continue
@@ -126,7 +126,7 @@ def whosmat7(file_path):
             ):
                 class_name = "complex " + class_name
 
-            vars.append((var, shape, class_name))
+            vars[var] = (shape, class_name)
 
         return vars
 
