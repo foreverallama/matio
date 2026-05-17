@@ -1,4 +1,6 @@
-"""Classes for loading MAT-file v4 files"""
+"""Classes for loading MAT-file v4 files.
+v4 format only supports 2D double (real and complex), char and sparse arrays.
+"""
 
 import warnings
 from dataclasses import dataclass
