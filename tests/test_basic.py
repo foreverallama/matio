@@ -28,7 +28,6 @@ SUPPORTED_V4_TESTS = [
 
 def skip_unsupported_v4(version, request):
     request_name = request.node.name.split("[")[0]
-    print(f"Running test: {request_name} with version: {version}")
     if version == "v4" and request_name not in SUPPORTED_V4_TESTS:
         pytest.skip(f"MAT-file v4 does not support the test '{request_name}'")
 
