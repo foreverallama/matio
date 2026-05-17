@@ -209,6 +209,8 @@ class MatFile5Reader:
                 info = hdr.classname
             else:
                 info = mclass_info.get(hdr.mclass, "unknown")
+                if hdr.is_complex:
+                    info = "complex " + info
 
             vars.append((name, shape, info))
 

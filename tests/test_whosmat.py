@@ -37,7 +37,7 @@ def test_whosmat(file_v7, file_v73):
         name_v73, shape_v73, classname_v73 = var_v73
 
         if "sparse" in classname_v7 or "sparse" in classname_v73:
-            continue  # Skip sparse matrices for now
+            continue  # FIXME: Add test for sparse matrix
 
         assert name_v7 == name_v73, f"Variable names differ: {name_v7} vs {name_v73}"
         assert (
@@ -46,3 +46,28 @@ def test_whosmat(file_v7, file_v73):
         assert (
             classname_v7 == classname_v73
         ), f"Class names differ for {name_v7}: {classname_v7} vs {classname_v73}"
+
+
+def test_whosmat_v4():
+    """Test whosmat function for v4 file."""
+    file_v4 = DATA_DIR / "test_basic_v4.mat"
+    var_v4 = whosmat(file_v4)
+
+    expected = [
+        ("char_array", (3, 2), "char"),
+        ("char_empty", (0, 0), "char"),
+        ("char_scalar", (1, 1), "char"),
+        ("complex_array", (3, 1), "complex128"),
+        ("complex_scalar", (1, 1), "complex128"),
+        ("double_array", (2, 3), "float64"),
+        ("double_scalar", (1, 1), "float64"),
+        ("fp32", (10002, 1), "float64"),
+        ("fp64", (10002, 1), "float64"),
+        ("i16", (10002, 1), "float64"),
+        ("i32", (10002, 1), "float64"),
+        ("i64", (10002, 1), "float64"),
+        ("fp_small", (9999, 1), "float64"),
+        # TODO: Add sparse items
+    ]
+
+    pass

@@ -164,7 +164,7 @@ cdef class VarHeader5:
     cdef cnp.int32_t dims_ptr[_MAT_MAXDIMS]
     cdef int n_dims
     cdef int check_stream_limit
-    cdef int is_complex
+    cdef readonly int is_complex
     cdef readonly int is_logical
     cdef public int is_global
     cdef readonly size_t nzmax

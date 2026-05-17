@@ -51,11 +51,13 @@ class VarHeader4:
     """Header for a variable in a MAT-file v4 file"""
 
     name: str
+    floating_point_format: int
     dtype: np.dtype
     mat_datatype: int
     dims: tuple
     is_complex: bool
     payload_byte_size: int
+    classname: str
 
 
 def loadmat4(file_path, byte_order, variable_names):
@@ -189,19 +191,11 @@ class MatFile4Reader:
         T = mopt % 10
 
         if (O != 0) or (M < 0 or M > 4) or (P < 0 or P > 5) or (T < 0 or T > 2):
-            if M not in (0, 1):
-                raise NotImplementedError(
-                    f"VAX and CRAY floating point formats are not supported."
-                )
-            else:
-                raise MatReadError(
-                    "Cannot read MAT-file v4 variable, variable header is malformed."
-                )
+            raise MatReadError("Cannot read MAT-file v4, variable header is malformed.")
 
         dims = (mrows, ncols)
         is_complex = imagf == 1
         dtype = np.dtype(f"{self.byte_order}{mattype_to_numpy[P]}")
-        # TODO: Check dtype conversion for VAX and CRAY formats
 
         name = (
             self.mat_stream.read(namlen).strip(b"\x00").decode("ascii")
@@ -211,7 +205,19 @@ class MatFile4Reader:
         if is_complex and not T == MAT_V4_DATATYPE.SPARSE:
             payload_bytes *= 2
 
-        header = VarHeader4(name, dtype, T, dims, is_complex, payload_bytes)
+        if T == MAT_V4_DATATYPE.FULL:
+            if is_complex:
+                classname = "complex double"
+            else:
+                classname = "double"
+        elif T == MAT_V4_DATATYPE.CHAR:
+            classname = "char"
+        elif T == MAT_V4_DATATYPE.SPARSE:
+            classname = "sparse"
+
+        header = VarHeader4(
+            name, M, dtype, T, dims, is_complex, payload_bytes, classname
+        )
 
         return header
 
@@ -240,16 +246,25 @@ class MatFile4Reader:
             name = header.name
             next_pos = self.mat_stream.tell() + header.payload_byte_size
 
-            if name in mdict:
-                msg = f"Duplicate variable name {name!r} in file. Overwriting previous."
-                warnings.warn(msg, MatReadWarning, stacklevel=2)
             if name == "":
-                # TODO: Verify if v4 files can have variables with no names
                 self.mat_stream.seek(next_pos)
                 continue
             if variable_names is not None and name not in variable_names:
                 self.mat_stream.seek(next_pos)
                 continue
+
+            if header.floating_point_format < 0 or header.floating_point_format > 4:
+                warnings.warn(
+                    f"Variable {name!r} has unknown floating point format {MAT_V4_MATRIX_TYPE(header.floating_point_format).name}, skipping variable.",
+                    MatReadWarning,
+                    stacklevel=2,
+                )
+                self.mat_stream.seek(next_pos)
+                continue
+
+            if name in mdict:
+                msg = f"Duplicate variable name {name!r} in file. Overwriting previous."
+                warnings.warn(msg, MatReadWarning, stacklevel=2)
 
             try:
                 res = self.read_var_array(header)
@@ -284,11 +299,7 @@ class MatFile4Reader:
                 self.mat_stream.seek(next_pos)
                 continue
 
-            shape = self._matrix_reader.shape_from_header(header)
-            if header.mat_datatype == MAT_V4_DATATYPE.SPARSE:
-                info = "sparse"
-            else:
-                info = header.dtype.name
-            vars.append((name, shape, info))
+            shape = tuple(int(s) for s in header.dims)
+            vars.append((name, shape, header.classname))
             self.mat_stream.seek(next_pos)
         return vars

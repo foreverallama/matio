@@ -106,6 +106,26 @@ def whosmat7(file_path):
             else:
                 shape = f[var].shape[::-1]
 
+            if (
+                isinstance(f[var], h5py.Dataset)
+                and not is_empty
+                and f[var].dtype.names is not None
+                and class_name
+                in (
+                    "int8",
+                    "uint8",
+                    "int16",
+                    "uint16",
+                    "int32",
+                    "uint32",
+                    "int64",
+                    "uint64",
+                    "single",
+                    "double",
+                )
+            ):
+                class_name = "complex " + class_name
+
             vars.append((var, shape, class_name))
 
         return vars
