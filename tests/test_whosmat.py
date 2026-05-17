@@ -36,9 +36,6 @@ def test_whosmat(file_v7, file_v73):
         name_v7, shape_v7, classname_v7 = var_v7
         name_v73, shape_v73, classname_v73 = var_v73
 
-        if "sparse" in classname_v7 or "sparse" in classname_v73:
-            continue  # FIXME: Add test for sparse matrix
-
         assert name_v7 == name_v73, f"Variable names differ: {name_v7} vs {name_v73}"
         assert (
             shape_v7 == shape_v73

@@ -203,14 +203,15 @@ class MatFile5Reader:
             else:
                 shape = self._matrix_reader.shape_from_header(hdr)
 
-            if hdr.is_logical:
-                info = "logical"
-            elif hdr.classname is not None:
+            if hdr.classname is not None:
                 info = hdr.classname
             else:
                 info = mclass_info.get(hdr.mclass, "unknown")
-                if hdr.is_complex:
-                    info = "complex " + info
+                if hdr.mclass != mxTypes.mxSPARSE_CLASS:
+                    if hdr.is_complex:
+                        info = "complex " + info
+                    elif hdr.is_logical:
+                        info = "logical"
 
             vars.append((name, shape, info))
 
