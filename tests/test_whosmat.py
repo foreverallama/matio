@@ -25,7 +25,7 @@ file_pairs = [
 @pytest.mark.parametrize("file_v7, file_v73", file_pairs)
 def test_whosmat(file_v7, file_v73):
     """Test whosmat function for both v7 and v7.3 files."""
-
+    print(f"Testing files: {file_v7} and {file_v73}")
     v7 = whosmat(file_v7)
     v73 = whosmat(file_v73)
 
@@ -34,16 +34,16 @@ def test_whosmat(file_v7, file_v73):
         v73.keys()
     ), f"Variable names differ: {set(v7.keys())} vs {set(v73.keys())}"
 
-    for var_v7, var_v73 in zip(v7, v73):
-        shape_v7, classname_v7 = v7[var_v7]
-        shape_v73, classname_v73 = v73[var_v73]
+    for var in v7.keys():
+        shape_v7, classname_v7 = v7[var]
+        shape_v73, classname_v73 = v73[var]
 
         assert (
             shape_v7 == shape_v73
-        ), f"Shape mismatch for variable {var_v7}: {shape_v7} vs {shape_v73}"
+        ), f"Shape mismatch for variable {var}: {shape_v7} vs {shape_v73}"
         assert (
             classname_v7 == classname_v73
-        ), f"Class name mismatch for variable {var_v7}: {classname_v7} vs {classname_v73}"
+        ), f"Class name mismatch for variable {var}: {classname_v7} vs {classname_v73}"
 
 
 def test_whosmat_v4():
