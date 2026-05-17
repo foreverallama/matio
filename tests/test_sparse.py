@@ -6,10 +6,15 @@ import pytest
 
 from matio import load_from_mat, save_to_mat
 
-files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
+load_files = [
+    ("test_basic_v7.mat", "v7"),
+    ("test_basic_v73.mat", "v7.3"),
+    ("test_basic_v4.mat", "v4"),
+]
+save_files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
 
 
-@pytest.mark.parametrize("filename, version", files)
+@pytest.mark.parametrize("filename, version", load_files)
 class TestLoadSparse:
     """Tests for reading sparse matrices from MAT-files"""
 
@@ -110,6 +115,9 @@ class TestLoadSparse:
 
     def test_sparse_logical(self, filename, version):
         """Test reading Sparse Logical from MAT-file"""
+        if version == "v4":
+            pytest.skip("MAT-file v4 does not support sparse logical variables")
+
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["sparse_logical"], spmatrix=False
@@ -159,7 +167,7 @@ class TestLoadSparse:
         )
 
 
-@pytest.mark.parametrize("filename, version", files)
+@pytest.mark.parametrize("filename, version", save_files)
 class TestSaveSparse:
 
     def test_sparse_empty(self, filename, version):

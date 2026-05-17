@@ -31,7 +31,6 @@ data.i32  = 70000 * ones(N,1);
 data.i16  = -1000 * ones(N,1);
 data.u16  = 50000 * ones(N,1);
 data.u8   = 200 * ones(N,1);
-
 %% Complex
 
 complex_scalar = 1 + 2i;

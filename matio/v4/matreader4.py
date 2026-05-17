@@ -1,12 +1,11 @@
 """Classes for loading MAT-file v4 files"""
 
-import sys
 import warnings
 from dataclasses import dataclass
 from enum import IntEnum
 
 import numpy as np
-import scipy.sparse
+from scipy.sparse import coo_array
 
 from matio.utils.matclass import MatReadError, MatReadWarning
 from matio.utils.matheaders import MAT4_HEADER_MOPT_MAX_VAL
@@ -141,39 +140,36 @@ class MatFile4Reader:
         return decode_char_arrays(arr, "latin-1")
 
     def read_sparse_array(self, header):
-        """Read sparse array."""
-        # TODO: Implement and Test
-        pass
+        """Read sparse array.
+        sparse array data is stored in (mrow, ncol) matrix.
+            * ncol = 3 for real sparse
+            * ncol = 4 for complex sparse
 
-        # Notes
-        # -----
-        # MATLAB 4 real sparse arrays are saved in a N+1 by 3 array format, where
-        # N is the number of non-zero values. Column 1 values [0:N] are the
-        # (1-based) row indices of the each non-zero value, column 2 [0:N] are the
-        # column indices, column 3 [0:N] are the (real) values. The last values
-        # [-1,0:2] of the rows, column indices are shape[0] and shape[1]
-        # respectively of the output matrix. The last value for the values column
-        # is a padding 0. mrows and ncols values from the header give the shape of
-        # the stored matrix, here [N+1, 3]. Complex data are saved as a 4 column
-        # matrix, where the fourth column contains the imaginary component; the
-        # last value is again 0. Complex sparse data do *not* have the header
-        # ``imagf`` field set to True; the fact that the data are complex is only
-        # detectable because there are 4 storage columns.
+        Each row corresponds to the entry for a non-zero value (COO format):
+            * First two columns are the row and column indices (1-based).
+            * Third column is the real value of the non-zero entry
+            * Fourth column (if present) is the imaginary value of the non-zero entry.
 
-        # res = self.read_sub_array(hdr)
-        # tmp = res[:-1,:]
-        # # All numbers are float64 in Matlab, but SciPy sparse expects int shape
-        # dims = (int(res[-1,0]), int(res[-1,1]))
-        # I = np.ascontiguousarray(tmp[:,0],dtype='intc')  # fixes byte order also
-        # J = np.ascontiguousarray(tmp[:,1],dtype='intc')
-        # I -= 1  # for 1-based indexing
-        # J -= 1
-        # if res.shape[1] == 3:
-        #     V = np.ascontiguousarray(tmp[:,2],dtype='float')
-        # else:
-        #     V = np.ascontiguousarray(tmp[:,2],dtype='complex')
-        #     V.imag = tmp[:,3]
-        # return scipy.sparse.coo_array((V,(I,J)), dims)
+        The last row of the sparse array data contains the shape of the output matrix.
+        Last value (or two values for complex sparse) is a padding 0.
+
+        Note: The imagf flag in header is not set for complex sparse.
+        """
+        data = self.read_numeric_array(header)
+        is_complex = data.shape[1] == 4
+        out_shape = tuple(int(s) for s in data[-1, :2])
+
+        # scipy coo requires int and 0-based indexing
+        coo_i = data[:-1, 0].astype(int) - 1
+        coo_j = data[:-1, 1].astype(int) - 1
+        real = data[:-1, 2]
+        if is_complex:
+            imag = data[:-1, 3]
+            coo_v = real + 1j * imag
+        else:
+            coo_v = real
+
+        return coo_array((coo_v, (coo_i, coo_j)), shape=out_shape).tocsc()
 
     def read_var_header(self):
         """Read variable header"""
