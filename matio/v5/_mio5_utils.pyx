@@ -34,14 +34,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Programmer's notes
-# ------------------
-# Routines here have been reasonably optimized.
-
-# The char matrix reading is not very fast, but it's not usually a
-# bottleneck. See comments in ``read_char`` for possible ways to go if you
-# want to optimize.
-
 import sys
 from copy import copy as pycopy
 
