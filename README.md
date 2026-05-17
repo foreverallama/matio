@@ -5,16 +5,11 @@ The `mat-io` module provides tools for loading and saving MAT-files, including M
 - `string`
 - `datetime`, `duration` and `calendarDuration`
 - `table` and `timetable`
-- `containers.Map` and `dictionary`
+- `containers.Map`
 - `categorical`
 - Enumeration Instance Arrays
 
-MAT-file versions `v6`, `v7` and `v7.3` are supported.
-
-- Versions `v6` and `v7` uses a modified version of `scipy.io` under the hood
-- Version `v7.3` uses `h5py` to write in the HDF5 format.
-
-Data is returned in the same format as `scipy.io.loadmat` does.
+Data is returned in the same format as `scipy.io.loadmat`, i.e., as a dictionary of `{var_name: var_data}`.
 
 ## Installation
 
@@ -43,6 +38,8 @@ data = load_from_mat(
 - `add_table_attrs`: If `True`, adds custom Matlab Table or Timetable properties as `pandas.DataFrame` attributes.
 - `mdict`: If provided, this dictionary will be updated with the data from a MAT-file.
 - `variable_names`: A list of variable names to load from file.
+
+Supported MAT-file versions are `v4`, `v6`, `v7` and `v7.3`.
 
 ### Saving MAT-files
 
