@@ -72,7 +72,6 @@ def loadmat4(file_path, byte_order, variable_names):
 def whosmat4(file_path, byte_order):
     """List variables in MAT-file v4 file"""
 
-    # TODO: Test
     with open(file_path, "rb") as f:
         MR = MatFile4Reader(f, byte_order)
         vars = MR.list_variables()
@@ -195,7 +194,7 @@ class MatFile4Reader:
 
         name = (
             self.mat_stream.read(namlen).strip(b"\x00").decode("ascii")
-        )  # TODO: Verify if I need to add +1 byte for terminating null
+        )  # FIXME: Verify if I need to add +1 byte for terminating null
         payload_bytes = np.prod(dims) * dtype.itemsize
 
         if is_complex and not T == MAT_V4_DATATYPE.SPARSE:
