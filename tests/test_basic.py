@@ -11,14 +11,33 @@ from matio.utils.matclass import MatWriteWarning
 HAS_FLOAT128 = hasattr(np, "float128")
 HAS_COMPLEX256 = hasattr(np, "complex256")
 
-files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
+load_files = [
+    ("test_basic_v7.mat", "v7"),
+    ("test_basic_v73.mat", "v7.3"),
+    ("test_basic_v4.mat", "v4"),
+]
+save_files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
+
+SUPPORTED_V4_TESTS = [
+    "test_numeric_empty",
+    "test_numeric_double",
+    "test_complex",
+    "test_char",
+]
 
 
-@pytest.mark.parametrize("filename, version", files)
+def skip_unsupported_v4(version, request):
+    request_name = request.node.name.split("[")[0]
+    if version == "v4" and request_name not in SUPPORTED_V4_TESTS:
+        pytest.skip(f"MAT-file v4 does not support the test '{request_name}'")
+
+
+@pytest.mark.parametrize("filename, version", load_files)
 class TestLoadBasicDataTypes:
 
-    def test_numeric_int8(self, filename, version):
+    def test_numeric_int8(self, filename, version, request):
         """Test reading int8 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["int8_scalar", "int8_array"])
         assert "int8_scalar" in mdict
@@ -30,9 +49,9 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(mdict["int8_scalar"], int8_scalar, strict=True)
         np.testing.assert_array_equal(mdict["int8_array"], int8_array, strict=True)
 
-    def test_numeric_uint8(self, filename, version):
+    def test_numeric_uint8(self, filename, version, request):
         """Test reading uint8 data from MAT-file"""
-
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["uint8_scalar", "uint8_array"])
         assert "uint8_scalar" in mdict
@@ -44,8 +63,9 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(mdict["uint8_scalar"], uint8_scalar, strict=True)
         np.testing.assert_array_equal(mdict["uint8_array"], uint8_array, strict=True)
 
-    def test_numeric_int16(self, filename, version):
+    def test_numeric_int16(self, filename, version, request):
         """Test reading int16 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["int16_scalar", "int16_array"])
         assert "int16_scalar" in mdict
@@ -57,8 +77,9 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(mdict["int16_scalar"], int16_scalar, strict=True)
         np.testing.assert_array_equal(mdict["int16_array"], int16_array, strict=True)
 
-    def test_numeric_uint16(self, filename, version):
+    def test_numeric_uint16(self, filename, version, request):
         """Test reading uint16 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["uint16_scalar", "uint16_array"]
@@ -74,8 +95,9 @@ class TestLoadBasicDataTypes:
         )
         np.testing.assert_array_equal(mdict["uint16_array"], uint16_array, strict=True)
 
-    def test_numeric_int32(self, filename, version):
+    def test_numeric_int32(self, filename, version, request):
         """Test reading int32 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["int32_scalar", "int32_array"])
         assert "int32_scalar" in mdict
@@ -87,8 +109,9 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(mdict["int32_scalar"], int32_scalar, strict=True)
         np.testing.assert_array_equal(mdict["int32_array"], int32_array, strict=True)
 
-    def test_numeric_uint32(self, filename, version):
+    def test_numeric_uint32(self, filename, version, request):
         """Test reading uint32 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["uint32_scalar", "uint32_array"]
@@ -104,8 +127,9 @@ class TestLoadBasicDataTypes:
         )
         np.testing.assert_array_equal(mdict["uint32_array"], uint32_array, strict=True)
 
-    def test_numeric_int64(self, filename, version):
+    def test_numeric_int64(self, filename, version, request):
         """Test reading int64 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(file_path, variable_names=["int64_scalar", "int64_array"])
         assert "int64_scalar" in mdict
@@ -117,8 +141,9 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(mdict["int64_scalar"], int64_scalar, strict=True)
         np.testing.assert_array_equal(mdict["int64_array"], int64_array, strict=True)
 
-    def test_numeric_uint64(self, filename, version):
+    def test_numeric_uint64(self, filename, version, request):
         """Test reading uint64 data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["uint64_scalar", "uint64_array"]
@@ -134,8 +159,9 @@ class TestLoadBasicDataTypes:
         )
         np.testing.assert_array_equal(mdict["uint64_array"], uint64_array, strict=True)
 
-    def test_numeric_single(self, filename, version):
+    def test_numeric_single(self, filename, version, request):
         """Test reading single data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["single_scalar", "single_array"]
@@ -153,8 +179,9 @@ class TestLoadBasicDataTypes:
         )
         np.testing.assert_array_equal(mdict["single_array"], single_array, strict=True)
 
-    def test_numeric_double(self, filename, version):
+    def test_numeric_double(self, filename, version, request):
         """Test reading double data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["double_scalar", "double_array"]
@@ -172,17 +199,33 @@ class TestLoadBasicDataTypes:
         )
         np.testing.assert_array_equal(mdict["double_array"], double_array, strict=True)
 
-    def test_logical(self, filename, version):
+    def test_numeric_empty(self, filename, version, request):
+        """Test reading empty numeric array from MAT-file"""
+        skip_unsupported_v4(version, request)
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["numeric_empty"])
+        assert "numeric_empty" in mdict
+
+        numeric_empty = np.empty((0, 0))
+        np.testing.assert_array_equal(
+            mdict["numeric_empty"], numeric_empty, strict=True
+        )
+
+    def test_logical(self, filename, version, request):
         """Test reading logical data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
-            file_path, variable_names=["logical_scalar", "logical_array"]
+            file_path,
+            variable_names=["logical_scalar", "logical_array", "logical_empty"],
         )
         assert "logical_scalar" in mdict
         assert "logical_array" in mdict
+        assert "logical_empty" in mdict
 
         logical_scalar = np.array([[1]], dtype=bool)
         logical_array = np.array([[1, 0, 1]], dtype=bool).reshape(1, 3)
+        logical_empty = np.empty((0, 0), dtype=np.bool_)
 
         np.testing.assert_array_equal(
             mdict["logical_scalar"], logical_scalar, strict=True
@@ -190,10 +233,13 @@ class TestLoadBasicDataTypes:
         np.testing.assert_array_equal(
             mdict["logical_array"], logical_array, strict=True
         )
+        np.testing.assert_array_equal(
+            mdict["logical_empty"], logical_empty, strict=True
+        )
 
-    def test_complex(self, filename, version):
+    def test_complex(self, filename, version, request):
         """Test reading complex data from MAT-file"""
-
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
             file_path, variable_names=["complex_scalar", "complex_array"]
@@ -213,12 +259,16 @@ class TestLoadBasicDataTypes:
             mdict["complex_array"], complex_array, strict=True
         )
 
-    def test_char(self, filename, version):
+    def test_char(self, filename, version, request):
         """Test reading char data from MAT-file"""
+        skip_unsupported_v4(version, request)
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        mdict = load_from_mat(file_path, variable_names=["char_array", "char_scalar"])
+        mdict = load_from_mat(
+            file_path, variable_names=["char_array", "char_scalar", "char_empty"]
+        )
         assert "char_array" in mdict
         assert "char_scalar" in mdict
+        assert "char_empty" in mdict
 
         char_scalar = np.array(["Hello"], dtype=np.str_).reshape(
             1,
@@ -226,34 +276,14 @@ class TestLoadBasicDataTypes:
         char_array = np.array(["ab", "cd", "ef"], dtype=np.str_).reshape(
             3,
         )
+        char_empty = np.empty((0,), dtype=np.str_)
 
         np.testing.assert_array_equal(mdict["char_scalar"], char_scalar, strict=True)
         np.testing.assert_array_equal(mdict["char_array"], char_array, strict=True)
-
-    def test_empty(self, filename, version):
-        """Test reading empty arrays from MAT-file"""
-        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        mdict = load_from_mat(
-            file_path, variable_names=["numeric_empty", "char_empty", "logical_empty"]
-        )
-        assert "numeric_empty" in mdict
-        assert "char_empty" in mdict
-        assert "logical_empty" in mdict
-
-        numeric_empty = np.empty((0, 0))
-        char_empty = np.empty((0,), dtype=np.str_)
-        logical_empty = np.empty((0, 0), dtype=np.bool_)
-
-        np.testing.assert_array_equal(
-            mdict["numeric_empty"], numeric_empty, strict=True
-        )
         np.testing.assert_array_equal(mdict["char_empty"], char_empty, strict=True)
-        np.testing.assert_array_equal(
-            mdict["logical_empty"], logical_empty, strict=True
-        )
 
 
-@pytest.mark.parametrize("filename, version", files)
+@pytest.mark.parametrize("filename, version", save_files)
 class TestSaveBasicDatatypes:
 
     def test_numeric_int8(self, filename, version):
@@ -520,7 +550,8 @@ class TestSaveBasicDatatypes:
         """Test writing logical data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
-            file_path, variable_names=["logical_scalar", "logical_array"]
+            file_path,
+            variable_names=["logical_scalar", "logical_array", "logical_empty"],
         )
 
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
@@ -529,7 +560,8 @@ class TestSaveBasicDatatypes:
         try:
             save_to_mat(temp_file_path, mdict, version=version)
             mload = load_from_mat(
-                temp_file_path, variable_names=["logical_scalar", "logical_array"]
+                temp_file_path,
+                variable_names=["logical_scalar", "logical_array", "logical_empty"],
             )
 
             np.testing.assert_array_equal(
@@ -537,6 +569,9 @@ class TestSaveBasicDatatypes:
             )
             np.testing.assert_array_equal(
                 mdict["logical_array"], mload["logical_array"], strict=True
+            )
+            np.testing.assert_array_equal(
+                mdict["logical_empty"], mload["logical_empty"], strict=True
             )
 
         finally:
@@ -573,33 +608,8 @@ class TestSaveBasicDatatypes:
     def test_char(self, filename, version):
         """Test writing char data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        mdict = load_from_mat(file_path, variable_names=["char_scalar", "char_array"])
-
-        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
-            temp_file_path = tmpfile.name
-
-        try:
-            save_to_mat(temp_file_path, mdict, version=version)
-            mload = load_from_mat(
-                temp_file_path, variable_names=["char_scalar", "char_array"]
-            )
-
-            np.testing.assert_array_equal(
-                mdict["char_scalar"], mload["char_scalar"], strict=True
-            )
-            np.testing.assert_array_equal(
-                mdict["char_array"], mload["char_array"], strict=True
-            )
-
-        finally:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-
-    def test_empty(self, filename, version):
-        """Test writing empty char data to MAT-file"""
-        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
         mdict = load_from_mat(
-            file_path, variable_names=["char_empty", "numeric_empty", "logical_empty"]
+            file_path, variable_names=["char_scalar", "char_array", "char_empty"]
         )
 
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
@@ -609,17 +619,40 @@ class TestSaveBasicDatatypes:
             save_to_mat(temp_file_path, mdict, version=version)
             mload = load_from_mat(
                 temp_file_path,
-                variable_names=["char_empty", "numeric_empty", "logical_empty"],
+                variable_names=["char_scalar", "char_array", "char_empty"],
             )
 
             np.testing.assert_array_equal(
+                mdict["char_scalar"], mload["char_scalar"], strict=True
+            )
+            np.testing.assert_array_equal(
+                mdict["char_array"], mload["char_array"], strict=True
+            )
+            np.testing.assert_array_equal(
                 mdict["char_empty"], mload["char_empty"], strict=True
             )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_numeric_empty(self, filename, version):
+        """Test writing empty numeric data to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["numeric_empty"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path,
+                variable_names=["numeric_empty"],
+            )
+
             np.testing.assert_array_equal(
                 mdict["numeric_empty"], mload["numeric_empty"], strict=True
-            )
-            np.testing.assert_array_equal(
-                mdict["logical_empty"], mload["logical_empty"], strict=True
             )
 
         finally:
@@ -627,7 +660,7 @@ class TestSaveBasicDatatypes:
                 os.remove(temp_file_path)
 
 
-@pytest.mark.parametrize("filename, version", files)
+@pytest.mark.parametrize("filename, version", save_files)
 class TestWriteNonSupportedNumeric:
 
     @pytest.mark.skipif(
@@ -695,3 +728,40 @@ class TestWriteNonSupportedNumeric:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+def test_load_numeric_precision_v4(filename="test_basic_v4.mat"):
+    """Test reading double data from MAT-file.
+    MATLAB v4 documentation states that double arrays can be saved with a different precision.
+    I was not able to replicate this behaviour with MATLAB,
+    but I'm keeping the test for completeness.
+    """
+    file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+
+    var_names = [
+        "u8",  # Array saved with uint8 precision
+        "i16",  # Array saved with int16 precision
+        "u16",  # Array saved with uint16 precision
+        "i32",  # Array saved with int32 precision
+        "fp32",  # Array saved with single precision
+        "fp64",  # Array saved with double precision
+        "fp_small",  # Array saved with double precision
+    ]
+
+    mdict = load_from_mat(file_path, variable_names=var_names)
+
+    N = 10002
+    expected_dict = {
+        "u8": 200 * np.ones((N, 1), dtype=np.float64),
+        "i16": -1000 * np.ones((N, 1), dtype=np.float64),
+        "u16": 50000 * np.ones((N, 1), dtype=np.float64),
+        "i32": 70000 * np.ones((N, 1), dtype=np.float64),
+        "fp32": 0.5 * np.ones((N, 1), dtype=np.float64),
+        "fp64": np.pi * np.ones((N, 1), dtype=np.float64),
+        "fp_small": np.ones((9999, 1), dtype=np.float64),
+    }
+
+    for key in var_names:
+        assert key in mdict
+        expected_val = expected_dict[key]
+        np.testing.assert_array_equal(mdict[key], expected_val, strict=True)

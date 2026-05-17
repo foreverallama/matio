@@ -1,4 +1,4 @@
-"""Cython mio5 utility routines (-*- python -*- like)"""
+"""Cython mio5 utility routines."""
 
 # Copyright (c) 2001-2002 Enthought, Inc. 2003, SciPy Developers.
 # All rights reserved.
@@ -33,14 +33,6 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-# Programmer's notes
-# ------------------
-# Routines here have been reasonably optimized.
-
-# The char matrix reading is not very fast, but it's not usually a
-# bottleneck. See comments in ``read_char`` for possible ways to go if you
-# want to optimize.
 
 import sys
 from copy import copy as pycopy
@@ -77,19 +69,16 @@ cdef extern from "numpy/arrayobject.h":
 cdef extern from "numpy_rephrasing.h":
     void PyArray_Set_BASE(cnp.ndarray arr, object obj)
 
-# Numpy must be initialized before any code using the numpy C-API
-# directly
+# Numpy must be initialized before any code using the numpy C-API directly
 cnp.import_array()
 
-# Constant from numpy - max number of array dimensions
-DEF _MAT_MAXDIMS = 32
-# max number of integer indices of matlab data types (miINT8 etc)
-DEF _N_MIS = 20
-# max number of integer indices of matlab class types (mxINT8_CLASS etc)
-DEF _N_MXS = 20
+DEF _MAT_MAXDIMS = 32 # numpy constant - max number of array dimensions
+DEF _N_MIS = 20 # max number of integer indices of matlab data types (miINT8 etc)
+DEF _N_MXS = 20 # max number of integer indices of matlab class types (mxINT8_CLASS etc)
 
 from scipy.sparse import csc_array
 
+from matio.subsystem import MatSubsystem
 from matio.utils.matclass import (
     MCOS_SUBSYSTEM_CLASS,
     EmptyMatStruct,
@@ -102,7 +91,6 @@ from matio.utils.matutils import decode_char_arrays
 from matio.v5 cimport _streams
 
 import matio.v5.matio5_params as mio5p
-from matio.subsystem import MatSubsystem
 
 
 cdef enum:
@@ -147,7 +135,6 @@ swapped_code = '>' if sys_is_le else '<'
 
 cdef cnp.dtype BOOL_DTYPE = np.dtype(np.bool_)
 
-
 cpdef cnp.uint32_t byteswap_u4(cnp.uint32_t u4) noexcept:
     return ((u4 << 24) |
            ((u4 << 8) & 0xff0000U) |
@@ -164,41 +151,21 @@ cdef class VarHeader5:
     cdef cnp.int32_t dims_ptr[_MAT_MAXDIMS]
     cdef int n_dims
     cdef int check_stream_limit
-    cdef int is_complex
+    cdef readonly int is_complex
     cdef readonly int is_logical
     cdef public int is_global
     cdef readonly size_t nzmax
 
-    def set_dims(self, dims):
-        """ Allow setting of dimensions from python
-
-        This is for constructing headers for tests
-        """
-        self.dims = dims
-        self.n_dims = len(dims)
-        for i, dim in enumerate(dims):
-            self.dims_ptr[i] = <cnp.int32_t>int(dim)
-
 
 cdef class VarReader5:
-    """Initialize from file reader object
-
-    preader needs the following fields defined:
-
-    * mat_stream (file-like)
-    * byte_order (str)
-    * uint16_codec (str)
-    """
+    """Initialize from file reader object."""
 
     cdef public int is_swapped, little_endian
     cdef object codecs, uint16_codec
-    # c-optimized version of reading stream
-    cdef _streams.GenericStream cstream
-    # pointers to stuff in preader.dtypes
-    cdef PyObject* dtypes[_N_MIS]
-    # pointers to stuff in preader.class_dtypes
-    cdef PyObject* class_dtypes[_N_MXS]
-    # element processing options
+
+    cdef _streams.GenericStream cstream # c-optimized version of reading stream
+    cdef PyObject* dtypes[_N_MIS] # pointers to stuff in preader.dtypes
+    cdef PyObject* class_dtypes[_N_MXS] # pointers to stuff in preader.class_dtypes
 
     cdef object subsystem
 
@@ -209,14 +176,17 @@ cdef class VarReader5:
             self.little_endian = not sys_is_le
         else:
             self.little_endian = sys_is_le
+
         # store codecs for text matrix reading
         self.codecs = mio5p.MDTYPES[byte_order]['codecs'].copy()
         self.uint16_codec = preader.uint16_codec
         uint16_codec = self.uint16_codec
+
         # Set length of miUINT16 char encoding
         self.codecs['uint16_len'] = len("  ".encode(uint16_codec)) \
                 - len(" ".encode(uint16_codec))
         self.codecs['uint16_codec'] = uint16_codec
+
         # set c-optimized stream object from python file-like object
         self.cstream = _streams.make_stream(preader.mat_stream)
 
@@ -226,6 +196,7 @@ cdef class VarReader5:
             if isinstance(key, str):
                 continue
             self.dtypes[key] = <PyObject*>dt
+
         # copy refs to class_dtypes into object pointer array
         for key, dt in mio5p.MDTYPES[byte_order]['classes'].items():
             if isinstance(key, str):
@@ -235,10 +206,9 @@ cdef class VarReader5:
         self.subsystem = preader.subsystem
 
     def set_stream(self, fobj):
-        ''' Set stream of best type from file-like `fobj`
-
-        Called from Python when initiating a variable read
-        '''
+        """Set stream of best type from file-like `fobj`
+        Called from Python when initiating a variable read.
+        """
         self.cstream = _streams.make_stream(fobj)
 
     def read_tag(self):

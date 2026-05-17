@@ -35,7 +35,6 @@ def mat_to_string(props, byte_order, **_kwargs):
     for char_count in char_counts:
         if char_count == 0xFFFFFFFFFFFFFFFF:
             strings.append(np.nan)
-            print("here")
             continue
         byte_length = char_count * 2  # UTF-16 encoding
         extracted_string = byte_data[pos : pos + byte_length].decode(encoding)

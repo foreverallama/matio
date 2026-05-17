@@ -15,7 +15,7 @@ from matio.utils.matclass import (
     MatWriteWarning,
 )
 from matio.utils.matconvert import convert_py_to_mat, guess_class_name
-from matio.utils.matheaders import MAT_5_VERSION, MAT_HDF_VERSION
+from matio.utils.matheaders import MAT_FILE_VERSIONS
 
 
 def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
@@ -153,14 +153,14 @@ def mat_numeric(arr, version, classname=None, int_decode=None):
                 MatWriteWarning,
             )
     elif dt.kind == "c":
-        if version == MAT_5_VERSION:
+        if version == MAT_FILE_VERSIONS.V5:
             target_dtype = np.dtype(np.complex128)
             if dt.itemsize != 16:
                 warnings.warn(
                     f"Complex type {dt} not supported in MATLAB. Converting to {target_dtype}.",
                     MatWriteWarning,
                 )
-        elif version == MAT_HDF_VERSION:
+        elif version == MAT_FILE_VERSIONS.HDF:
             target_dtype = np.dtype([("real", np.float64), ("imag", np.float64)])
             classname = "double"
             if dt.itemsize != 16:
