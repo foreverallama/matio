@@ -86,7 +86,10 @@ def to_dataframe(data, nvars, varnames):
         vname = varnames[0, i].item()
         coldata = data[0, i]
         if isinstance(coldata, np.ndarray):
-            if coldata.shape[1] == 1:
+            if coldata.ndim == 1:
+                # char columns are decoded to one string per row
+                rows[vname] = make_series(coldata, coldata.dtype.kind)
+            elif coldata.shape[1] == 1:
                 rows[vname] = make_series(coldata[:, 0], coldata.dtype.kind)
             else:
                 for j in range(coldata.shape[1]):
