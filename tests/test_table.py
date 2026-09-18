@@ -474,3 +474,28 @@ class TestSaveMatlabTable:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+char_files = [("test_table_char_v7.mat", "v7"), ("test_table_char_v73.mat", "v7.3")]
+
+
+@pytest.mark.parametrize("filename, version", char_files)
+class TestLoadMatlabTableChar:
+
+    def test_table_char(self, filename, version):
+        """Test reading table with char array column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_char"])
+        assert "table_char" in mdict
+
+        df = pd.DataFrame({"Code": ["ab ", "cde"], "Value": [1.0, 2.0]})
+        pd.testing.assert_frame_equal(mdict["table_char"], df, check_like=True)
+
+    def test_table_char_single(self, filename, version):
+        """Test reading table with single char column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_char_single"])
+        assert "table_char_single" in mdict
+
+        df = pd.DataFrame({"Code": ["a", "b"]})
+        pd.testing.assert_frame_equal(mdict["table_char_single"], df, check_like=True)
