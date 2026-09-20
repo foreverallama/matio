@@ -12,7 +12,8 @@ TABLE_LOAD_VERSION = 5
 TABLE_SAVE_VERSION = 4
 MIN_TABLE_VERSION = 1
 
-TIMETABLE_VERSION = 6
+TIMETABLE_LOAD_VERSION = 7
+TIMETABLE_SAVE_VERSION = 6
 MIN_TIMETABLE_VERSION = 2
 
 # Pandas marks this as experimental
@@ -205,7 +206,7 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
-    if ver > TIMETABLE_VERSION or ver <= MIN_TIMETABLE_VERSION:
+    if ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
         warnings.warn(
             f"mat_to_timetable: MATLAB timetable version {ver} is not supported.",
             UserWarning,
@@ -213,15 +214,23 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     num_vars = int(timetable_data[0, 0]["numVars"].item())
-    var_names = timetable_data[0, 0]["varNames"]
+
+    if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useVarNames2048"].item():
+        var_names = timetable_data[0, 0]["varNames2048"]
+    else:
+        var_names = timetable_data[0, 0]["varNames"]
+
     data = timetable_data[0, 0]["data"]
     df = to_dataframe(data, num_vars, var_names)
 
     row_times = timetable_data[0, 0]["rowTimes"]
     num_rows = int(timetable_data[0, 0]["numRows"].item())
-
     row_times = get_row_times(row_times, num_rows)
-    dim_names = timetable_data[0, 0]["dimNames"]
+
+    if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useDimNames2048"].item():
+        dim_names = timetable_data[0, 0]["dimNames2048"]
+    else:
+        dim_names = timetable_data[0, 0]["dimNames"]
     df.index = pd.Index(row_times, name=dim_names[0, 0].item())
 
     if add_table_attrs:
@@ -353,7 +362,7 @@ def make_timetable_props():
     return {
         "CustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
         "VariableCustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
-        "versionSavedFrom": np.float64(TIMETABLE_VERSION),
+        "versionSavedFrom": np.float64(TIMETABLE_SAVE_VERSION),
         "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
         "incompatibilityMsg": np.empty((0, 0), dtype=np.str_),
         "arrayProps": arrayprops,
