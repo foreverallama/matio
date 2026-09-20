@@ -25,6 +25,12 @@ dependencies = [
     "h5py>=3.13.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+]
+
 [project.urls]
 Homepage = "https://github.com/foreverallama/matio"
 Repository = "https://github.com/foreverallama/matio"
