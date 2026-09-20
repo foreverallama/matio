@@ -8,7 +8,8 @@ import pandas as pd
 from matio.utils.converters.mattimes import caldur_dtype
 from matio.utils.matclass import EmptyMatStruct, MatConvertError, MatConvertWarning
 
-TABLE_VERSION = 5
+TABLE_LOAD_VERSION = 5
+TABLE_SAVE_VERSION = 4
 MIN_TABLE_VERSION = 1
 
 TIMETABLE_VERSION = 6
@@ -110,7 +111,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     table_attrs = props.get("props")
     ver = int(table_attrs[0, 0]["versionSavedFrom"].item())
-    if ver > TABLE_VERSION:
+    if ver > TABLE_LOAD_VERSION:
         warnings.warn(
             f"mat_to_table: MATLAB table version {ver} is not supported.",
             UserWarning,
@@ -275,10 +276,10 @@ def make_table_props():
     props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
     props["CustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
     props["VariableCustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
-    props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["versionSavedFrom"][0, 0] = np.float64(TABLE_SAVE_VERSION)
     props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
     props["incompatibilityMsg"][0, 0] = np.empty((0, 0), dtype=np.str_)
-    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_SAVE_VERSION)
     props["Description"][0, 0] = np.empty((0, 0), dtype=np.str_)
     props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
     props["DimensionNames"][0, 0] = np.array(
