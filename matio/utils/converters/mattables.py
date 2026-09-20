@@ -122,7 +122,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     nvars = int(props.get("nvars").item())
 
     # MATLAB 2025a supports variable names up to 2048 chars
-    if table_attrs[0, 0]["useVariableNames2048"].item():
+    if ver >= 5 and table_attrs[0, 0]["useVariableNames2048"].item():
         varnames = table_attrs[0, 0]["VariableNames2048"]
     else:
         varnames = props.get("varnames")
