@@ -8,10 +8,12 @@ import pandas as pd
 from matio.utils.converters.mattimes import caldur_dtype
 from matio.utils.matclass import EmptyMatStruct, MatConvertError, MatConvertWarning
 
-TABLE_VERSION = 4
+TABLE_LOAD_VERSION = 5
+TABLE_SAVE_VERSION = 4
 MIN_TABLE_VERSION = 1
 
-TIMETABLE_VERSION = 6
+TIMETABLE_LOAD_VERSION = 7
+TIMETABLE_SAVE_VERSION = 6
 MIN_TIMETABLE_VERSION = 2
 
 # Pandas marks this as experimental
@@ -21,7 +23,7 @@ MIN_TIMETABLE_VERSION = 2
 pd.options.future.infer_string = True
 
 
-def add_table_props(df, tab_props):
+def add_table_props(df, tab_props, ver):
     """Add MATLAB table properties to pandas DataFrame
     These properties are mostly cell arrays of character vectors
     """
@@ -41,9 +43,15 @@ def add_table_props(df, tab_props):
     df.attrs["VariableContinuity"] = [
         s.item() if s.size > 0 else "" for s in tab_props["VariableContinuity"].ravel()
     ]
+
+    if ver >= TABLE_LOAD_VERSION and tab_props["useDimensionNames2048"].item():
+        dimension_names = tab_props["DimensionNames2048"]
+    else:
+        dimension_names = tab_props["DimensionNames"]
     df.attrs["DimensionNames"] = [
-        s.item() if s.size > 0 else "" for s in tab_props["DimensionNames"].ravel()
+        s.item() if s.size > 0 else "" for s in dimension_names.ravel()
     ]
+
     df.attrs["UserData"] = tab_props["UserData"]
 
     return df
@@ -104,7 +112,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     table_attrs = props.get("props")
     ver = int(table_attrs[0, 0]["versionSavedFrom"].item())
-    if ver > TABLE_VERSION:
+    if ver > TABLE_LOAD_VERSION:
         warnings.warn(
             f"mat_to_table: MATLAB table version {ver} is not supported.",
             UserWarning,
@@ -113,7 +121,13 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     data = props.get("data")
     nvars = int(props.get("nvars").item())
-    varnames = props.get("varnames")
+
+    # MATLAB 2025a supports variable names up to 2048 chars
+    if ver >= 5 and table_attrs[0, 0]["useVariableNames2048"].item():
+        varnames = table_attrs[0, 0]["VariableNames2048"]
+    else:
+        varnames = props.get("varnames")
+
     df = to_dataframe(data, nvars, varnames)
 
     # Add df.index
@@ -126,7 +140,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
-        df = add_table_props(df, table_attrs)
+        df = add_table_props(df, table_attrs, ver)
 
     return df
 
@@ -192,7 +206,7 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
-    if ver > TIMETABLE_VERSION or ver <= MIN_TIMETABLE_VERSION:
+    if ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
         warnings.warn(
             f"mat_to_timetable: MATLAB timetable version {ver} is not supported.",
             UserWarning,
@@ -200,15 +214,23 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     num_vars = int(timetable_data[0, 0]["numVars"].item())
-    var_names = timetable_data[0, 0]["varNames"]
+
+    if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useVarNames2048"].item():
+        var_names = timetable_data[0, 0]["varNames2048"]
+    else:
+        var_names = timetable_data[0, 0]["varNames"]
+
     data = timetable_data[0, 0]["data"]
     df = to_dataframe(data, num_vars, var_names)
 
     row_times = timetable_data[0, 0]["rowTimes"]
     num_rows = int(timetable_data[0, 0]["numRows"].item())
-
     row_times = get_row_times(row_times, num_rows)
-    dim_names = timetable_data[0, 0]["dimNames"]
+
+    if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useDimNames2048"].item():
+        dim_names = timetable_data[0, 0]["dimNames2048"]
+    else:
+        dim_names = timetable_data[0, 0]["dimNames"]
     df.index = pd.Index(row_times, name=dim_names[0, 0].item())
 
     if add_table_attrs:
@@ -263,10 +285,10 @@ def make_table_props():
     props["useDimensionNamesOriginal"][0, 0] = np.bool_(False)
     props["CustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
     props["VariableCustomProps"][0, 0] = EmptyMatStruct(np.empty((1, 1), dtype=object))
-    props["versionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["versionSavedFrom"][0, 0] = np.float64(TABLE_SAVE_VERSION)
     props["minCompatibleVersion"][0, 0] = np.float64(MIN_TABLE_VERSION)
     props["incompatibilityMsg"][0, 0] = np.empty((0, 0), dtype=np.str_)
-    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_VERSION)
+    props["VersionSavedFrom"][0, 0] = np.float64(TABLE_SAVE_VERSION)
     props["Description"][0, 0] = np.empty((0, 0), dtype=np.str_)
     props["VariableNamesOriginal"][0, 0] = np.empty((0, 0), dtype=object)
     props["DimensionNames"][0, 0] = np.array(
@@ -340,7 +362,7 @@ def make_timetable_props():
     return {
         "CustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
         "VariableCustomProps": EmptyMatStruct(np.empty((1, 1), dtype=object)),
-        "versionSavedFrom": np.float64(TIMETABLE_VERSION),
+        "versionSavedFrom": np.float64(TIMETABLE_SAVE_VERSION),
         "minCompatibleVersion": np.float64(MIN_TIMETABLE_VERSION),
         "incompatibilityMsg": np.empty((0, 0), dtype=np.str_),
         "arrayProps": arrayprops,

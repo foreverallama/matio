@@ -474,3 +474,50 @@ class TestSaveMatlabTable:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+tablev5_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
+
+
+@pytest.mark.parametrize("filename, version", tablev5_files)
+class TestLoadMatlabTableV5:
+
+    def test_table_v5_long_varname(self, filename, version):
+        """Test reading table with variable names longer than 63 characters"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_v5_long_varname"])
+        assert "table_v5_long_varname" in mdict
+
+        long_name = "A" * 100
+        df = pd.DataFrame(
+            {
+                long_name: np.array([1.0, 2.0, 3.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            mdict["table_v5_long_varname"], df, check_like=True
+        )
+
+    def test_table_v5_long_dimname(self, filename, version):
+        """Test reading table with dimension names longer than 63 characters"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["table_v5_long_dimname"],
+            add_table_attrs=True,
+        )
+        assert "table_v5_long_dimname" in mdict
+
+        df = pd.DataFrame(
+            {
+                "Value": np.array([1.0, 2.0, 3.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            mdict["table_v5_long_dimname"], df, check_like=True
+        )
+
+        assert mdict["table_v5_long_dimname"].attrs["DimensionNames"] == [
+            "R" * 100,
+            "Variables",
+        ]
