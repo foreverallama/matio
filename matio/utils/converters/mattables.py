@@ -8,7 +8,7 @@ import pandas as pd
 from matio.utils.converters.mattimes import caldur_dtype
 from matio.utils.matclass import EmptyMatStruct, MatConvertError, MatConvertWarning
 
-TABLE_VERSION = 4
+TABLE_VERSION = 5
 MIN_TABLE_VERSION = 1
 
 TIMETABLE_VERSION = 6
@@ -21,7 +21,7 @@ MIN_TIMETABLE_VERSION = 2
 pd.options.future.infer_string = True
 
 
-def add_table_props(df, tab_props):
+def add_table_props(df, tab_props, ver):
     """Add MATLAB table properties to pandas DataFrame
     These properties are mostly cell arrays of character vectors
     """
@@ -41,9 +41,15 @@ def add_table_props(df, tab_props):
     df.attrs["VariableContinuity"] = [
         s.item() if s.size > 0 else "" for s in tab_props["VariableContinuity"].ravel()
     ]
+
+    if ver >= 5 and tab_props["useDimensionNames2048"].item():
+        dimension_names = tab_props["DimensionNames2048"]
+    else:
+        dimension_names = tab_props["DimensionNames"]
     df.attrs["DimensionNames"] = [
-        s.item() if s.size > 0 else "" for s in tab_props["DimensionNames"].ravel()
+        s.item() if s.size > 0 else "" for s in dimension_names.ravel()
     ]
+
     df.attrs["UserData"] = tab_props["UserData"]
 
     return df
@@ -113,7 +119,13 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     data = props.get("data")
     nvars = int(props.get("nvars").item())
-    varnames = props.get("varnames")
+
+    # MATLAB 2025a supports variable names up to 2048 chars
+    if table_attrs[0, 0]["useVariableNames2048"].item():
+        varnames = table_attrs[0, 0]["VariableNames2048"]
+    else:
+        varnames = props.get("varnames")
+
     df = to_dataframe(data, nvars, varnames)
 
     # Add df.index
@@ -126,7 +138,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
-        df = add_table_props(df, table_attrs)
+        df = add_table_props(df, table_attrs, ver)
 
     return df
 
