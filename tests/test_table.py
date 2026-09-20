@@ -478,15 +478,14 @@ class TestSaveMatlabTable:
 
 tablev5_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
 
+
 @pytest.mark.parametrize("filename, version", tablev5_files)
 class TestLoadMatlabTableV5:
 
     def test_table_v5_long_varname(self, filename, version):
         """Test reading table with variable names longer than 63 characters"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        mdict = load_from_mat(
-            file_path, variable_names=["table_v5_long_varname"]
-        )
+        mdict = load_from_mat(file_path, variable_names=["table_v5_long_varname"])
         assert "table_v5_long_varname" in mdict
 
         long_name = "A" * 100
