@@ -503,3 +503,57 @@ class TestSaveMatlabTimetable:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+timetablev7_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
+
+
+@pytest.mark.parametrize("filename, version", timetablev7_files)
+class TestLoadMatlabTimetableV7:
+
+    def test_timetable_v7_long_varname(self, filename, version):
+        """Test reading timetable with variable names longer than 63 characters"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["timetable_v7_long_varname"],
+        )
+        assert "timetable_v7_long_varname" in mdict
+
+        long_name = "A" * 100
+        df = pd.DataFrame(
+            {long_name: [1.0, 2.0, 3.0]},
+            index=pd.Index(
+                np.array(
+                    ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    dtype="datetime64[ns]",
+                ),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            mdict["timetable_v7_long_varname"], df, check_like=True
+        )
+
+    def test_timetable_v7_long_dimname(self, filename, version):
+        """Test reading timetable with dimension names longer than 63 characters"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["timetable_v7_long_dimname"],
+        )
+        assert "timetable_v7_long_dimname" in mdict
+
+        df = pd.DataFrame(
+            {"Value": [1.0, 2.0, 3.0]},
+            index=pd.Index(
+                np.array(
+                    ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    dtype="datetime64[ns]",
+                ),
+                name="R" * 100,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            mdict["timetable_v7_long_dimname"], df, check_like=True
+        )
