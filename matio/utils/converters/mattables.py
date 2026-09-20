@@ -43,7 +43,7 @@ def add_table_props(df, tab_props, ver):
         s.item() if s.size > 0 else "" for s in tab_props["VariableContinuity"].ravel()
     ]
 
-    if ver >= 5 and tab_props["useDimensionNames2048"].item():
+    if ver >= TABLE_LOAD_VERSION and tab_props["useDimensionNames2048"].item():
         dimension_names = tab_props["DimensionNames2048"]
     else:
         dimension_names = tab_props["DimensionNames"]
