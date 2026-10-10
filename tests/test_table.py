@@ -521,9 +521,7 @@ class TestSaveMatlabTableChar:
             )
 
             for key in mdict:
-                pd.testing.assert_frame_equal(
-                    mdict[key], mload[key], check_like=True
-                )
+                pd.testing.assert_frame_equal(mdict[key], mload[key], check_like=True)
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
