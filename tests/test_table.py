@@ -474,3 +474,54 @@ class TestSaveMatlabTable:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+char_files = [("test_table_char_v7.mat", "v7"), ("test_table_char_v73.mat", "v7.3")]
+
+
+@pytest.mark.parametrize("filename, version", char_files)
+class TestLoadMatlabTableChar:
+
+    def test_table_char(self, filename, version):
+        """Test reading table with char array column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_char"])
+        assert "table_char" in mdict
+
+        df = pd.DataFrame({"Code": ["ab ", "cde"], "Value": [1.0, 2.0]})
+        pd.testing.assert_frame_equal(mdict["table_char"], df, check_like=True)
+
+    def test_table_char_single(self, filename, version):
+        """Test reading table with single char column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_char_single"])
+        assert "table_char_single" in mdict
+
+        df = pd.DataFrame({"Code": ["a", "b"]})
+        pd.testing.assert_frame_equal(mdict["table_char_single"], df, check_like=True)
+
+
+@pytest.mark.parametrize("filename, version", char_files)
+class TestSaveMatlabTableChar:
+
+    def test_table_char_roundtrip(self, filename, version):
+        """Test writing and reading table with char array columns."""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["table_char", "table_char_single"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["table_char", "table_char_single"]
+            )
+
+            for key in mdict:
+                pd.testing.assert_frame_equal(mdict[key], mload[key], check_like=True)
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
