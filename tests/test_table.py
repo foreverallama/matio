@@ -499,3 +499,31 @@ class TestLoadMatlabTableChar:
 
         df = pd.DataFrame({"Code": ["a", "b"]})
         pd.testing.assert_frame_equal(mdict["table_char_single"], df, check_like=True)
+
+
+@pytest.mark.parametrize("filename, version", char_files)
+class TestSaveMatlabTableChar:
+
+    def test_table_char_roundtrip(self, filename, version):
+        """Test writing and reading table with char array columns."""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["table_char", "table_char_single"]
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(
+                temp_file_path, variable_names=["table_char", "table_char_single"]
+            )
+
+            for key in mdict:
+                pd.testing.assert_frame_equal(
+                    mdict[key], mload[key], check_like=True
+                )
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
