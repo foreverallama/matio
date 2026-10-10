@@ -93,7 +93,7 @@ def mat_caldur_to_numpy(arr):
     """Converts MATLAB caledarDuration struct to numpy timedelta record"""
 
     def _broadcast_to_ref(x, dtype):
-        x = np.asarray(x)
+        x = np.asarray(x).astype(int)
         if x.size == 1:
             return np.full(ref_shape, x.item(), dtype=dtype)
         return x.astype(dtype)
