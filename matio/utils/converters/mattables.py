@@ -159,7 +159,8 @@ def get_row_times(row_times, num_rows):
             # calendarDuration
             # Only one of months, days, or millis is non-zero array
             for field in comps.dtype.names:
-                if np.any(comps[field] != 0):
+                unit = np.datetime_data(comps[field].dtype)[0]
+                if np.any(comps[field] != np.timedelta64(0, unit)):
                     step = comps[field]
                     break
             if step is None:
