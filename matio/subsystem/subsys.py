@@ -68,6 +68,7 @@ class MatSubsystem:
         self.dynprop_metadata = []
         self._u6_metadata = None  # Unknown Object Metadata
         self._u7_metadata = None  # Unknown Object Metadata
+        self._record_offsets = {}  # Cached record offsets per metadata region
 
         self.mcos_props_saved = []
 
@@ -212,6 +213,7 @@ class MatSubsystem:
             count=(region_offsets[5] - region_offsets[4]) // 4,
             offset=region_offsets[4],
         )
+        self._record_offsets = {}
 
         # Following may be reserved in some versions
         # Unknown data, kept raw
@@ -376,19 +378,36 @@ class MatSubsystem:
 
         return prop_map
 
+    def get_record_offset(self, region, metadata, record_id, nfields, first_offset):
+        """Returns the offset of a variable-length record in a metadata region
+
+        Each record is a count followed by count * nfields values, padded to an
+        even length. Offsets are cached while walking, so looking up every
+        object in a file is O(n) instead of O(n^2). first_offset is only used
+        when the region is walked for the first time.
+        """
+
+        offsets = self._record_offsets.setdefault(region, [first_offset])
+        while len(offsets) <= record_id:
+            offset = offsets[-1]
+            offset += 1 + nfields * metadata[offset]
+            offset += offset % 2  # Padding
+            offsets.append(offset)
+
+        return offsets[record_id]
+
     def get_property_idxs(self, obj_type_id, saveobj_ret_type):
         """Returns the property (name, type, value) metadata for an object ID"""
 
+        region = "saveobj" if saveobj_ret_type else "nobj"
         prop_field_idxs = (
             self.saveobj_metadata if saveobj_ret_type else self.nobj_metadata
         )
 
         nfields = 3
-        offset = prop_field_idxs[0]
-        for _ in range(obj_type_id):
-            nprops = prop_field_idxs[offset]
-            offset += 1 + nfields * nprops
-            offset += offset % 2  # Padding
+        offset = self.get_record_offset(
+            region, prop_field_idxs, obj_type_id, nfields, prop_field_idxs[0]
+        )
 
         nprops = prop_field_idxs[offset]
         offset += 1
@@ -436,11 +455,7 @@ class MatSubsystem:
             # Newer versions don't write dynamic property metadata for some builtin types like string
             return {}
 
-        offset = 0
-        for i in range(dep_id):
-            nprops = self.dynprop_metadata[offset]
-            offset += 1 + nprops
-            offset += offset % 2  # Padding
+        offset = self.get_record_offset("dynprop", self.dynprop_metadata, dep_id, 1, 0)
 
         ndynprops = self.dynprop_metadata[offset]
         offset += 1
