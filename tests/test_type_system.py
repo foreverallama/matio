@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pytest
 
 from matio import load_from_mat
@@ -27,3 +28,9 @@ class TestLoadTypeSystems:
         assert mdict["handletype"].classname == "COM.Excel_Application"
         assert mdict["javatype"].type_system == "java"
         assert mdict["handletype"].type_system == "handle"
+
+        handle_properties = mdict["handletype"].properties
+        assert handle_properties.shape == (139, 1)
+        assert isinstance(handle_properties[0, 0], np.ndarray)
+        assert handle_properties[0, 0].shape == (4520, 1)
+        assert handle_properties[0, 0].dtype == np.uint8
