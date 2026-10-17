@@ -325,7 +325,14 @@ class MatRead7:
                 metadata = obj[()].T
         else:
             metadata = obj[()].T
-        return self.subsystem.load_opaque_object(metadata, type_system, classname)
+
+        if type_system == "handle":
+            handle_data = self.read_cell(obj)
+            return self.subsystem.load_opaque_object(
+                handle_data, type_system, classname
+            )
+        else:
+            return self.subsystem.load_opaque_object(metadata, type_system, classname)
 
     def read_h5_data(self, obj):
         """Reads data from the HDF5 object."""
