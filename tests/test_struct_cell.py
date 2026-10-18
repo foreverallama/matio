@@ -566,3 +566,34 @@ class TestSaveStructCell:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+def test_struct_duplicate_fieldnames():
+    """Test reading struct with duplicate field names from v7 MAT-file"""
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        # Duplicate field names cannot be saved, so patch unique names in the file
+        fields = {"a0": 0.0, "b0": 1.0, "a1": 2.0, "a2": 3.0, "b1": 4.0, "c0": 5.0}
+        save_to_mat(temp_file_path, {"s": fields}, version="v7", do_compression=False)
+        with open(temp_file_path, "rb") as f:
+            contents = f.read()
+        for name in fields:
+            key = name.encode() + b"\x00"
+            assert contents.count(key) == 1
+            contents = contents.replace(key, key[:1] + b"\x00\x00")
+        with open(temp_file_path, "wb") as f:
+            f.write(contents)
+
+        mload = load_from_mat(temp_file_path)
+
+        # Repeats of a name are numbered per name, in order of appearance
+        names = ("a", "b", "_1_a", "_2_a", "_1_b", "c")
+        assert mload["s"].dtype.names == names
+        for name, value in zip(names, fields.values()):
+            assert mload["s"][name][0, 0][0, 0] == value
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
