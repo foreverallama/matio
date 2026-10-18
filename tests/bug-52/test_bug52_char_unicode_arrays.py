@@ -78,6 +78,24 @@ def test_write_char(filename, version):
             os.remove(temp_file_path)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_write_char_latin1(version):
+    """Test writing char data with all characters below 256"""
+    char_latin1 = np.array(["Café naïve résumé 25 °C"])
+
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        save_to_mat(temp_file_path, {"a": char_latin1}, version=version)
+        mload = load_from_mat(temp_file_path)
+        np.testing.assert_array_equal(mload["a"], char_latin1, strict=True)
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+
 # Using some old files from MAT.jl
 
 simple_string = np.array(["the quick brown fox"])

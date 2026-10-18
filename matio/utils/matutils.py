@@ -82,7 +82,7 @@ def encode_char_arrays(arr):
     for i, units in enumerate(encoded):
         out[i, : len(units)] = units  # pad with zeros if shorter than max_units
 
-    if max_val <= 255:
+    if max_val <= 127:  # uint8 is written as miUTF8, so only ASCII fits
         out = out.astype(np.uint8)
 
     reshaped = out.reshape(arr.shape + (max_units,), order="F")
