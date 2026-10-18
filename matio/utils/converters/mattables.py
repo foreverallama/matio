@@ -6,7 +6,12 @@ import numpy as np
 import pandas as pd
 
 from matio.utils.converters.mattimes import caldur_dtype
-from matio.utils.matclass import EmptyMatStruct, MatConvertError, MatConvertWarning
+from matio.utils.matclass import (
+    EmptyMatStruct,
+    MatConvertError,
+    MatConvertWarning,
+    MatlabOpaque,
+)
 
 TABLE_LOAD_VERSION = 5
 TABLE_SAVE_VERSION = 4
@@ -320,20 +325,29 @@ def make_table_props():
     return props
 
 
+def get_column_data(col):
+    """Converts a pandas Series to a column variable of a MATLAB table"""
+
+    if isinstance(col.dtype, pd.StringDtype):
+        # Covers both "str" (NaN) and "string" (pd.NA) dtypes
+        return col.to_numpy(
+            dtype=np.dtypes.StringDType(na_object=np.nan), na_value=np.nan
+        ).reshape(-1, 1)
+
+    if isinstance(col.dtype, pd.CategoricalDtype):
+        props = categorical_to_mat(col.array)
+        props["codes"] = props["codes"].reshape(-1, 1)
+        return MatlabOpaque(properties=props, classname="categorical")
+
+    return col.to_numpy().reshape(-1, 1)
+
+
 def table_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB table"""
 
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
-        if df[col].dtype == "str":
-            coldata = (
-                df[col]
-                .to_numpy(dtype=np.dtypes.StringDType(na_object=np.nan))
-                .reshape(-1, 1)
-            )
-        else:
-            coldata = df[col].to_numpy().reshape(-1, 1)
-        data[0, i] = coldata
+        data[0, i] = get_column_data(df[col])
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])
@@ -400,15 +414,7 @@ def timetable_to_mat(df):
 
     data = np.empty((1, len(df.columns)), dtype=object)
     for i, col in enumerate(df.columns):
-        if df[col].dtype == "str":
-            coldata = (
-                df[col]
-                .to_numpy(dtype=np.dtypes.StringDType(na_object=np.nan))
-                .reshape(-1, 1)
-            )
-        else:
-            coldata = df[col].to_numpy().reshape(-1, 1)
-        data[0, i] = coldata
+        data[0, i] = get_column_data(df[col])
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])

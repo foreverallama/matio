@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattables import table_to_mat
 from matio.utils.matclass import MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
@@ -253,6 +254,37 @@ class TestSaveMatlabTable:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_table_string_dtype(self, filename, version):
+        """Test writing table with pandas "string" column to MAT-file"""
+        df = pd.DataFrame({"s": pd.array(["a", None, "bc"], dtype="string")})
+        mdict = {"table_string_dtype": df}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_string_dtype"])
+
+            expected = pd.DataFrame({"s": pd.array(["a", np.nan, "bc"], dtype="str")})
+            pd.testing.assert_frame_equal(expected, mload["table_string_dtype"])
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_categorical_column(self, filename, version):
+        """Test converting table with categorical column for writing"""
+        df = pd.DataFrame({"c": pd.Categorical(["low", "high", None])})
+
+        coldata = table_to_mat(df)["data"][0, 0]
+
+        assert isinstance(coldata, MatlabOpaque)
+        assert coldata.classname == "categorical"
+        np.testing.assert_array_equal(
+            coldata.properties["codes"], np.array([[2], [1], [0]], dtype=np.uint8)
+        )
 
     def test_table_empty(self, filename, version):
         """Test writing empty table to MAT-file"""
