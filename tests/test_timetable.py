@@ -664,3 +664,34 @@ class TestLoadMatlabTimetableSteps:
         pd.testing.assert_frame_equal(
             mdict["timetable_sample_rate"], df, check_like=True
         )
+
+
+categorical_files = [
+    ("test_table_categorical_v7.mat", "v7"),
+    ("test_table_categorical_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", categorical_files)
+class TestLoadMatlabTimetableCategorical:
+
+    def test_timetable_categorical(self, filename, version):
+        """Test reading timetable with categorical column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_categorical"])
+        assert "timetable_categorical" in mdict
+
+        df = pd.DataFrame(
+            {
+                "Level": pd.Categorical(
+                    ["low", "high", "low"], categories=["high", "low"]
+                ),
+            },
+            index=pd.Index(
+                np.array([1, 2, 3], dtype="timedelta64[s]"),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            mdict["timetable_categorical"], df, check_like=True
+        )

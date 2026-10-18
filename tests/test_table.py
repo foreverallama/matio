@@ -598,3 +598,29 @@ class TestLoadMatlabTableNameClash:
             }
         )
         pd.testing.assert_frame_equal(mdict["table_name_clash"], df, check_like=True)
+
+
+categorical_files = [
+    ("test_table_categorical_v7.mat", "v7"),
+    ("test_table_categorical_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", categorical_files)
+class TestLoadMatlabTableCategorical:
+
+    def test_table_categorical(self, filename, version):
+        """Test reading table with categorical column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_categorical"])
+        assert "table_categorical" in mdict
+
+        df = pd.DataFrame(
+            {
+                "Level": pd.Categorical(
+                    ["low", "high", "low"], categories=["high", "low"]
+                ),
+                "Value": np.array([1.0, 2.0, 3.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(mdict["table_categorical"], df, check_like=True)

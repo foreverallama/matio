@@ -94,7 +94,8 @@ def to_dataframe(data, nvars, varnames):
     for i in range(nvars):
         vname = varnames[0, i].item()
         coldata = data[0, i]
-        if isinstance(coldata, np.ndarray):
+        # categorical columns are 2D pandas Categoricals
+        if isinstance(coldata, (np.ndarray, pd.Categorical)):
             if coldata.ndim == 1:
                 # char columns are decoded to one string per row
                 rows[vname] = make_series(coldata, coldata.dtype.kind)
