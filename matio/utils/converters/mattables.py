@@ -459,7 +459,8 @@ def categorical_to_mat(cat):
     """Converts a pandas Categorical to a MATLAB categorical"""
 
     category_names = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
-    codes = cat.codes.astype("int8") + 1  # 1-based indexing
+    # 1-based indexing, as the smallest unsigned integer type that fits all categories
+    codes = (cat.codes + 1).astype(np.min_scalar_type(len(cat.categories)))
     is_ordinal = np.bool_(cat.ordered)
     is_protected = np.bool_(False)  # not supported in pandas
 

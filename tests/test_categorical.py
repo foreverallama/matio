@@ -470,3 +470,26 @@ class TestSaveMatlabCategorical:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_categorical_many_categories(self, filename, version):
+        """Test writing categorical with more than 127 categories to MAT-file"""
+        cat = pd.Categorical([f"c{i:03d}" for i in range(300)] + [None])
+        mdict = {"cat_many": cat}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["cat_many"])
+
+            np.testing.assert_array_equal(
+                mload["cat_many"].codes, cat.codes.reshape(1, -1)
+            )
+            np.testing.assert_array_equal(
+                mload["cat_many"].categories, cat.categories, strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
