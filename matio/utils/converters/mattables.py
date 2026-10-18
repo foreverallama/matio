@@ -95,6 +95,9 @@ def to_dataframe(data, nvars, varnames):
     def make_series(col, dtype_kind):
         if dtype_kind == "T":
             return pd.Series(col, dtype="str")
+        elif dtype_kind == "V":
+            # struct arrays are split into one 1x1 struct per row
+            return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
         else:
             return pd.Series(col)
 

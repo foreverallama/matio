@@ -673,3 +673,32 @@ class TestLoadMatlabTableOriginalNames:
             "Row Id",
             "Variables",
         ]
+
+
+struct_files = [
+    ("test_table_struct_v7.mat", "v7"),
+    ("test_table_struct_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", struct_files)
+class TestLoadMatlabTableStruct:
+
+    def test_table_struct(self, filename, version):
+        """Test reading table with struct array column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_struct"])
+        assert "table_struct" in mdict
+        assert isinstance(mdict["table_struct"], pd.DataFrame)
+
+        np.testing.assert_array_equal(
+            mdict["table_struct"]["Value"], np.array([3.0, 4.0])
+        )
+
+        col = mdict["table_struct"]["S"]
+        for i, (a, b) in enumerate([(1.0, "x"), (2.0, "y")]):
+            assert isinstance(col[i], np.ndarray)
+            assert col[i].shape == (1, 1)
+            assert set(col[i].dtype.names) == {"a", "b"}
+            np.testing.assert_array_equal(col[i]["a"][0, 0], np.array([[a]]))
+            np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
