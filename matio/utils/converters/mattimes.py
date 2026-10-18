@@ -50,6 +50,28 @@ def mat_to_datetime(props, **_kwargs):
     return total_ns.astype("datetime64[ns]")
 
 
+def count_to_timedelta(count, unit, millis):
+    """Cast to the coarsest of unit, ms, us, ns that holds the values exactly"""
+
+    finite = np.isfinite(millis)
+    candidates = [
+        (count, unit),
+        (millis, "ms"),
+        (millis * 1e3, "us"),
+        (millis * 1e6, "ns"),
+    ]
+    result = None
+    for values, values_unit in candidates:
+        if np.any(np.abs(values[finite]) >= 2**63):
+            break  # this and finer units overflow int64
+        result = np.round(values).astype(f"timedelta64[{values_unit}]")
+        if np.all(values[finite] == np.round(values[finite])):
+            break
+    if result is None:
+        result = count.astype(f"timedelta64[{unit}]")
+    return result
+
+
 def mat_to_duration(props, **_kwargs):
     """Convert MATLAB duration to Numpy timedelta64 array"""
 
@@ -59,26 +81,26 @@ def mat_to_duration(props, **_kwargs):
 
     fmt = props.get("fmt", None)
     if fmt is None:
-        return millis.astype("timedelta64[ms]")
+        return count_to_timedelta(millis, "ms", millis)
 
     if fmt == "s":
         count = millis / 1000  # Seconds
-        dur = count.astype("timedelta64[s]")
+        dur = count_to_timedelta(count, "s", millis)
     elif fmt == "m":
         count = millis / (1000 * 60)  # Minutes
-        dur = count.astype("timedelta64[m]")
+        dur = count_to_timedelta(count, "m", millis)
     elif fmt == "h":
         count = millis / (1000 * 60 * 60)  # Hours
-        dur = count.astype("timedelta64[h]")
+        dur = count_to_timedelta(count, "h", millis)
     elif fmt == "d":
         count = millis / (1000 * 60 * 60 * 24)  # Days
-        dur = count.astype("timedelta64[D]")
+        dur = count_to_timedelta(count, "D", millis)
     elif fmt == "y":
-        count = millis / (1000 * 60 * 60 * 24 * 365)  # Years
-        dur = count.astype("timedelta64[Y]")
+        count = millis / (1000 * 60 * 60 * 24 * 365.2425)  # Years like MATLAB
+        dur = count_to_timedelta(count, "Y", millis)
     else:
         count = millis
-        dur = count.astype("timedelta64[ms]")
+        dur = count_to_timedelta(count, "ms", millis)
         warnings.warn(
             f"mat_to_duration: Unknown format '{fmt}'. Defaulting to 'ms'.",
             MatConvertWarning,

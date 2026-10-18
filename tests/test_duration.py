@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattimes import mat_to_duration
 from matio.utils.matclass import MatConvertWarning
 
 files = [("test_time_v7.mat", "v7"), ("test_time_v73.mat", "v7.3")]
@@ -12,6 +13,14 @@ files = [("test_time_v7.mat", "v7"), ("test_time_v73.mat", "v7.3")]
 # Notes
 # During load, fallback subdtype is 'ms'
 # However, during save, fallback is 's' as required by MATLAB
+
+
+def test_duration_fractional_beyond_ns_range():
+    """Test reading durations that are not whole seconds and too long for ns"""
+    props = {"millis": np.array([[1e13, 1500.0]]), "fmt": "s"}
+
+    dur = np.array([[10**13, 1500]], dtype="timedelta64[ms]")
+    np.testing.assert_array_equal(mat_to_duration(props), dur, strict=True)
 
 
 @pytest.mark.parametrize("filename, version", files)
@@ -272,6 +281,32 @@ class TestSaveMatlabDuration:
             np.testing.assert_array_equal(
                 mdict["dur_hms"].astype("timedelta64[s]"), mload["dur_hms"], strict=True
             )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    @pytest.mark.parametrize(
+        "dur",
+        [
+            np.array([[100, 1500, 2000]], dtype="timedelta64[ms]"),
+            np.array([[1, 2500]], dtype="timedelta64[us]"),
+            np.array([[1, 1500]], dtype="timedelta64[ns]"),
+        ],
+    )
+    def test_duration_fractional(self, filename, version, dur):
+        """Test writing durations that are not whole seconds to MAT-file"""
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatConvertWarning, match="duration_to_mat"):
+                save_to_mat(temp_file_path, {"dur": dur}, version=version)
+
+            mload = load_from_mat(temp_file_path, variable_names=["dur"])
+
+            np.testing.assert_array_equal(mload["dur"], dur, strict=True)
 
         finally:
             if os.path.exists(temp_file_path):
