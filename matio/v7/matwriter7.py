@@ -28,6 +28,7 @@ from matio.utils.matheaders import (
     MAT_FILE_VERSIONS,
     MAT_HDF_ATTRS,
     MAT_HDF_COMPRESSION,
+    MAT_HDF_COMPRESSION_MIN_BYTES,
     MAT_HDF_COMPRESSION_OPTS,
     MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
@@ -92,6 +93,16 @@ class MatWrite7:
         """Adds MATLAB empty attribute to the dataset."""
         dset.attrs.create(MAT_HDF_ATTRS.EMPTY, np.int32(1))
 
+    def get_compression_kwargs(self, data):
+        """MATLAB only compresses datasets larger than 10000 bytes"""
+        if data.nbytes <= MAT_HDF_COMPRESSION_MIN_BYTES:
+            return {}
+        return {
+            "compression": MAT_HDF_COMPRESSION,
+            "compression_opts": MAT_HDF_COMPRESSION_OPTS,
+            "chunks": True,
+        }
+
     def add_classname_attr(self, dset, classname):
         """Adds MATLAB class name attribute to the dataset."""
         dset.attrs.create(MAT_HDF_ATTRS.CLASS, np.bytes_(classname))
@@ -120,9 +131,7 @@ class MatWrite7:
             dset = parent.create_dataset(
                 var_name,
                 data=data.T,
-                compression=MAT_HDF_COMPRESSION,
-                compression_opts=MAT_HDF_COMPRESSION_OPTS,
-                chunks=True,
+                **self.get_compression_kwargs(data),
             )
 
         self.add_classname_attr(dset, classname)
@@ -147,9 +156,7 @@ class MatWrite7:
             dset = parent.create_dataset(
                 var_name,
                 data=data.T,
-                compression=MAT_HDF_COMPRESSION,
-                compression_opts=MAT_HDF_COMPRESSION_OPTS,
-                chunks=True,
+                **self.get_compression_kwargs(data),
             )
 
         self.add_classname_attr(dset, MatlabClasses.CHAR)
@@ -299,24 +306,18 @@ class MatWrite7:
         sparse_group.create_dataset(
             "jc",
             data=jc,
-            compression=MAT_HDF_COMPRESSION,
-            compression_opts=MAT_HDF_COMPRESSION_OPTS,
-            chunks=True,
+            **self.get_compression_kwargs(jc),
         )
         if data.size > 0:
             sparse_group.create_dataset(
                 "data",
                 data=data,
-                compression=MAT_HDF_COMPRESSION,
-                compression_opts=MAT_HDF_COMPRESSION_OPTS,
-                chunks=True,
+                **self.get_compression_kwargs(data),
             )
             sparse_group.create_dataset(
                 "ir",
                 data=ir,
-                compression=MAT_HDF_COMPRESSION,
-                compression_opts=MAT_HDF_COMPRESSION_OPTS,
-                chunks=True,
+                **self.get_compression_kwargs(ir),
             )
 
         self.add_classname_attr(sparse_group, classname)
