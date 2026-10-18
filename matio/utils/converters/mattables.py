@@ -420,7 +420,14 @@ def timetable_to_mat(df):
         [np.array([dim1]), np.array(["Variables"])], dtype=object
     ).reshape((1, 2))
 
-    if isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
+    if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:
+        warnings.warn(
+            f"timetable_to_mat: Row times with timezone '{df.index.tz}' are converted to UTC. "
+            "The timezone information will be lost.",
+            MatConvertWarning,
+        )
+        rowtimes = df.index.tz_convert(None).to_numpy()
+    elif isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
         rowtimes = df.index.to_numpy()
     else:
         raise MatConvertError(
