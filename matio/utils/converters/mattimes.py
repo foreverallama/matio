@@ -41,15 +41,14 @@ def mat_to_datetime(props, **_kwargs):
     nat = np.isnan(data.real)
     data = np.where(nat, 0, data)
 
+    ms_frac, ms_int_float = np.modf(data.real)
     if np.iscomplexobj(data):
-        # Not sure what the complex part represents
-        # probably holding some type of sub-ms precision which might be lost?
-        total_ns = (data.real + data.imag) * 1e6
-    else:
-        ms_frac, ms_int_float = np.modf(data)
-        ns_int = ms_int_float.astype(np.int64) * 1000_000
-        ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
-        total_ns = ns_int + ns_frac
+        # MATLAB keeps sub-ms precision as a double-double:
+        # the imaginary part is the rounding error of the real part
+        ms_frac = ms_frac + data.imag
+    ns_int = ms_int_float.astype(np.int64) * 1000_000
+    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
+    total_ns = ns_int + ns_frac
 
     dt = total_ns.astype("datetime64[ns]")
     dt[nat] = np.datetime64("NaT", "ns")
