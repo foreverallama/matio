@@ -163,11 +163,13 @@ def get_row_times(row_times, num_rows):
     start = row_times[0, 0]["origin"]
     if row_times[0, 0]["specifiedAsRate"]:
         fs = row_times[0, 0]["sampleRate"].item()
-        step = np.timedelta64(int(1e9 / fs), "ns")
         warnings.warn(
-            "get_row_times: MATLAB sampleRate is converted to TimeStep in nanoseconds for NumPy compatibility.",
+            "get_row_times: MATLAB sampleRate row times are rounded to nanoseconds for NumPy compatibility.",
             MatConvertWarning,
         )
+        # Row k is at k / fs, adding a rounded step would drift over many rows
+        offsets = np.round(np.arange(num_rows) * (1e9 / fs)).astype("timedelta64[ns]")
+        return (start + offsets).ravel()
     else:
         step = None
         comps = row_times[0, 0]["stepSize"]

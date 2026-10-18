@@ -612,3 +612,23 @@ class TestLoadMatlabTimetableSteps:
             index=pd.Index(np.array(row_times, dtype="datetime64[ns]"), name="Time"),
         )
         pd.testing.assert_frame_equal(mdict[var_name], df, check_like=True)
+
+    def test_timetable_sample_rate_no_drift(self, filename, version):
+        """Test row times of timetables with SampleRate are k / fs without drift"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with pytest.warns(MatConvertWarning, match="get_row_times"):
+            mdict = load_from_mat(file_path, variable_names=["timetable_sample_rate"])
+        assert "timetable_sample_rate" in mdict
+
+        df = pd.DataFrame(
+            {"data1": [1.0, 2.0, 3.0, 4.0]},
+            index=pd.Index(
+                np.array(
+                    [0, 333333333, 666666667, 1000000000], dtype="timedelta64[ns]"
+                ),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            mdict["timetable_sample_rate"], df, check_like=True
+        )
