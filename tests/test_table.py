@@ -624,3 +624,38 @@ class TestLoadMatlabTableCategorical:
             }
         )
         pd.testing.assert_frame_equal(mdict["table_categorical"], df, check_like=True)
+
+
+original_names_files = [
+    ("test_table_original_names_v7.mat", "v7"),
+    ("test_table_original_names_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", original_names_files)
+class TestLoadMatlabTableOriginalNames:
+
+    def test_table_original_names(self, filename, version):
+        """Test reading table with names that are not valid identifiers"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["table_original_names"],
+            add_table_attrs=True,
+        )
+        assert "table_original_names" in mdict
+
+        df = pd.DataFrame(
+            {
+                "p [bar]": np.array([1.0, 2.0]),
+                "x(1)": np.array([3.0, 4.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            mdict["table_original_names"], df, check_like=True
+        )
+
+        assert mdict["table_original_names"].attrs["DimensionNames"] == [
+            "Row Id",
+            "Variables",
+        ]

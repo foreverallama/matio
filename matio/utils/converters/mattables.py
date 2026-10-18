@@ -23,6 +23,13 @@ MIN_TIMETABLE_VERSION = 2
 pd.options.future.infer_string = True
 
 
+def use_original_names(props, flag):
+    """Checks if names that are not valid identifiers are saved as original names
+    MATLAB 2019b allows any table variable and dimension names
+    """
+    return flag in props.dtype.names and props[flag].item()
+
+
 def add_table_props(df, tab_props, ver):
     """Add MATLAB table properties to pandas DataFrame
     These properties are mostly cell arrays of character vectors
@@ -46,6 +53,8 @@ def add_table_props(df, tab_props, ver):
 
     if ver >= TABLE_LOAD_VERSION and tab_props["useDimensionNames2048"].item():
         dimension_names = tab_props["DimensionNames2048"]
+    elif use_original_names(tab_props, "useDimensionNamesOriginal"):
+        dimension_names = tab_props["DimensionNamesOriginal"]
     else:
         dimension_names = tab_props["DimensionNames"]
     df.attrs["DimensionNames"] = [
@@ -135,6 +144,8 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     # MATLAB 2025a supports variable names up to 2048 chars
     if ver >= TABLE_LOAD_VERSION and table_attrs[0, 0]["useVariableNames2048"].item():
         varnames = table_attrs[0, 0]["VariableNames2048"]
+    elif use_original_names(table_attrs[0, 0], "useVariableNamesOriginal"):
+        varnames = table_attrs[0, 0]["VariableNamesOriginal"]
     else:
         varnames = props.get("varnames")
 
@@ -241,6 +252,8 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
 
     if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useVarNames2048"].item():
         var_names = timetable_data[0, 0]["varNames2048"]
+    elif use_original_names(timetable_data[0, 0], "useVarNamesOrig"):
+        var_names = timetable_data[0, 0]["varNamesOrig"]
     else:
         var_names = timetable_data[0, 0]["varNames"]
 
@@ -253,6 +266,8 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
 
     if ver >= TIMETABLE_LOAD_VERSION and timetable_data[0, 0]["useDimNames2048"].item():
         dim_names = timetable_data[0, 0]["dimNames2048"]
+    elif use_original_names(timetable_data[0, 0], "useDimNamesOrig"):
+        dim_names = timetable_data[0, 0]["dimNamesOrig"]
     else:
         dim_names = timetable_data[0, 0]["dimNames"]
     df.index = pd.Index(row_times, name=dim_names[0, 0].item())
