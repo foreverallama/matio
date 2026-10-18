@@ -37,6 +37,10 @@ def mat_to_datetime(props, **_kwargs):
             stacklevel=2,
         )
 
+    # MATLAB saves NaT as NaN
+    nat = np.isnan(data.real)
+    data = np.where(nat, 0, data)
+
     if np.iscomplexobj(data):
         # Not sure what the complex part represents
         # probably holding some type of sub-ms precision which might be lost?
@@ -47,7 +51,9 @@ def mat_to_datetime(props, **_kwargs):
         ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
         total_ns = ns_int + ns_frac
 
-    return total_ns.astype("datetime64[ns]")
+    dt = total_ns.astype("datetime64[ns]")
+    dt[nat] = np.datetime64("NaT", "ns")
+    return dt
 
 
 def count_to_timedelta(count, unit, millis):
@@ -159,6 +165,7 @@ def datetime_to_mat(arr):
         millis = dt_int.astype(np.float64) * conversion_factor
     else:
         millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
+    millis = np.where(np.isnat(arr), np.nan, millis)  # MATLAB saves NaT as NaN
 
     tz = np.empty((0, 0), dtype=np.str_)
     fmt = np.empty((0, 0), dtype=np.str_)
