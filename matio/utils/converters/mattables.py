@@ -89,6 +89,7 @@ def to_dataframe(data, nvars, varnames):
         else:
             return pd.Series(col)
 
+    names = {varnames[0, i].item() for i in range(nvars)}
     rows = {}
     for i in range(nvars):
         vname = varnames[0, i].item()
@@ -102,6 +103,11 @@ def to_dataframe(data, nvars, varnames):
             else:
                 for j in range(coldata.shape[1]):
                     colname = f"{vname}_{j + 1}"
+                    # Avoid overwriting other variables, same names as MATLAB splitvars
+                    k = 1
+                    while colname in names or colname in rows:
+                        colname = f"{vname}_{j + 1}_{k}"
+                        k += 1
                     rows[colname] = make_series(coldata[:, j], coldata.dtype.kind)
         else:
             rows[vname] = pd.Series(coldata)

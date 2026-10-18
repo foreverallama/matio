@@ -572,3 +572,29 @@ class TestLoadMatlabTableV5:
             "R" * 100,
             "Variables",
         ]
+
+
+name_clash_files = [
+    ("test_table_name_clash_v7.mat", "v7"),
+    ("test_table_name_clash_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", name_clash_files)
+class TestLoadMatlabTableNameClash:
+
+    def test_table_name_clash(self, filename, version):
+        """Test reading table with split matrix names clashing with a variable"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_name_clash"])
+        assert "table_name_clash" in mdict
+
+        # Same names as MATLAB splitvars
+        df = pd.DataFrame(
+            {
+                "m_1_1": np.array([1.0, 3.0]),
+                "m_2": np.array([2.0, 4.0]),
+                "m_1": np.array([5.0, 6.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(mdict["table_name_clash"], df, check_like=True)
