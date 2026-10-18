@@ -58,6 +58,11 @@ def string_to_mat(arr):
     char_counts = []
 
     for s in arr.ravel(order="F"):
+        if not isinstance(s, str):
+            # Missing string, e.g. NaN in StringDType(na_object=np.nan)
+            utf16_data_list.append(np.empty(0, dtype=np.uint16))
+            char_counts.append(0xFFFFFFFFFFFFFFFF)
+            continue
         utf16_arr = np.frombuffer(s.encode(encoding), dtype=np.uint16)
         utf16_data_list.append(utf16_arr)
         char_counts.append(len(utf16_arr))
