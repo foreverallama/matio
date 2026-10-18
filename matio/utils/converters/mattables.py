@@ -219,7 +219,11 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
-    if ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
+    # Like MATLAB, load newer versions that declare they are compatible with this one
+    min_ver = ver
+    if "minCompatibleVersion" in timetable_data.dtype.names:
+        min_ver = int(timetable_data[0, 0]["minCompatibleVersion"].item())
+    if min_ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
         warnings.warn(
             f"mat_to_timetable: MATLAB timetable version {ver} is not supported.",
             UserWarning,

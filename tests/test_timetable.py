@@ -559,6 +559,38 @@ class TestLoadMatlabTimetableV7:
         )
 
 
+timetablev8_files = [
+    ("test_timetablev8_v7.mat", "v7"),
+    ("test_timetablev8_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", timetablev8_files)
+class TestLoadMatlabTimetableV8:
+
+    @pytest.mark.parametrize(
+        "var_name, col_name",
+        [("timetable_v8", "data1"), ("timetable_v8_long_varname", "A" * 100)],
+    )
+    def test_timetable_v8(self, filename, version, var_name, col_name):
+        """Test reading timetable saved with MATLAB 2026b (version 8)"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert var_name in mdict
+
+        df = pd.DataFrame(
+            {col_name: [1.0, 2.0, 3.0]},
+            index=pd.Index(
+                np.array(
+                    ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    dtype="datetime64[ns]",
+                ),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(mdict[var_name], df, check_like=True)
+
+
 timetable_steps_files = [
     ("test_timetable_steps_v7.mat", "v7"),
     ("test_timetable_steps_v73.mat", "v7.3"),
