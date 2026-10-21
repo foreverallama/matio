@@ -16,6 +16,15 @@ files = [
 @pytest.mark.parametrize("filename, version", files)
 class TestLoadMatlabFunctionHandles:
 
+    def test_fh_empty(self, filename, version):
+        """Test reading function handle empty from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["empty_fh"])
+        assert "empty_fh" in mdict
+        assert isinstance(mdict["empty_fh"], MatlabFunction)
+        assert mdict["empty_fh"].size == 0
+        assert mdict["empty_fh"].shape == (0, 0)
+
     def test_fh_simple(self, filename, version):
         """Test reading function handle simple from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
