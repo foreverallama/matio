@@ -138,7 +138,7 @@ class MatFile5Reader:
             self._matrix_reader.set_stream(self.mat_stream)
         if not mdtype == miTypes.miMATRIX:
             raise TypeError(f"Expecting miMATRIX type here, got {mdtype}")
-        header = self._matrix_reader.read_header(check_stream_limit)
+        header = self._matrix_reader.read_header(check_stream_limit, byte_count)
         return header, next_pos
 
     def read_var_array(self, header, process=True):

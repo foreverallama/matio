@@ -146,6 +146,7 @@ cdef class VarHeader5:
     cdef readonly object name
     cdef readonly object classname
     cdef readonly object type_system
+    cdef readonly long payload_size
     cdef readonly int mclass
     cdef readonly object dims
     cdef cnp.int32_t dims_ptr[_MAT_MAXDIMS]
@@ -560,7 +561,8 @@ cdef class VarReader5:
             byte_count[0] = u4s[1]
         return 0
 
-    cpdef VarHeader5 read_header(self, int check_stream_limit):
+    cpdef VarHeader5 read_header(self, int check_stream_limit,
+                                 long payload_size):
         ''' Return matrix header for current stream position
 
         Returns matrix headers at top level and sub levels
@@ -577,7 +579,10 @@ cdef class VarReader5:
             cnp.uint32_t flags_class, nzmax
             cnp.uint16_t mc
             int i
+            long header_start
+            long remaining_payload
             VarHeader5 header
+        header_start = self.cstream.tell()
         # Read and discard mdtype and byte_count
         self.cstream.read_into(<void *>u4s, 8)
         # get array flags and nzmax
@@ -603,6 +608,7 @@ cdef class VarReader5:
             header.type_system = self.read_int8_string().decode('ascii')
             header.classname = self.read_int8_string().decode('ascii')
             header.dims = None
+            header.payload_size = payload_size - (self.cstream.tell() - header_start)
             return header
 
         header.n_dims = self.read_into_int32s(header.dims_ptr, sizeof(header.dims_ptr))
@@ -616,6 +622,8 @@ cdef class VarReader5:
         if mc == mxOBJECT_CLASS:
             header.classname = self.read_int8_string().decode('ascii')
 
+        remaining_payload = payload_size - (self.cstream.tell() - header_start)
+        header.payload_size = remaining_payload
         return header
 
     cdef inline size_t size_from_header(self, VarHeader5 header) noexcept:
@@ -666,7 +674,7 @@ cdef class VarReader5:
             raise TypeError('Expecting matrix here')
         if byte_count == 0:
             return MatlabCanonicalEmpty()
-        header = self.read_header(False)
+        header = self.read_header(False, byte_count)
         return self.array_from_header(header, process)
 
     cpdef array_from_header(self, VarHeader5 header, int process=1):
@@ -717,7 +725,10 @@ cdef class VarReader5:
             arr = self.read_struct(header)
             arr = MatlabObject(arr, header.classname)
         elif mc == mxFUNCTION_CLASS: # just a matrix of struct type
-            arr = self.read_mi_matrix()
+            if header.payload_size:
+                arr = self.read_mi_matrix()
+            else:
+                arr = EmptyMatStruct(np.empty(header.dims, dtype=object))
             arr = MatlabFunction(arr)
         elif mc == mxOPAQUE_CLASS:
             arr = self.read_opaque(header)
