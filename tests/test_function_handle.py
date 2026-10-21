@@ -109,6 +109,26 @@ class TestLoadMatlabFunctionHandles:
 @pytest.mark.parametrize("filename, version", files)
 class TestSaveMatlabFunctionHandles:
 
+    def test_fh_empty(self, filename, version):
+        """Test writing an empty function handle to a MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["empty_fh"])
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["empty_fh"])
+
+            assert isinstance(mload["empty_fh"], MatlabFunction)
+            assert mload["empty_fh"].size == 0
+            assert mload["empty_fh"].shape == (0, 0)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_fh_simple(self, filename, version):
         """Test writing function handle simple to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
