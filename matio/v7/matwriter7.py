@@ -260,10 +260,11 @@ class MatWrite7:
         """Writes a function handle to the HDF5 file."""
 
         if data.size == 0:
-            warnings.warn(
-                "Empty function handle not supported. Skipping.", MatWriteWarning
-            )
-            return
+            data_empty = self.get_empty_array(data.shape)
+            dset = parent.create_dataset(var_name, data=data_empty)
+            self.add_classname_attr(dset, MatlabClasses.FUNCTION)
+            self.add_empty_attribute(dset)
+            return dset
 
         dset = self.write_struct_array(
             parent, var_name, data, object_decode=ObjectDecodingHint.FUNCTION_HINT

@@ -274,8 +274,13 @@ class MatRead7:
 
         return csc_array((data, ir, jc), shape=(nrows, ncols))
 
-    def read_function_handle(self, obj, object_decode):
+    def read_function_handle(self, obj, object_decode, is_empty=0):
         """Reads MATLAB function handles from the v7.3 MAT-file."""
+
+        if is_empty:
+            # Note: EmptyMatStruct gets overwritten by MatlabFunction
+            # Kept for readability
+            return MatlabFunction(EmptyMatStruct(np.empty(shape=obj[()], dtype=object)))
 
         if object_decode != ObjectDecodingHint.FUNCTION_HINT:
             raise ValueError(
@@ -365,7 +370,7 @@ class MatRead7:
         elif matlab_class == b"cell":
             arr = self.read_cell(obj, is_empty)
         elif matlab_class == b"function_handle":
-            arr = self.read_function_handle(obj, object_decode)
+            arr = self.read_function_handle(obj, object_decode, is_empty)
         elif matlab_class == b"canonical empty" and is_empty:
             arr = MatlabCanonicalEmpty()
         elif object_decode >= 0:

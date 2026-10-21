@@ -379,7 +379,8 @@ class VarWriter5:
     def write_function_handle(self, arr):
         """Write MatlabFunction"""
         self.write_header(matdims(arr, self.oned_as), mxTypes.mxFUNCTION_CLASS)
-        self.write(arr.view(np.ndarray))
+        if arr.size:
+            self.write(arr.view(np.ndarray))
 
     def write_opaque(self, arr):
         """Array Flags, Var Name, Type System, Class Name, Metadata"""
