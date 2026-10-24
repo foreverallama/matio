@@ -131,7 +131,11 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
 
     table_attrs = props.get("props")
     ver = int(table_attrs[0, 0]["versionSavedFrom"].item())
-    if ver > TABLE_LOAD_VERSION:
+    # Like MATLAB, load newer versions that declare they are compatible with this one
+    min_ver = ver
+    if "minCompatibleVersion" in table_attrs.dtype.names:
+        min_ver = int(table_attrs[0, 0]["minCompatibleVersion"].item())
+    if min_ver > TABLE_LOAD_VERSION:
         warnings.warn(
             f"mat_to_table: MATLAB table version {ver} is not supported.",
             UserWarning,

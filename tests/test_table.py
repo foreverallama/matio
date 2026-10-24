@@ -573,6 +573,20 @@ class TestLoadMatlabTableV5:
             "Variables",
         ]
 
+    def test_table_min_compatible_version(self, filename, version, monkeypatch):
+        """Test that tables are loaded based on minCompatibleVersion"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        var_name = "table_v5_long_varname"  # version 5, minCompatibleVersion 1
+
+        monkeypatch.setattr("matio.utils.converters.mattables.TABLE_LOAD_VERSION", 4)
+        mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert isinstance(mdict[var_name], pd.DataFrame)
+
+        monkeypatch.setattr("matio.utils.converters.mattables.TABLE_LOAD_VERSION", 0)
+        with pytest.warns(UserWarning, match="table version 5 is not supported"):
+            mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert not isinstance(mdict[var_name], pd.DataFrame)
+
 
 name_clash_files = [
     ("test_table_name_clash_v7.mat", "v7"),
