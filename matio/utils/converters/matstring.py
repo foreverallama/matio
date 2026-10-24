@@ -7,6 +7,8 @@ import numpy as np
 from matio.utils.matclass import MatConvertWarning
 
 MAT_STRING_VERSION = 1
+# Character count of a missing string (<missing> in MATLAB)
+MAT_STRING_MISSING = 0xFFFFFFFFFFFFFFFF
 
 
 def mat_to_string(props, byte_order, **_kwargs):
@@ -33,7 +35,7 @@ def mat_to_string(props, byte_order, **_kwargs):
     pos = 0
     encoding = "utf-16-le" if byte_order[0] == "<" else "utf-16-be"
     for char_count in char_counts:
-        if char_count == 0xFFFFFFFFFFFFFFFF:
+        if char_count == MAT_STRING_MISSING:
             strings.append(np.nan)
             continue
         byte_length = char_count * 2  # UTF-16 encoding
@@ -61,7 +63,7 @@ def string_to_mat(arr):
         if not isinstance(s, str):
             # Missing string, e.g. NaN in StringDType(na_object=np.nan)
             utf16_data_list.append(np.empty(0, dtype=np.uint16))
-            char_counts.append(0xFFFFFFFFFFFFFFFF)
+            char_counts.append(MAT_STRING_MISSING)
             continue
         utf16_arr = np.frombuffer(s.encode(encoding), dtype=np.uint16)
         utf16_data_list.append(utf16_arr)
