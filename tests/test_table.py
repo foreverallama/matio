@@ -572,3 +572,133 @@ class TestLoadMatlabTableV5:
             "R" * 100,
             "Variables",
         ]
+
+    def test_table_min_compatible_version(self, filename, version, monkeypatch):
+        """Test that tables are loaded based on minCompatibleVersion"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        var_name = "table_v5_long_varname"  # version 5, minCompatibleVersion 1
+
+        monkeypatch.setattr("matio.utils.converters.mattables.TABLE_LOAD_VERSION", 4)
+        mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert isinstance(mdict[var_name], pd.DataFrame)
+
+        monkeypatch.setattr("matio.utils.converters.mattables.TABLE_LOAD_VERSION", 0)
+        with pytest.warns(UserWarning, match="table version 5 is not supported"):
+            mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert not isinstance(mdict[var_name], pd.DataFrame)
+
+
+name_clash_files = [
+    ("test_table_name_clash_v7.mat", "v7"),
+    ("test_table_name_clash_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", name_clash_files)
+class TestLoadMatlabTableNameClash:
+
+    def test_table_name_clash(self, filename, version):
+        """Test reading table with split matrix names clashing with a variable"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_name_clash"])
+        assert "table_name_clash" in mdict
+
+        # Same names as MATLAB splitvars
+        df = pd.DataFrame(
+            {
+                "m_1_1": np.array([1.0, 3.0]),
+                "m_2": np.array([2.0, 4.0]),
+                "m_1": np.array([5.0, 6.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(mdict["table_name_clash"], df, check_like=True)
+
+
+categorical_files = [
+    ("test_table_categorical_v7.mat", "v7"),
+    ("test_table_categorical_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", categorical_files)
+class TestLoadMatlabTableCategorical:
+
+    def test_table_categorical(self, filename, version):
+        """Test reading table with categorical column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_categorical"])
+        assert "table_categorical" in mdict
+
+        df = pd.DataFrame(
+            {
+                "Level": pd.Categorical(
+                    ["low", "high", "low"], categories=["high", "low"]
+                ),
+                "Value": np.array([1.0, 2.0, 3.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(mdict["table_categorical"], df, check_like=True)
+
+
+original_names_files = [
+    ("test_table_original_names_v7.mat", "v7"),
+    ("test_table_original_names_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", original_names_files)
+class TestLoadMatlabTableOriginalNames:
+
+    def test_table_original_names(self, filename, version):
+        """Test reading table with names that are not valid identifiers"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["table_original_names"],
+            add_table_attrs=True,
+        )
+        assert "table_original_names" in mdict
+
+        df = pd.DataFrame(
+            {
+                "p [bar]": np.array([1.0, 2.0]),
+                "x(1)": np.array([3.0, 4.0]),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            mdict["table_original_names"], df, check_like=True
+        )
+
+        assert mdict["table_original_names"].attrs["DimensionNames"] == [
+            "Row Id",
+            "Variables",
+        ]
+
+
+struct_files = [
+    ("test_table_struct_v7.mat", "v7"),
+    ("test_table_struct_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", struct_files)
+class TestLoadMatlabTableStruct:
+
+    def test_table_struct(self, filename, version):
+        """Test reading table with struct array column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["table_struct"])
+        assert "table_struct" in mdict
+        assert isinstance(mdict["table_struct"], pd.DataFrame)
+
+        np.testing.assert_array_equal(
+            mdict["table_struct"]["Value"], np.array([3.0, 4.0])
+        )
+
+        col = mdict["table_struct"]["S"]
+        for i, (a, b) in enumerate([(1.0, "x"), (2.0, "y")]):
+            assert isinstance(col[i], np.ndarray)
+            assert col[i].shape == (1, 1)
+            assert set(col[i].dtype.names) == {"a", "b"}
+            np.testing.assert_array_equal(col[i]["a"][0, 0], np.array([[a]]))
+            np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
