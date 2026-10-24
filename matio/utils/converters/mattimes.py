@@ -37,6 +37,10 @@ def mat_to_datetime(props, **_kwargs):
             stacklevel=2,
         )
 
+    # MATLAB saves NaT as NaN
+    nat = np.isnan(data.real)
+    data = np.where(nat, 0, data)
+
     if np.iscomplexobj(data):
         # Not sure what the complex part represents
         # probably holding some type of sub-ms precision which might be lost?
@@ -47,7 +51,31 @@ def mat_to_datetime(props, **_kwargs):
         ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
         total_ns = ns_int + ns_frac
 
-    return total_ns.astype("datetime64[ns]")
+    dt = total_ns.astype("datetime64[ns]")
+    dt[nat] = np.datetime64("NaT", "ns")
+    return dt
+
+
+def count_to_timedelta(count, unit, millis):
+    """Cast to the coarsest of unit, ms, us, ns that holds the values exactly"""
+
+    finite = np.isfinite(millis)
+    candidates = [
+        (count, unit),
+        (millis, "ms"),
+        (millis * 1e3, "us"),
+        (millis * 1e6, "ns"),
+    ]
+    result = None
+    for values, values_unit in candidates:
+        if np.any(np.abs(values[finite]) >= 2**63):
+            break  # this and finer units overflow int64
+        result = np.round(values).astype(f"timedelta64[{values_unit}]")
+        if np.all(values[finite] == np.round(values[finite])):
+            break
+    if result is None:
+        result = count.astype(f"timedelta64[{unit}]")
+    return result
 
 
 def mat_to_duration(props, **_kwargs):
@@ -59,26 +87,26 @@ def mat_to_duration(props, **_kwargs):
 
     fmt = props.get("fmt", None)
     if fmt is None:
-        return millis.astype("timedelta64[ms]")
+        return count_to_timedelta(millis, "ms", millis)
 
     if fmt == "s":
         count = millis / 1000  # Seconds
-        dur = count.astype("timedelta64[s]")
+        dur = count_to_timedelta(count, "s", millis)
     elif fmt == "m":
         count = millis / (1000 * 60)  # Minutes
-        dur = count.astype("timedelta64[m]")
+        dur = count_to_timedelta(count, "m", millis)
     elif fmt == "h":
         count = millis / (1000 * 60 * 60)  # Hours
-        dur = count.astype("timedelta64[h]")
+        dur = count_to_timedelta(count, "h", millis)
     elif fmt == "d":
         count = millis / (1000 * 60 * 60 * 24)  # Days
-        dur = count.astype("timedelta64[D]")
+        dur = count_to_timedelta(count, "D", millis)
     elif fmt == "y":
-        count = millis / (1000 * 60 * 60 * 24 * 365)  # Years
-        dur = count.astype("timedelta64[Y]")
+        count = millis / (1000 * 60 * 60 * 24 * 365.2425)  # Years like MATLAB
+        dur = count_to_timedelta(count, "Y", millis)
     else:
         count = millis
-        dur = count.astype("timedelta64[ms]")
+        dur = count_to_timedelta(count, "ms", millis)
         warnings.warn(
             f"mat_to_duration: Unknown format '{fmt}'. Defaulting to 'ms'.",
             MatConvertWarning,
@@ -137,6 +165,7 @@ def datetime_to_mat(arr):
         millis = dt_int.astype(np.float64) * conversion_factor
     else:
         millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
+    millis = np.where(np.isnat(arr), np.nan, millis)  # MATLAB saves NaT as NaN
 
     tz = np.empty((0, 0), dtype=np.str_)
     fmt = np.empty((0, 0), dtype=np.str_)

@@ -557,3 +557,110 @@ class TestLoadMatlabTimetableV7:
         pd.testing.assert_frame_equal(
             mdict["timetable_v7_long_dimname"], df, check_like=True
         )
+
+
+timetablev8_files = [
+    ("test_timetablev8_v7.mat", "v7"),
+    ("test_timetablev8_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", timetablev8_files)
+class TestLoadMatlabTimetableV8:
+
+    @pytest.mark.parametrize(
+        "var_name, col_name",
+        [("timetable_v8", "data1"), ("timetable_v8_long_varname", "A" * 100)],
+    )
+    def test_timetable_v8(self, filename, version, var_name, col_name):
+        """Test reading timetable saved with MATLAB 2026b (version 8)"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert var_name in mdict
+
+        df = pd.DataFrame(
+            {col_name: [1.0, 2.0, 3.0]},
+            index=pd.Index(
+                np.array(
+                    ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    dtype="datetime64[ns]",
+                ),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(mdict[var_name], df, check_like=True)
+
+
+timetable_steps_files = [
+    ("test_timetable_steps_v7.mat", "v7"),
+    ("test_timetable_steps_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", timetable_steps_files)
+class TestLoadMatlabTimetableSteps:
+
+    @pytest.mark.parametrize(
+        "var_name, row_times",
+        [
+            (
+                "timetable_step_millis",
+                [
+                    "2020-01-01T00:00:00.25",
+                    "2020-01-01T00:00:00.26",
+                    "2020-01-01T00:00:00.27",
+                ],
+            ),
+            (
+                "timetable_step_start_offset",
+                [
+                    "2020-01-01T00:00:00.25",
+                    "2020-01-01T00:00:01.25",
+                    "2020-01-01T00:00:02.25",
+                ],
+            ),
+            (
+                "timetable_step_years",
+                ["2020-01-01T00:00", "2020-12-31T05:49:12", "2021-12-31T11:38:24"],
+            ),
+            (
+                "timetable_step_caldays",
+                ["2020-01-01T12:30", "2020-01-02T12:30", "2020-01-03T12:30"],
+            ),
+            (
+                "timetable_step_calmonths",
+                ["2020-01-15T12:30", "2020-02-15T12:30", "2020-03-15T12:30"],
+            ),
+        ],
+    )
+    def test_timetable_step_row_times(self, filename, version, var_name, row_times):
+        """Test row times of timetables with TimeStep keep start time and step"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=[var_name])
+        assert var_name in mdict
+
+        df = pd.DataFrame(
+            {"data1": [1.0, 2.0, 3.0]},
+            index=pd.Index(np.array(row_times, dtype="datetime64[ns]"), name="Time"),
+        )
+        pd.testing.assert_frame_equal(mdict[var_name], df, check_like=True)
+
+    def test_timetable_sample_rate_no_drift(self, filename, version):
+        """Test row times of timetables with SampleRate are k / fs without drift"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with pytest.warns(MatConvertWarning, match="get_row_times"):
+            mdict = load_from_mat(file_path, variable_names=["timetable_sample_rate"])
+        assert "timetable_sample_rate" in mdict
+
+        df = pd.DataFrame(
+            {"data1": [1.0, 2.0, 3.0, 4.0]},
+            index=pd.Index(
+                np.array(
+                    [0, 333333333, 666666667, 1000000000], dtype="timedelta64[ns]"
+                ),
+                name="Time",
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            mdict["timetable_sample_rate"], df, check_like=True
+        )

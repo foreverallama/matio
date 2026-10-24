@@ -163,11 +163,13 @@ def get_row_times(row_times, num_rows):
     start = row_times[0, 0]["origin"]
     if row_times[0, 0]["specifiedAsRate"]:
         fs = row_times[0, 0]["sampleRate"].item()
-        step = np.timedelta64(int(1e9 / fs), "ns")
         warnings.warn(
-            "get_row_times: MATLAB sampleRate is converted to TimeStep in nanoseconds for NumPy compatibility.",
+            "get_row_times: MATLAB sampleRate row times are rounded to nanoseconds for NumPy compatibility.",
             MatConvertWarning,
         )
+        # Row k is at k / fs, adding a rounded step would drift over many rows
+        offsets = np.round(np.arange(num_rows) * (1e9 / fs)).astype("timedelta64[ns]")
+        return (start + offsets).ravel()
     else:
         step = None
         comps = row_times[0, 0]["stepSize"]
@@ -183,18 +185,25 @@ def get_row_times(row_times, num_rows):
             if step is None:
                 step = comps[0, 0]["millis"]  # fallback if all are zero
 
-            step_unit = np.datetime_data(step.dtype)[0]
-            start = start.astype(f"datetime64[{step_unit}]")
+            if step.dtype == "timedelta64[M]":
+                # NumPy adds months at month precision, so add back the day and time
+                # MATLAB saves explicit row times if the start day is past the 28th
+                month = start.astype("datetime64[M]")
+                times = (month + step * np.arange(num_rows) + (start - month)).ravel()
+                return times.astype("datetime64[ns]")
         else:
             step = comps
-            step_dtype_unit = np.datetime_data(step.dtype)[0]
 
-            if start.dtype.kind == "m":
-                start_dtype_new = f"timedelta64[{step_dtype_unit}]"
-            else:
-                start_dtype_new = f"datetime64[{step_dtype_unit}]"
-            start = start.astype(start_dtype_new)
+        # MATLAB years are 365.2425 days, NumPy cannot mix them with other units
+        if step.dtype == "timedelta64[Y]":
+            step = step.astype("timedelta64[s]")
+        if start.dtype == "timedelta64[Y]":
+            start = start.astype("timedelta64[s]")
+        if start.dtype.kind == "m" and np.all(start.astype(step.dtype) == start):
+            # Keep the unit of the step if it holds the start time
+            start = start.astype(step.dtype)
 
+    # NumPy uses the finer unit of start and step, so neither is truncated
     times = (start + step * np.arange(num_rows)).ravel()
     if times.dtype.kind == "M":
         # MATLAB saves datetime as [ms] data
@@ -210,7 +219,11 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
         return props
 
     ver = int(timetable_data[0, 0]["versionSavedFrom"].item())
-    if ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
+    # Like MATLAB, load newer versions that declare they are compatible with this one
+    min_ver = ver
+    if "minCompatibleVersion" in timetable_data.dtype.names:
+        min_ver = int(timetable_data[0, 0]["minCompatibleVersion"].item())
+    if min_ver > TIMETABLE_LOAD_VERSION or ver <= MIN_TIMETABLE_VERSION:
         warnings.warn(
             f"mat_to_timetable: MATLAB timetable version {ver} is not supported.",
             UserWarning,

@@ -145,3 +145,22 @@ class TestSaveMatlabDatetime:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    @pytest.mark.parametrize("unit", ["ms", "ns"])
+    def test_datetime_nat(self, filename, version, unit):
+        """Test writing datetime with NaT to MAT-file"""
+        dt_nat = np.array([["2024-01-01T12:00:00", "NaT"]], dtype=f"datetime64[{unit}]")
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"dt_nat": dt_nat}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["dt_nat"])
+
+            np.testing.assert_array_equal(np.isnat(mload["dt_nat"]), [[False, True]])
+            assert abs(mload["dt_nat"][0, 0] - dt_nat[0, 0]) < np.timedelta64(1, "us")
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
