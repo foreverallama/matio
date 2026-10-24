@@ -164,3 +164,23 @@ class TestSaveMatlabDatetime:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+precision_files = [
+    ("test_datetime_precision_v7.mat", "v7"),
+    ("test_datetime_precision_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", precision_files)
+class TestLoadMatlabDatetimePrecision:
+
+    def test_datetime_subms(self, filename, version):
+        """Test reading datetime with sub-millisecond precision from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["dt_subms"])
+        assert "dt_subms" in mdict
+
+        dt_subms = np.array([["2024-01-01T12:00:00.1234567"]], dtype="datetime64[ns]")
+
+        np.testing.assert_array_equal(mdict["dt_subms"], dt_subms, strict=True)
