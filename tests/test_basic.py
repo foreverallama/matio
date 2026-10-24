@@ -1,6 +1,7 @@
 import os
 import tempfile
 
+import h5py
 import numpy as np
 import pytest
 
@@ -765,3 +766,29 @@ def test_load_numeric_precision_v4(filename="test_basic_v4.mat"):
         assert key in mdict
         expected_val = expected_dict[key]
         np.testing.assert_array_equal(mdict[key], expected_val, strict=True)
+
+
+def test_save_compression_v73():
+    """Test that v7.3 only compresses datasets above 10000 bytes, like MATLAB"""
+    mdict = {
+        "small": np.ones((1, 1250), dtype=np.float64),  # 10000 bytes
+        "large": np.ones((1, 1251), dtype=np.float64),  # 10008 bytes
+    }
+
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        save_to_mat(temp_file_path, mdict, version="v7.3")
+
+        with h5py.File(temp_file_path, "r") as f:
+            assert f["small"].compression is None
+            assert f["large"].compression == "gzip"
+
+        mload = load_from_mat(temp_file_path, variable_names=None)
+        for key in mdict:
+            np.testing.assert_array_equal(mload[key], mdict[key], strict=True)
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
