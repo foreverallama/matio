@@ -107,3 +107,25 @@ class TestSaveMatlabString:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_string_missing(self, filename, version):
+        """Test writing string with missing values to MAT-file"""
+        dtype = np.dtypes.StringDType(na_object=np.nan)
+        mdict = {
+            "string_missing": np.array([["a", np.nan, "bc"]], dtype=dtype),
+            "string_all_missing": np.array([[np.nan]], dtype=dtype),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
+
+            for key, value in mdict.items():
+                np.testing.assert_array_equal(value, mload[key], strict=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

@@ -466,6 +466,33 @@ class TestSaveMatlabTimetable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_timetable_datetime_tz(self, filename, version):
+        """Test writing timetable with timezone-aware datetime index to MAT-file"""
+        index = pd.DatetimeIndex(
+            ["2024-01-01 01:00", "2024-01-01 01:01"], name="Time"
+        ).tz_localize("Europe/Berlin")
+        mdict = {"timetable_tz": pd.DataFrame({"x": [1.0, 2.0]}, index=index)}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatConvertWarning, match="converted to UTC"):
+                save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["timetable_tz"])
+
+            expected = pd.DatetimeIndex(
+                ["2024-01-01 00:00", "2024-01-01 00:01"],
+                dtype="datetime64[ns]",
+                name="Time",
+            )
+            pd.testing.assert_index_equal(mload["timetable_tz"].index, expected)
+            np.testing.assert_array_equal(mload["timetable_tz"]["x"], [1.0, 2.0])
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     @pytest.mark.xfail(reason="Writing attributes not implemented")
     def test_timetable_with_attrs(self, filename, version):
         """Test writing numeric timetable to MAT-file"""
