@@ -55,6 +55,7 @@ class MatSubsystem:
         self.oned_as = oned_as
 
         self.mcos_object_cache = {}
+        self._prop_refs = None  # Object records referencing each saved property
 
         self.version = None
         self.num_names = 0
@@ -414,6 +415,46 @@ class MatSubsystem:
         return prop_field_idxs[offset : offset + nprops * nfields].reshape(
             (nprops, nfields)
         )
+
+    def get_object_property_idxs(self, saveobj_id, normobj_id):
+        """Returns the saved property metadata of an object, like get_properties"""
+
+        if saveobj_id != 0:
+            return self.get_property_idxs(saveobj_id, True)
+        return self.get_property_idxs(normobj_id, False)
+
+    def count_property_refs(self):
+        """Returns how many objects reference each saved property"""
+
+        counts = np.zeros(len(self.mcos_props_saved), dtype=np.int64)
+        object_ids = np.asarray(self.object_id_metadata).reshape(-1, 6)
+        for saveobj_id, normobj_id in object_ids[1:, 3:5]:
+            recs = self.get_object_property_idxs(saveobj_id, normobj_id)
+            np.add.at(counts, recs[recs[:, 1] == PropertyType.PROPERTY_VALUE, 2], 1)
+        return counts
+
+    def release_saved_properties(self, object_id):
+        """Frees the saved properties of a converted object
+
+        The converted object holds its own copy of the data. Saved properties
+        that no other object references are not needed again.
+        """
+
+        _, saveobj_id, normobj_id, _ = self.get_object_metadata(object_id)
+        recs = self.get_object_property_idxs(saveobj_id, normobj_id)
+
+        if self._prop_refs is None:
+            try:
+                self._prop_refs = self.count_property_refs()
+            except (IndexError, ValueError):
+                self._prop_refs = False  # Corrupt metadata: keep everything
+        if self._prop_refs is False:
+            return
+        for _, prop_type, prop_value in recs:
+            if prop_type == PropertyType.PROPERTY_VALUE:
+                self._prop_refs[prop_value] -= 1
+                if self._prop_refs[prop_value] == 0:
+                    self.mcos_props_saved[prop_value] = None
 
     def get_saved_properties(self, obj_type_id, saveobj_ret_type):
         """Returns the saved properties (as dict) for an object ID"""
@@ -1010,6 +1051,9 @@ class MatSubsystem:
                             type_system=type_system,
                             class_alias=class_alias,
                         )
+                    else:
+                        del obj_props
+                        self.release_saved_properties(object_id)
                     self.mcos_object_cache[object_id] = obj
                 else:
                     obj = MatlabOpaque(

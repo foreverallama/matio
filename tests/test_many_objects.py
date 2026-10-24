@@ -7,6 +7,7 @@ import pytest
 
 from matio import load_from_mat, save_to_mat
 from matio.subsystem.subsys import MatSubsystem
+from matio.utils.matclass import PropertyType
 
 versions = ["v7", "v7.3"]
 NUM_OBJECTS = 200
@@ -46,6 +47,52 @@ def test_record_offsets():
         offset = subsystem.get_record_offset("nobj", metadata, record_id, nfields, 0)
         assert offset == expected[record_id]
         assert metadata[offset] == counts[record_id]
+
+
+def test_release_saved_properties():
+    """Test that a saved property is freed only once every object using it is converted"""
+    value = PropertyType.PROPERTY_VALUE
+    subsystem = MatSubsystem("<")
+    subsystem.mcos_props_saved = [np.array([1.0]), np.array([2.0])]
+    subsystem.saveobj_metadata = np.array([0, 0], dtype="<i4")
+    # Records: 0 empty, 1 uses property 0, 2 uses properties 0 and 1
+    subsystem.nobj_metadata = np.array(
+        [0, 0, 1, 0, value, 0, 2, 0, value, 0, 1, value, 1, 0], dtype="<i4"
+    )
+    # Objects 1 and 2 share record 1, object 3 points to record 2
+    subsystem.object_id_metadata = np.array(
+        [0, 0, 0, 0, 0, 0]
+        + [1, 0, 0, 0, 1, 0]
+        + [1, 0, 0, 0, 1, 0]
+        + [1, 0, 0, 0, 2, 0],
+        dtype="<i4",
+    )
+
+    subsystem.release_saved_properties(1)
+    subsystem.release_saved_properties(2)
+    assert subsystem.mcos_props_saved[0] is not None
+    assert subsystem.mcos_props_saved[1] is not None
+
+    subsystem.release_saved_properties(3)
+    assert subsystem.mcos_props_saved == [None, None]
+
+
+@pytest.mark.parametrize("bad_record", [[1000, 0], [1, 0, 1, 99]])
+def test_release_keeps_properties_on_corrupt_metadata(bad_record):
+    """Test that a corrupt record of another object disables freeing instead of failing"""
+    value = PropertyType.PROPERTY_VALUE
+    subsystem = MatSubsystem("<")
+    subsystem.mcos_props_saved = [np.array([1.0])]
+    subsystem.saveobj_metadata = np.array([0, 0], dtype="<i4")
+    # Records: 0 empty, 1 uses property 0, 2 corrupt
+    subsystem.nobj_metadata = np.array([0, 0, 1, 0, value, 0] + bad_record, dtype="<i4")
+    # Object 1 points to record 1, object 2 (not loaded) to record 2
+    subsystem.object_id_metadata = np.array(
+        [0, 0, 0, 0, 0, 0] + [1, 0, 0, 0, 1, 0] + [1, 0, 0, 0, 2, 0], dtype="<i4"
+    )
+
+    subsystem.release_saved_properties(1)
+    assert subsystem.mcos_props_saved[0] is not None
 
 
 @pytest.mark.parametrize("version", versions)
