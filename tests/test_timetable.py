@@ -722,3 +722,36 @@ class TestLoadMatlabTimetableOriginalNames:
         pd.testing.assert_frame_equal(
             mdict["timetable_original_names"], df, check_like=True
         )
+
+
+struct_files = [
+    ("test_table_struct_v7.mat", "v7"),
+    ("test_table_struct_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", struct_files)
+class TestLoadMatlabTimetableStruct:
+
+    def test_timetable_struct(self, filename, version):
+        """Test reading timetable with struct array column from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["timetable_struct"])
+        assert "timetable_struct" in mdict
+        assert isinstance(mdict["timetable_struct"], pd.DataFrame)
+
+        np.testing.assert_array_equal(
+            mdict["timetable_struct"].index,
+            np.array([1, 2], dtype="timedelta64[s]"),
+        )
+        np.testing.assert_array_equal(
+            mdict["timetable_struct"]["Value"], np.array([3.0, 4.0])
+        )
+
+        col = mdict["timetable_struct"]["S"]
+        for i, (a, b) in enumerate([(1.0, "x"), (2.0, "y")]):
+            assert isinstance(col.iloc[i], np.ndarray)
+            assert col.iloc[i].shape == (1, 1)
+            assert set(col.iloc[i].dtype.names) == {"a", "b"}
+            np.testing.assert_array_equal(col.iloc[i]["a"][0, 0], np.array([[a]]))
+            np.testing.assert_array_equal(col.iloc[i]["b"][0, 0], np.array([b]))
