@@ -109,7 +109,10 @@ def detect_dtype_uniformity(vals):
     value_dtypes = set()
     val_type = None
     for v in vals:
-        if not isinstance(v, np.ndarray):
+        # Uniform values must be char vectors or numeric/logical scalars
+        if not isinstance(v, np.ndarray) or (
+            v.dtype.kind not in ("U", "S") and v.size != 1
+        ):
             uniformity = np.bool_(False)
             val_type = "any"
             break

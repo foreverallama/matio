@@ -180,3 +180,33 @@ class TestSaveMatlabContainerMap:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_map_vector_values(self, filename, version):
+        """Test writing container.Map with non-scalar values to MAT-file"""
+        mdict = {
+            "map_vector_values": MatlabContainerMap(
+                {"a": np.array([[1.0, 2.0]]), "b": np.array([[3.0, 4.0]])}
+            )
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
+
+            for key, val in mdict["map_vector_values"].items():
+                np.testing.assert_array_equal(
+                    mload["map_vector_values"][key], val, strict=True
+                )
+
+            # MATLAB loads uniform maps only with scalar or char values
+            mraw = load_from_mat(temp_file_path, raw_data=True)
+            ser = mraw["map_vector_values"].properties["serialization"][0, 0]
+            assert not ser["uniformity"].item()
+            assert ser["valueType"].item() == "any"
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
