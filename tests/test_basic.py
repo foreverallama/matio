@@ -1,5 +1,7 @@
 import os
+import sys
 import tempfile
+import threading
 
 import h5py
 import numpy as np
@@ -810,3 +812,29 @@ def test_save_compression_v73():
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+def test_save_v7_threads(tmp_path):
+    """Test writing v7 files from several threads at once"""
+    mdict = {f"v{i}": np.arange(i % 50 + 1.0) for i in range(300)}
+    save_to_mat(str(tmp_path / "serial.mat"), mdict, version="v7")
+    expected = (tmp_path / "serial.mat").read_bytes()[128:]  # header has a timestamp
+
+    def write(k):
+        for j in range(3):
+            save_to_mat(str(tmp_path / f"thread{k}_{j}.mat"), mdict, version="v7")
+
+    switch_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        threads = [threading.Thread(target=write, args=(k,)) for k in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        sys.setswitchinterval(switch_interval)
+
+    for k in range(8):
+        for j in range(3):
+            assert (tmp_path / f"thread{k}_{j}.mat").read_bytes()[128:] == expected
