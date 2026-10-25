@@ -211,17 +211,22 @@ class MatRead7:
     def read_struct(self, obj, is_empty=0):
         """Reads MATLAB struct arrays from the v7.3 MAT-file."""
 
-        if is_empty:
+        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        if is_empty and field_order is None:
             return EmptyMatStruct(np.empty(shape=obj[()], dtype=object))
 
-        fields = list(obj.keys())
-        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        # Empty struct arrays are datasets, their fields are only in the attribute
+        fields = [] if is_empty else list(obj.keys())
         if field_order is not None:
             if isinstance(field_order, h5py.Reference):
                 # MATLAB writes large field lists as a reference to dset
                 fields = ["".join(x.astype(str)) for x in self.h5stream[field_order]]
             else:
                 fields = ["".join(x.astype(str)) for x in field_order]
+
+        if is_empty:
+            dt = [(name, object) for name in fields]
+            return np.empty(shape=obj[()], dtype=dt)
 
         if self.is_struct_matrix(obj):
             is_scalar = False
