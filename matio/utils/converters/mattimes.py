@@ -154,14 +154,17 @@ def datetime_to_mat(arr):
 
     unit = np.datetime_data(arr.dtype)[0]
 
-    # For sub-millisecond precision, preserve in decimal portion
+    # For sub-millisecond precision, write a double-double like MATLAB:
+    # the imaginary part is the rounding error of the real part
     if unit in ["us", "ns", "ps", "fs", "as"]:
-        dt_int = arr.astype(np.int64)
-
-        unit_to_ms = {"us": 1e-3, "ns": 1e-6, "ps": 1e-9, "fs": 1e-12, "as": 1e-15}
-
-        conversion_factor = unit_to_ms[unit]
-        millis = dt_int.astype(np.float64) * conversion_factor
+        per_ms = {"us": 10**3, "ns": 10**6, "ps": 10**9, "fs": 10**12, "as": 10**15}
+        ms_int, rest = np.divmod(arr.astype(np.int64), per_ms[unit])
+        ms_int = ms_int.astype(np.float64)
+        ms_frac = rest / per_ms[unit]
+        millis = ms_int + ms_frac
+        error = (ms_int - millis) + ms_frac
+        if np.any(error[~np.isnat(arr)] != 0):
+            millis = millis + 1j * error
     else:
         millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
     millis = np.where(np.isnat(arr), np.nan, millis)  # MATLAB saves NaT as NaN
