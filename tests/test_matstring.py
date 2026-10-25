@@ -129,3 +129,25 @@ class TestSaveMatlabString:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_string_zero_elements(self, filename, version):
+        """Test writing zero-element string arrays to MAT-file"""
+        dtype = np.dtypes.StringDType(na_object=np.nan)
+        mdict = {
+            "string_0x3": np.empty((0, 3), dtype=dtype),
+            "string_2x0": np.empty((2, 0), dtype=dtype),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
+
+            for key, value in mdict.items():
+                np.testing.assert_array_equal(value, mload[key], strict=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
