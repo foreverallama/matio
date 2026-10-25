@@ -313,7 +313,11 @@ class VarWriter5:
     def write_sparse(self, arr):
         """Sparse matrices are 2D"""
         A = arr.tocsc()  # convert to sparse CSC format
-        A.sort_indices()  # MATLAB expects sorted row indices
+        if not A.has_canonical_format:
+            # MATLAB expects sorted row indices without duplicates
+            # scipy.sparse copies only native byte order
+            A = A.astype(A.dtype.newbyteorder("="))
+            A.sum_duplicates()
         is_complex = A.dtype.kind == "c"
         is_logical = A.dtype.kind == "b"
         nz = A.nnz

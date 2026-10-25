@@ -3,6 +3,7 @@ import tempfile
 
 import numpy as np
 import pytest
+from scipy.sparse import csc_array
 
 from matio import load_from_mat, save_to_mat
 
@@ -406,6 +407,43 @@ class TestSaveSparse:
                 mdict["sparse_nnz"].toarray(),
                 mload["sparse_nnz"].toarray(),
                 strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_sparse_duplicates(self, filename, version):
+        """Test writing sparse with duplicate entries to MAT-file"""
+        # Entry (0, 0) is stored twice, MATLAB does not sum such duplicates
+        data = np.array([4.0, 1.0, 2.0])
+        sparse_dup = csc_array(
+            (data, np.array([1, 0, 0]), np.array([0, 3, 3])), shape=(2, 2)
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"sparse_dup": sparse_dup}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["sparse_dup"])
+
+            assert mload["sparse_dup"].nnz == 2
+            np.testing.assert_array_equal(
+                mload["sparse_dup"].toarray(), [[3.0, 0.0], [4.0, 0.0]]
+            )
+            # the input is not changed
+            np.testing.assert_array_equal(sparse_dup.indices, [1, 0, 0])
+
+            # non-native byte order, unsorted
+            data = np.array([1.0, 2.0], dtype=">f8")
+            sparse_be = csc_array(
+                (data, np.array([1, 0]), np.array([0, 2, 2])), shape=(2, 2)
+            )
+            save_to_mat(temp_file_path, {"sparse_be": sparse_be}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["sparse_be"])
+            np.testing.assert_array_equal(
+                mload["sparse_be"].toarray(), [[2.0, 0.0], [1.0, 0.0]]
             )
 
         finally:
