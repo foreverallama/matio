@@ -7,7 +7,7 @@ import pytest
 
 from matio import load_from_mat, save_to_mat
 from matio.utils.converters.mattables import table_to_mat
-from matio.utils.matclass import MatlabOpaque
+from matio.utils.matclass import MatConvertWarning, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -301,6 +301,29 @@ class TestSaveMatlabTable:
             pd.testing.assert_frame_equal(
                 mdict["table_empty"], mload["table_empty"], check_like=True
             )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_table_datetime_tz(self, filename, version):
+        """Test writing table with timezone-aware datetime column to MAT-file"""
+        times = pd.DatetimeIndex(["2024-01-01 01:00", None]).tz_localize(
+            "Europe/Berlin"
+        )
+        mdict = {"table_tz": pd.DataFrame({"t": times, "x": [1.0, 2.0]})}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatConvertWarning, match="converted to UTC"):
+                save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_tz"])
+
+            expected = np.array(["2024-01-01T00:00", "NaT"], dtype="datetime64[ns]")
+            np.testing.assert_array_equal(mload["table_tz"]["t"], expected)
+            np.testing.assert_array_equal(mload["table_tz"]["x"], [1.0, 2.0])
 
         finally:
             if os.path.exists(temp_file_path):

@@ -368,6 +368,14 @@ def get_column_data(col):
         props["codes"] = props["codes"].reshape(-1, 1)
         return MatlabOpaque(properties=props, classname="categorical")
 
+    if isinstance(col.dtype, pd.DatetimeTZDtype):
+        warnings.warn(
+            f"table_to_mat: Column '{col.name}' with timezone '{col.dt.tz}' is converted to UTC. "
+            "The timezone information will be lost.",
+            MatConvertWarning,
+        )
+        col = col.dt.tz_convert(None)
+
     return col.to_numpy().reshape(-1, 1)
 
 
