@@ -414,6 +414,24 @@ class TestSaveBasicDatatypes:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_numeric_non_native_byte_order(self, filename, version):
+        """Test writing integer data with non-native byte order to MAT-file"""
+        arr = np.array([[1, -2], [3, -4]], dtype=np.int32)
+        mdict = {"x": arr.astype(arr.dtype.newbyteorder())}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["x"])
+
+            np.testing.assert_array_equal(mload["x"], arr)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_numeric_uint32(self, filename, version):
         """Test writing uint32 data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)

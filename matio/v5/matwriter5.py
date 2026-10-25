@@ -153,7 +153,7 @@ class VarWriter5:
         if mdtype is None:
             mdtype = NP_TO_MTYPES[arr.dtype.str[1:]]
         # Array needs to be in native byte order
-        if arr.dtype.byteorder == (SYS_BYTE_ORDER == ">"):
+        if not arr.dtype.isnative:
             arr = arr.byteswap().view(arr.dtype.newbyteorder())
         byte_count = arr.size * arr.itemsize
         if byte_count <= 4:
