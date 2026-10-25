@@ -178,6 +178,8 @@ def duration_to_mat(arr):
 
     unit, _ = np.datetime_data(arr.dtype)
     millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6
+    # MATLAB saves missing durations as NaN
+    millis = np.where(np.isnat(arr), np.nan, millis)
     allowed_units = ("s", "m", "h", "D", "Y")
     if unit not in allowed_units:
         warnings.warn(

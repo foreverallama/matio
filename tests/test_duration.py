@@ -311,3 +311,20 @@ class TestSaveMatlabDuration:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_duration_nat(self, filename, version):
+        """Test writing duration with NaT to MAT-file"""
+        dur = np.array([[1, "NaT", 3]], dtype="timedelta64[s]")
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"dur": dur}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["dur"])
+
+            np.testing.assert_array_equal(mload["dur"], dur, strict=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
