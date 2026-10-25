@@ -210,3 +210,31 @@ class TestSaveMatlabContainerMap:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_map_negative_keys(self, filename, version):
+        """Test writing container.Map with negative integer keys to MAT-file"""
+        mdict = {
+            "map_negative_keys": MatlabContainerMap(
+                {-2: np.array(["neg"]), 3: np.array(["pos"])}
+            )
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
+
+            for key, val in mdict["map_negative_keys"].items():
+                np.testing.assert_array_equal(
+                    mload["map_negative_keys"][key], val, strict=True
+                )
+
+            mraw = load_from_mat(temp_file_path, raw_data=True)
+            ser = mraw["map_negative_keys"].properties["serialization"][0, 0]
+            assert ser["keyType"].item() == "int64"
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

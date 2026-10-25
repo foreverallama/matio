@@ -146,8 +146,9 @@ def containermap_to_mat(props):
     if all(isinstance(k, str) for k in keys):
         key_type = "char"
     elif all(isinstance(k, int) for k in keys):
-        key_type = "uint64"
+        key_type = "int64" if min(keys) < 0 else "uint64"
         # Defaulting to highest precision as Python doesn't differentiate
+        # MATLAB saturates negative keys to 0 for uint64
     else:
         key_type = "double"
 
