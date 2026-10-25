@@ -35,7 +35,12 @@ from matio.utils.matclass import (
     OpaqueType,
 )
 
-matlab_saveobj_ret_types = ["string", "timetable"]
+matlab_saveobj_ret_types = [
+    "function_handle_object",
+    "function_handle_workspace",
+    "string",
+    "timetable",
+]
 
 matlab_classdef_types = [
     "calendarDuration",
