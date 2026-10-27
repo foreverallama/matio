@@ -46,9 +46,20 @@ def mat_to_datetime(props, **_kwargs):
         # MATLAB keeps sub-ms precision as a double-double:
         # the imaginary part is the rounding error of the real part
         ms_frac = ms_frac + data.imag
-    ns_int = ms_int_float.astype(np.int64) * 1000_000
+    # datetime64[ns] covers about the years 1678 to 2262
+    outside = np.abs(ms_int_float) > np.iinfo(np.int64).max // 1_000_000
+    ns_int = np.where(outside, 0, ms_int_float).astype(np.int64) * 1000_000
     ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
     total_ns = ns_int + ns_frac
+    # the sign flips if the sub-ms part pushed the sum past the int64 limit
+    outside |= (ns_int > 0) & (total_ns < 0) | (ns_int < 0) & (total_ns > 0)
+    if outside.any():
+        warnings.warn(
+            "MATLAB datetime outside the datetime64[ns] range was set to NaT.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+        nat |= outside
 
     dt = total_ns.astype("datetime64[ns]")
     dt[nat] = np.datetime64("NaT", "ns")

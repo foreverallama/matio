@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattimes import mat_to_datetime
 from matio.utils.matclass import MatConvertWarning
 
 files = [("test_time_v7.mat", "v7"), ("test_time_v73.mat", "v7.3")]
@@ -184,3 +185,19 @@ class TestLoadMatlabDatetimePrecision:
         dt_subms = np.array([["2024-01-01T12:00:00.1234567"]], dtype="datetime64[ns]")
 
         np.testing.assert_array_equal(mdict["dt_subms"], dt_subms, strict=True)
+
+
+def test_datetime_outside_ns_range():
+    """MATLAB datetimes outside the datetime64[ns] range become NaT"""
+    # datetime(9999, 12, 31), datetime(2024, 1, 1) and the last whole milliseconds
+    # inside the range, as stored by MATLAB (ms since 1970)
+    data = np.array(
+        [[253402214400000.0, 1704067200000.0, 9223372036854.0, -9223372036854.0]]
+    )
+    with pytest.warns(MatConvertWarning, match="outside the datetime64"):
+        dt = mat_to_datetime({"data": data + 0j})
+    expected = np.array(
+        [["NaT", "2024-01-01", "2262-04-11T23:47:16.854", "1677-09-21T00:12:43.146"]],
+        dtype="datetime64[ns]",
+    )
+    np.testing.assert_array_equal(dt, expected, strict=True)
