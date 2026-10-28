@@ -428,7 +428,10 @@ class TestSaveBasicDatatypes:
             save_to_mat(temp_file_path, mdict, version=version)
             mload = load_from_mat(temp_file_path, variable_names=["x"])
 
-            np.testing.assert_array_equal(mload["x"], arr)
+            # v7.3 keeps the byte order of the written dataset, so compare natively
+            actual = mload["x"]
+            actual = actual.astype(actual.dtype.newbyteorder("="))
+            np.testing.assert_array_equal(actual, arr, strict=True)
 
         finally:
             if os.path.exists(temp_file_path):

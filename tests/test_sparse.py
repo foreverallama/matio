@@ -430,7 +430,9 @@ class TestSaveSparse:
 
             assert mload["sparse_dup"].nnz == 2
             np.testing.assert_array_equal(
-                mload["sparse_dup"].toarray(), [[3.0, 0.0], [4.0, 0.0]]
+                mload["sparse_dup"].toarray(),
+                np.array([[3.0, 0.0], [4.0, 0.0]]),
+                strict=True,
             )
             # the input is not changed
             np.testing.assert_array_equal(sparse_dup.indices, [1, 0, 0])
@@ -443,7 +445,9 @@ class TestSaveSparse:
             save_to_mat(temp_file_path, {"sparse_be": sparse_be}, version=version)
             mload = load_from_mat(temp_file_path, variable_names=["sparse_be"])
             np.testing.assert_array_equal(
-                mload["sparse_be"].toarray(), [[2.0, 0.0], [1.0, 0.0]]
+                mload["sparse_be"].toarray(),
+                np.array([[2.0, 0.0], [1.0, 0.0]]),
+                strict=True,
             )
 
         finally:
