@@ -274,7 +274,9 @@ class MatRead7:
                 data = data.astype(dtype)
             ir = obj["ir"][()]
         else:
-            data = np.array([], dtype=np.float64)
+            matlab_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, b"double")
+            dtype = matlab_class_to_dtype(matlab_class, np.dtype(np.float64))
+            data = np.array([], dtype=dtype)
             ir = np.array([], dtype=np.int32)
 
         return csc_array((data, ir, jc), shape=(nrows, ncols))
