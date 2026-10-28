@@ -322,8 +322,10 @@ class TestSaveMatlabTable:
             mload = load_from_mat(temp_file_path, variable_names=["table_tz"])
 
             expected = np.array(["2024-01-01T00:00", "NaT"], dtype="datetime64[ns]")
-            np.testing.assert_array_equal(mload["table_tz"]["t"], expected)
-            np.testing.assert_array_equal(mload["table_tz"]["x"], [1.0, 2.0])
+            np.testing.assert_array_equal(mload["table_tz"]["t"], expected, strict=True)
+            np.testing.assert_array_equal(
+                mload["table_tz"]["x"], np.array([1.0, 2.0]), strict=True
+            )
 
         finally:
             if os.path.exists(temp_file_path):
