@@ -449,3 +449,21 @@ class TestSaveSparse:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("dtype", ["f8", "c16"])
+def test_write_sparse_foreign_byteorder(tmp_path, dtype):
+    from scipy.sparse import csc_array
+
+    dtype = np.dtype(dtype).newbyteorder("S")
+    data = np.array([1, 2, 3], dtype=dtype)
+    if dtype.kind == "c":
+        data.imag = [2, -1, 4]
+    expected = np.diag(data.astype(dtype.newbyteorder("=")))
+    arr = csc_array((data, [0, 1, 2], [0, 1, 2, 3]), shape=(3, 3))
+    before = arr.data.tobytes()
+    path = tmp_path / "foreign_sparse.mat"
+    save_to_mat(path, {"a": arr}, version="v7")
+    actual = load_from_mat(path)["a"]
+    np.testing.assert_array_equal(actual.toarray(), expected, strict=True)
+    assert arr.data.tobytes() == before
