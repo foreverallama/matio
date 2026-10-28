@@ -792,3 +792,13 @@ def test_save_compression_v73():
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+def test_large_stream_position():
+    from io import BytesIO
+
+    from matio.v5._streams import make_stream
+
+    stream = make_stream(BytesIO())
+    stream.seek(2**31 + 128)
+    assert stream.tell() == 2**31 + 128
