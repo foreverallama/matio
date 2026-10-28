@@ -94,10 +94,12 @@ def whosmat7(file_path):
                 if len(keys) == 0:
                     # Struct with no fields
                     shape = (1, 1)
-                f[var][keys[0]]
-                if isinstance(f[var][keys[0]], h5py.Dataset) and f[var][
-                    keys[0]
-                ].dtype == np.dtype("O"):
+                first = f[var][keys[0]]
+                if (
+                    isinstance(first, h5py.Dataset)
+                    and first.dtype == np.dtype("O")
+                    and MAT_HDF_ATTRS.CLASS not in first.attrs
+                ):
                     # Struct array
                     shape = f[var][keys[0]].shape[::-1]
                 else:
