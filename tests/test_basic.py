@@ -35,6 +35,18 @@ def skip_unsupported_v4(version, request):
         pytest.skip(f"MAT-file v4 does not support the test '{request_name}'")
 
 
+def test_load_nul_padded_variable_names():
+    """Test variable names padded with NUL bytes by non-MATLAB writers"""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_padded_varnames.mat"
+    )
+    mdict = load_from_mat(file_path, variable_names=["x"])
+    np.testing.assert_array_equal(
+        mdict["x"], np.array([[1.0], [2.0], [3.0]]), strict=True
+    )
+    assert set(whosmat(file_path)) == {"x", "y"}
+
+
 @pytest.mark.parametrize("filename, version", load_files)
 class TestLoadBasicDataTypes:
 
