@@ -103,6 +103,9 @@ def to_dataframe(data, nvars, varnames):
         elif dtype_kind == "V":
             # struct arrays are split into one 1x1 struct per row
             return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
+        elif dtype_kind in "biufc":
+            # Plain arrays skip building and aligning one Series per column
+            return col
         else:
             return pd.Series(col)
 
