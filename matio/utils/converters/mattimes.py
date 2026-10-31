@@ -218,7 +218,8 @@ def numpy_to_matcaldur(arr):
             reduced = np.array([[arr[f].flat[0]]], dtype=arr[f].dtype)
             comps[0, 0][f] = reduced.astype(np.float64)
         else:
-            comps[0, 0][f] = arr[f].astype(np.float64)
+            # MATLAB saves missing components as NaN
+            comps[0, 0][f] = np.where(np.isnat(arr[f]), np.nan, arr[f].astype(float))
 
     return comps
 
