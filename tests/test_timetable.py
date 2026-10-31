@@ -532,6 +532,19 @@ class TestSaveMatlabTimetable:
                 os.remove(temp_file_path)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_dimension_names_unique(tmp_path, version):
+    times = pd.date_range("2020-01-01", periods=2, freq="s")
+    tt = pd.DataFrame({"t": times, "y": [1.0, 2.0]}).set_index("t", drop=False)
+    tab = pd.DataFrame({"Row": [1.0, 2.0], "Variables": [3.0, 4.0]})
+    path = tmp_path / "dimnames.mat"
+    save_to_mat(path, {"tt": tt, "tab": tab}, version=version)
+    mload = load_from_mat(path, add_table_attrs=True)
+    assert mload["tt"].index.name == "t_1"
+    assert list(mload["tt"].columns) == ["t", "y"]
+    assert mload["tab"].attrs["DimensionNames"] == ["Row_1", "Variables_1"]
+
+
 timetablev7_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
 
 
