@@ -1,5 +1,6 @@
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
@@ -21,6 +22,19 @@ def test_duration_fractional_beyond_ns_range():
 
     dur = np.array([[10**13, 1500]], dtype="timedelta64[ms]")
     np.testing.assert_array_equal(mat_to_duration(props), dur, strict=True)
+
+
+def test_duration_inf():
+    """MATLAB durations of Inf and -Inf become NaT like NaN"""
+    # seconds([1.5 Inf -Inf NaN]) as stored by MATLAB
+    props = {"millis": np.array([[1500.0, np.inf, -np.inf, np.nan]]), "fmt": "s"}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with pytest.warns(MatConvertWarning, match="Inf was set to NaT"):
+            dur = mat_to_duration(props)
+
+    expected = np.array([[1500, "NaT", "NaT", "NaT"]], dtype="timedelta64[ms]")
+    np.testing.assert_array_equal(dur, expected, strict=True)
 
 
 @pytest.mark.parametrize("filename, version", files)

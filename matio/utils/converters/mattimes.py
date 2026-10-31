@@ -72,6 +72,15 @@ def count_to_timedelta(count, unit, millis):
     """Cast to the coarsest of unit, ms, us, ns that holds the values exactly"""
 
     finite = np.isfinite(millis)
+    if np.isinf(millis).any():
+        warnings.warn(
+            "MATLAB duration Inf was set to NaT.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+    # NumPy casts only NaN to NaT, the cast of Inf depends on the platform
+    count = np.where(finite, count, np.nan)
+    millis = np.where(finite, millis, np.nan)
     candidates = [
         (count, unit),
         (millis, "ms"),
