@@ -3,6 +3,7 @@
 import warnings
 
 import numpy as np
+import pandas as pd
 
 from matio.utils.matclass import MatConvertWarning
 
@@ -165,6 +166,16 @@ def mat_to_calendarduration(props, **_kwargs):
 def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
 
+    if isinstance(arr, (pd.Timestamp, pd.DatetimeIndex)):
+        if arr.tz is not None:
+            warnings.warn(
+                f"datetime_to_mat: Timezone '{arr.tz}' is converted to UTC. "
+                "The timezone information will be lost.",
+                MatConvertWarning,
+            )
+            arr = arr.tz_convert(None)
+        arr = np.atleast_2d(arr.to_numpy())
+
     unit = np.datetime_data(arr.dtype)[0]
 
     # For sub-millisecond precision, write a double-double like MATLAB:
@@ -191,6 +202,9 @@ def datetime_to_mat(arr):
 
 def duration_to_mat(arr):
     """Convert numpy timedelta64 array to MATLAB duration format."""
+
+    if isinstance(arr, (pd.Timedelta, pd.TimedeltaIndex)):
+        arr = np.atleast_2d(arr.to_numpy())
 
     unit, _ = np.datetime_data(arr.dtype)
     millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6
