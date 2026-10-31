@@ -109,7 +109,10 @@ def detect_dtype_uniformity(vals):
     value_dtypes = set()
     val_type = None
     for v in vals:
-        if not isinstance(v, np.ndarray):
+        # Uniform values must be char vectors or numeric/logical scalars
+        if not isinstance(v, np.ndarray) or (
+            v.dtype.kind not in ("U", "S") and v.size != 1
+        ):
             uniformity = np.bool_(False)
             val_type = "any"
             break
@@ -143,8 +146,9 @@ def containermap_to_mat(props):
     if all(isinstance(k, str) for k in keys):
         key_type = "char"
     elif all(isinstance(k, int) for k in keys):
-        key_type = "uint64"
+        key_type = "int64" if min(keys) < 0 else "uint64"
         # Defaulting to highest precision as Python doesn't differentiate
+        # MATLAB saturates negative keys to 0 for uint64
     else:
         key_type = "double"
 

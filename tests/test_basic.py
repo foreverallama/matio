@@ -794,6 +794,14 @@ def test_save_compression_v73():
             os.remove(temp_file_path)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_numpy_unicode_scalar(tmp_path, version):
+    file_path = tmp_path / "unicode_scalar.mat"
+    save_to_mat(file_path, {"label": np.str_("alpha")}, version=version)
+    actual = load_from_mat(file_path)["label"]
+    np.testing.assert_array_equal(actual, np.array(["alpha"]), strict=True)
+
+
 def test_large_stream_position():
     from io import BytesIO
 
