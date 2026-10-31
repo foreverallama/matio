@@ -37,6 +37,10 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     # Move char axis to end and flatten
     arr2 = np.moveaxis(arr, char_axis, -1)
     flat = arr2.reshape(-1, char_len)
+    if mdtype == 4 and not flat[:, ::2].any():
+        # MATLAB on Windows writes one byte per character in the ANSI code page
+        # (cp1252 in Western locales), UTF-8 packed into uint16 sets high bytes
+        codec = "cp1252"
 
     strings = []
     for char_data in flat:

@@ -137,3 +137,16 @@ def test_load_old_char_null(filename="char_array_old_null.mat"):
     mdict = load_from_mat(file_path)
     assert "simple_string" in mdict
     np.testing.assert_array_equal(mdict["simple_string"], simple_string, strict=True)
+
+
+def test_load_v6_windows_char(filename="chars_v6_windows.mat"):
+    """Test reading -v6 char data that MATLAB on Windows writes in cp1252"""
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    mdict = load_from_mat(file_path)
+
+    np.testing.assert_array_equal(mdict["units"], np.array(["°C"]), strict=True)
+    np.testing.assert_array_equal(mdict["currency"], np.array(["a€b"]), strict=True)
+    np.testing.assert_array_equal(mdict["word"], np.array(["Größe"]), strict=True)
+    np.testing.assert_array_equal(
+        mdict["rows"], np.array(["°C  ", "V×µA"]), strict=True
+    )
