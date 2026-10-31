@@ -512,7 +512,8 @@ def categorical_to_mat(cat):
     # 1-based indexing, as the smallest unsigned integer type that fits all categories
     codes = (cat.codes + 1).astype(np.min_scalar_type(len(cat.categories)))
     is_ordinal = np.bool_(cat.ordered)
-    is_protected = np.bool_(False)  # not supported in pandas
+    # MATLAB requires ordinal categoricals to be protected
+    is_protected = np.bool_(cat.ordered)
 
     return {
         "categoryNames": category_names,
