@@ -309,7 +309,10 @@ def mat_to_categorical(props, **_kwargs):
     # MATLAB codes are 1-indexed as uint integers
     codes = props.get("codes").astype(int) - 1
     ordered = bool(props.get("isOrdinal").item())
-    return pd.Categorical.from_codes(codes, categories=category_names, ordered=ordered)
+    # pandas validation fails on empty codes with a non-zero first dimension (1x0)
+    return pd.Categorical.from_codes(
+        codes, categories=category_names, ordered=ordered, validate=codes.size > 0
+    )
 
 
 def make_table_props():

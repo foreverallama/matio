@@ -235,6 +235,27 @@ class TestSaveMatlabTable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_table_empty_datetime(self, filename, version):
+        """Test writing table with no rows and a datetime column to MAT-file"""
+        df = pd.DataFrame(
+            {
+                "id": np.array([], dtype=np.float64),
+                "when": np.array([], dtype="datetime64[ns]"),
+            }
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"table_empty_dt": df}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["table_empty_dt"])
+            pd.testing.assert_frame_equal(mload["table_empty_dt"], df)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_table_strings(self, filename, version):
         """Test writing string table to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
