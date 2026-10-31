@@ -91,3 +91,10 @@ def test_whosmat_v4():
         assert (
             classname == expected_classname
         ), f"Class name mismatch for variable {name}: expected {expected_classname}, got {classname}"
+
+
+@pytest.mark.parametrize("name, shape", [("s", (1, 1)), ("a", (2, 3)), ("n", (1, 1))])
+def test_whosmat_struct_with_cell_field(name, shape):
+    # MATLAB: s = struct('c', {{1, 2}}); a = repmat(s, 2, 3);
+    # n = struct('n', [1, 2, 3]); save(..., 's', 'a', 'n', '-v7.3')
+    assert whosmat(DATA_DIR / "struct_cells.mat")[name] == (shape, "struct")

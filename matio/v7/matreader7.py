@@ -94,10 +94,12 @@ def whosmat7(file_path):
                 if len(keys) == 0:
                     # Struct with no fields
                     shape = (1, 1)
-                f[var][keys[0]]
-                if isinstance(f[var][keys[0]], h5py.Dataset) and f[var][
-                    keys[0]
-                ].dtype == np.dtype("O"):
+                first = f[var][keys[0]]
+                if (
+                    isinstance(first, h5py.Dataset)
+                    and first.dtype == np.dtype("O")
+                    and MAT_HDF_ATTRS.CLASS not in first.attrs
+                ):
                     # Struct array
                     shape = f[var][keys[0]].shape[::-1]
                 else:
@@ -211,17 +213,22 @@ class MatRead7:
     def read_struct(self, obj, is_empty=0):
         """Reads MATLAB struct arrays from the v7.3 MAT-file."""
 
-        if is_empty:
+        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        if is_empty and field_order is None:
             return EmptyMatStruct(np.empty(shape=obj[()], dtype=object))
 
-        fields = list(obj.keys())
-        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        # Empty struct arrays are datasets, their fields are only in the attribute
+        fields = [] if is_empty else list(obj.keys())
         if field_order is not None:
             if isinstance(field_order, h5py.Reference):
                 # MATLAB writes large field lists as a reference to dset
                 fields = ["".join(x.astype(str)) for x in self.h5stream[field_order]]
             else:
                 fields = ["".join(x.astype(str)) for x in field_order]
+
+        if is_empty:
+            dt = [(name, object) for name in fields]
+            return np.empty(shape=obj[()], dtype=dt)
 
         if self.is_struct_matrix(obj):
             is_scalar = False
@@ -269,7 +276,9 @@ class MatRead7:
                 data = data.astype(dtype)
             ir = obj["ir"][()]
         else:
-            data = np.array([], dtype=np.float64)
+            matlab_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, b"double")
+            dtype = matlab_class_to_dtype(matlab_class, np.dtype(np.float64))
+            data = np.array([], dtype=dtype)
             ir = np.array([], dtype=np.int32)
 
         return csc_array((data, ir, jc), shape=(nrows, ncols))

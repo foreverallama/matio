@@ -168,6 +168,20 @@ class TestLoadSparse:
         )
 
 
+@pytest.mark.parametrize("spmatrix", [False, True])
+def test_sparse_logical_without_data(spmatrix):
+    # MATLAB: x = logical(sparse(3, 4)); save(..., 'x', '-v7.3')
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "sparse_logical_zero_v73.mat"
+    )
+    x = load_from_mat(file_path, spmatrix=spmatrix)["x"]
+    assert x.shape == (3, 4)
+    assert x.nnz == 0
+    np.testing.assert_array_equal(
+        x.toarray(), np.zeros((3, 4), dtype=np.bool_), strict=True
+    )
+
+
 @pytest.mark.parametrize("filename, version", save_files)
 class TestSaveSparse:
 

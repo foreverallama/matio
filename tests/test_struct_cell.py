@@ -457,6 +457,27 @@ class TestSaveStructCell:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_struct_empty_with_fields(self, filename, version):
+        """Test writing empty struct array with fields to MAT-file"""
+        dtype = [("a", object), ("b", object)]
+        mdict = {"struct_empty_fields": np.empty((0, 3), dtype=dtype)}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path)
+
+            np.testing.assert_array_equal(
+                mload["struct_empty_fields"], mdict["struct_empty_fields"], strict=True
+            )
+            assert mload["struct_empty_fields"].dtype.names == ("a", "b")
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_struct_no_fields(self, filename, version):
         """Test writing struct no fields to MAT-file"""
         from matio.utils.matclass import EmptyMatStruct
