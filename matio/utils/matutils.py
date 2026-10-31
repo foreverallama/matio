@@ -245,18 +245,11 @@ def to_writeable(source, oned_as="col"):
         dtype = []
         values = []
         for field, value in source.items():
-            if isinstance(field, str):
-                if field[0] not in "_0123456789":
-                    dtype.append((str(field), object))
-                    values.append(value)
-                else:
-                    msg = (
-                        f"Starting field name with a underscore "
-                        f"or a digit ({field}) is ignored"
-                    )
-                    warnings.warn(msg, MatWriteWarning, stacklevel=2)
+            if isinstance(field, str) and is_valid_struct_fieldname(field):
+                dtype.append((field, object))
+                values.append(value)
             else:
-                msg = f"Non-string field name ({field!r}) is ignored"
+                msg = f"{field!r} is not a valid MATLAB field name. Skipping it"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
         if dtype:
             return np.array([tuple(values)], dtype).reshape((1, 1))
@@ -309,6 +302,15 @@ def is_valid_matlab_varname(name):
     underscores. S = load(f) fails for the whole file with any other name.
     """
     return name.isascii() and name.isidentifier() and not name.startswith("_")
+
+
+def is_valid_struct_fieldname(name):
+    """Checks if a name can be written as a MATLAB struct field name
+
+    Unlike variable names, MATLAB loads field names with spaces or other ASCII
+    characters. Non-ASCII names fail to encode when writing.
+    """
+    return name.isascii() and name != "" and name[0] not in "_0123456789"
 
 
 def sanitize_input_lists(var_list, arg_name):

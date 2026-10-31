@@ -507,7 +507,10 @@ class TestSaveStructCell:
         class NoFields:
             pass
 
-        mdict = {"struct_keys": {1: 10, "ok": 20}, "struct_obj": NoFields()}
+        mdict = {
+            "struct_keys": {1: 10, "gr\u00f6\u00dfe": 30, "p [bar]": 40, "ok": 20},
+            "struct_obj": NoFields(),
+        }
 
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
             temp_file_path = tmpfile.name
@@ -516,11 +519,12 @@ class TestSaveStructCell:
             with pytest.warns(MatWriteWarning) as record:
                 save_to_mat(temp_file_path, mdict, version=version)
             messages = [str(w.message) for w in record]
-            assert any("Non-string field name (1)" in msg for msg in messages)
+            assert any("1 is not a valid MATLAB field name" in msg for msg in messages)
+            assert any("'gr\u00f6\u00dfe' is not a valid" in msg for msg in messages)
             assert any("NoFields object has no public" in msg for msg in messages)
 
             mload = load_from_mat(temp_file_path, variable_names=None)
-            assert mload["struct_keys"].dtype.names == ("ok",)
+            assert mload["struct_keys"].dtype.names == ("p [bar]", "ok")
             assert isinstance(mload["struct_obj"], EmptyMatStruct)
 
         finally:
