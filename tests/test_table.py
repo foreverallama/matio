@@ -267,7 +267,7 @@ class TestSaveMatlabTable:
             save_to_mat(temp_file_path, mdict, version=version)
             mload = load_from_mat(temp_file_path, variable_names=["table_string_dtype"])
 
-            expected = pd.DataFrame({"s": pd.array(["a", np.nan, "bc"], dtype="str")})
+            expected = pd.DataFrame({"s": ["a", np.nan, "bc"]})
             pd.testing.assert_frame_equal(expected, mload["table_string_dtype"])
 
         finally:
@@ -734,3 +734,13 @@ class TestLoadMatlabTableStruct:
             assert set(col[i].dtype.names) == {"a", "b"}
             np.testing.assert_array_equal(col[i]["a"][0, 0], np.array([[a]]))
             np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
+
+
+@pytest.fixture(autouse=True)
+def string_inference_for_expected_tables():
+    # Expected frames must not rely on an import changing pandas options.
+    if int(pd.__version__.split(".")[0]) < 3:
+        with pd.option_context("future.infer_string", True):
+            yield
+    else:
+        yield

@@ -782,3 +782,13 @@ class TestLoadMatlabTimetableStruct:
             assert set(col.iloc[i].dtype.names) == {"a", "b"}
             np.testing.assert_array_equal(col.iloc[i]["a"][0, 0], np.array([[a]]))
             np.testing.assert_array_equal(col.iloc[i]["b"][0, 0], np.array([b]))
+
+
+@pytest.fixture(autouse=True)
+def string_inference_for_expected_tables():
+    # Expected frames must not rely on an import changing pandas options.
+    if int(pd.__version__.split(".")[0]) < 3:
+        with pd.option_context("future.infer_string", True):
+            yield
+    else:
+        yield
