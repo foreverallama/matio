@@ -155,7 +155,8 @@ class MatFile5Reader:
 
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
-            name = hdr.name.decode("ascii")
+            # MATLAB ends names at the first NUL, non-MATLAB writers may pad with NULs
+            name = hdr.name.partition(b"\x00")[0].decode("ascii")
             if name in mdict:
                 msg = f"Duplicate variable name {name!r} in file. Overwriting previous."
                 warnings.warn(msg, MatReadWarning, stacklevel=2)
@@ -193,7 +194,8 @@ class MatFile5Reader:
         vars = {}
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
-            name = hdr.name.decode("ascii")
+            # MATLAB ends names at the first NUL, non-MATLAB writers may pad with NULs
+            name = hdr.name.partition(b"\x00")[0].decode("ascii")
             if name == "":
                 # Skip subsystem
                 self.mat_stream.seek(next_position)
