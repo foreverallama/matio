@@ -38,11 +38,14 @@ def loadmat7(
     variable_names,
     raw_data,
     add_table_attrs,
+    datetime_unit="ns",
 ):
     """Reads MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        subsystem = read_subsystem(f, byte_order, raw_data, add_table_attrs)
+        subsystem = read_subsystem(
+            f, byte_order, raw_data, add_table_attrs, datetime_unit
+        )
         mat_reader = MatRead7(f, subsystem)
         matfile_dict = mat_reader.get_variables(variable_names)
 
@@ -408,7 +411,7 @@ class MatRead7:
         return mdict
 
 
-def read_subsystem(f, byte_order, raw_data, add_table_attrs):
+def read_subsystem(f, byte_order, raw_data, add_table_attrs, datetime_unit="ns"):
     """Read subsystem data if present"""
 
     if MAT_HDF_SUBSYS_GROUP not in f:
@@ -417,7 +420,9 @@ def read_subsystem(f, byte_order, raw_data, add_table_attrs):
     subsys_group = f[MAT_HDF_SUBSYS_GROUP]
     MR7 = MatRead7(f, None)
     subsys_data = MR7.read_struct(subsys_group)
-    subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)
+    subsystem = MatSubsystem(
+        byte_order, raw_data, add_table_attrs, datetime_unit=datetime_unit
+    )
     subsystem.load_subsystem(subsys_data)
 
     return subsystem

@@ -1,5 +1,6 @@
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
@@ -24,6 +25,16 @@ class TestLoadMatlabDatetime:
             1, 1
         )
 
+        np.testing.assert_array_equal(mdict["dt_basic"], dt_scalar, strict=True)
+
+    def test_datetime_unit(self, filename, version):
+        """Test reading datetime data with datetime_unit"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path, variable_names=["dt_basic"], datetime_unit="us"
+        )
+
+        dt_scalar = np.array([["2025-04-01T12:00:00"]], dtype="datetime64[us]")
         np.testing.assert_array_equal(mdict["dt_basic"], dt_scalar, strict=True)
 
     def test_datetime_array(self, filename, version):
@@ -200,4 +211,15 @@ def test_datetime_outside_ns_range():
         [["NaT", "2024-01-01", "2262-04-11T23:47:16.854", "1677-09-21T00:12:43.146"]],
         dtype="datetime64[ns]",
     )
+    np.testing.assert_array_equal(dt, expected, strict=True)
+
+
+def test_datetime_unit_range():
+    """datetime_unit="us" keeps MATLAB datetimes up to the year 9999"""
+    # datetime(9999, 12, 31) and datetime(2024, 1, 1) as stored by MATLAB
+    data = np.array([[253402214400000.0, 1704067200000.0]])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        dt = mat_to_datetime({"data": data + 0j}, datetime_unit="us")
+    expected = np.array([["9999-12-31", "2024-01-01"]], dtype="datetime64[us]")
     np.testing.assert_array_equal(dt, expected, strict=True)

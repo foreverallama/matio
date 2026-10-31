@@ -21,9 +21,14 @@ def load_from_mat(
     raw_data=False,
     add_table_attrs=False,
     spmatrix=True,
+    datetime_unit="ns",
 ):
     """Loads variables from MAT-file"""
 
+    if datetime_unit not in ("ns", "us", "ms"):
+        raise ValueError(
+            f"datetime_unit must be 'ns', 'us' or 'ms', not {datetime_unit!r}"
+        )
     subsystem_offset, ver, byte_order = read_mat_header(file_path)
     variable_names = sanitize_input_lists(variable_names, "variable_names")
 
@@ -35,10 +40,16 @@ def load_from_mat(
             variable_names,
             raw_data,
             add_table_attrs,
+            datetime_unit,
         )
     elif ver == MAT_FILE_VERSIONS.HDF:
         matfile_dict = loadmat7(
-            file_path, byte_order, variable_names, raw_data, add_table_attrs
+            file_path,
+            byte_order,
+            variable_names,
+            raw_data,
+            add_table_attrs,
+            datetime_unit,
         )
     elif ver == MAT_FILE_VERSIONS.V4:
         matfile_dict = loadmat4(file_path, byte_order, variable_names)

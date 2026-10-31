@@ -82,6 +82,7 @@ def convert_mat_to_py(props, classname, **kwargs):
         props,
         byte_order=kwargs.get("byte_order", None),
         add_table_attrs=kwargs.get("add_table_attrs", None),
+        datetime_unit=kwargs.get("datetime_unit", "ns"),
     )
 
 

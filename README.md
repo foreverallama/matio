@@ -29,6 +29,7 @@ data = load_from_mat(
     file_path,
     raw_data=False,
     add_table_attrs=False,
+    datetime_unit="ns",
     mdict=None,
     variable_names=None,
 )
@@ -36,6 +37,7 @@ data = load_from_mat(
 
 - `raw_data`: If `True`, returns raw property maps of Opaque class objects.
 - `add_table_attrs`: If `True`, adds custom Matlab Table or Timetable properties as `pandas.DataFrame` attributes.
+- `datetime_unit`: Unit of the returned `datetime64` arrays, `"ns"` (default), `"us"` or `"ms"`. `"ns"` covers about the years 1678 to 2262, coarser units cover a wider range. Datetimes outside the range are set to `NaT` with a warning.
 - `mdict`: If provided, this dictionary will be updated with the data from a MAT-file.
 - `variable_names`: A list of variable names to load from file.
 
