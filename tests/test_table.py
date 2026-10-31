@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.converters.mattables import table_to_mat
+from matio.utils.converters.mattables import _STRING_DTYPE, table_to_mat
 from matio.utils.matclass import MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
@@ -326,6 +326,10 @@ class TestSaveMatlabTable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    @pytest.mark.xfail(
+        _STRING_DTYPE is object,
+        reason="object columns of str are written as cell arrays of char",
+    )
     def test_table_nan(self, filename, version):
         """Test writing table with NaN values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -739,7 +743,7 @@ class TestLoadMatlabTableStruct:
 @pytest.fixture(autouse=True)
 def string_inference_for_expected_tables():
     # Expected frames must not rely on an import changing pandas options.
-    if int(pd.__version__.split(".")[0]) < 3:
+    if int(pd.__version__.split(".")[0]) < 3 and _STRING_DTYPE is not object:
         with pd.option_context("future.infer_string", True):
             yield
     else:

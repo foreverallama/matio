@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattables import _STRING_DTYPE
 from matio.utils.matclass import MatConvertWarning, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
@@ -787,7 +788,7 @@ class TestLoadMatlabTimetableStruct:
 @pytest.fixture(autouse=True)
 def string_inference_for_expected_tables():
     # Expected frames must not rely on an import changing pandas options.
-    if int(pd.__version__.split(".")[0]) < 3:
+    if int(pd.__version__.split(".")[0]) < 3 and _STRING_DTYPE is not object:
         with pd.option_context("future.infer_string", True):
             yield
     else:
