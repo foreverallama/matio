@@ -292,6 +292,15 @@ def shape_from_metadata(metadata):
     return tuple(dims)
 
 
+def is_valid_matlab_varname(name):
+    """Checks if a name is a valid MATLAB variable name
+
+    MATLAB names start with a letter and use only ASCII letters, digits and
+    underscores. S = load(f) fails for the whole file with any other name.
+    """
+    return name.isascii() and name.isidentifier() and not name.startswith("_")
+
+
 def sanitize_input_lists(var_list, arg_name):
     """Sanitize input list of variable names"""
     if var_list is None:
