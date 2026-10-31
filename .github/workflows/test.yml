@@ -21,6 +21,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        pandas-version: ["latest"]
+        include:
+          # Oldest supported pandas and the last pandas 2
+          - os: ubuntu-latest
+            python-version: "3.12"
+            pandas-version: "2.2.*"
+          - os: ubuntu-latest
+            python-version: "3.13"
+            pandas-version: "2.3.*"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,6 +50,10 @@ jobs:
           python -m pip install build
           python -m build
           pip install dist/*.whl
+
+      - name: Install pandas ${{ matrix.pandas-version }}
+        if: matrix.pandas-version != 'latest'
+        run: pip install "pandas==${{ matrix.pandas-version }}"
 
       - name: Run tests
         run: |
