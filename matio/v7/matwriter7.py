@@ -210,9 +210,7 @@ class MatWrite7:
             struct_group = parent.create_group(var_name)
             if fields is not None:
                 for field in fields:
-                    self.write_variable(
-                        field, data[field][0, 0], group=struct_group.name
-                    )
+                    self.write_variable(field, data[field][0, 0], group=struct_group)
         else:
             # Struct arrays are stored as dset of references to each struct
             struct_group = parent.create_group(var_name)
@@ -370,6 +368,8 @@ class MatWrite7:
 
         if group is None:
             parent = self.h5file
+        elif isinstance(group, h5py.Group):
+            parent = group
         else:
             parent = self.h5file.require_group(group)
 
