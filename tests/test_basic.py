@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import pytest
 
-from matio import load_from_mat, save_to_mat
+from matio import load_from_mat, save_to_mat, whosmat
 from matio.utils.matclass import MatWriteWarning
 
 # Check for availability of extended precision types in numpy
@@ -766,6 +766,28 @@ def test_load_numeric_precision_v4(filename="test_basic_v4.mat"):
         assert key in mdict
         expected_val = expected_dict[key]
         np.testing.assert_array_equal(mdict[key], expected_val, strict=True)
+
+
+def test_load_v73_skips_internal_groups():
+    """MATLAB saves Simulink logs with a #sigstream# group next to the variables"""
+    mdict = {"x": np.array([[1.0, 2.0]])}
+
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        save_to_mat(temp_file_path, mdict, version="v7.3")
+        with h5py.File(temp_file_path, "a") as f:
+            f.create_group("#sigstream#")
+
+        mload = load_from_mat(temp_file_path)
+        assert "#sigstream#" not in mload
+        np.testing.assert_array_equal(mload["x"], mdict["x"], strict=True)
+        assert whosmat(temp_file_path) == {"x": ((1, 2), "double")}
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 
 def test_save_compression_v73():
