@@ -103,6 +103,7 @@ empty_string = np.empty((0,), dtype="U1")
 concatenated_strings = np.array(["this is a string      ", "this is another string"])
 accented_string = np.array(["thé qüîck browñ fòx"])
 
+
 files_old = ["chars2_v7.mat", "chars2_hdf.mat", "chars2_v6.mat"]
 
 
@@ -127,6 +128,18 @@ def test_load_old_char(filename):
     np.testing.assert_array_equal(
         mdict["accented_string"], accented_string, strict=True
     )
+
+
+def test_load_multibyte_utf8_char(tmp_path):
+    """Test reading char data that scipy.io.savemat stores as multibyte UTF-8"""
+    from scipy.io import savemat
+
+    file_path = tmp_path / "utf8.mat"
+    savemat(file_path, {"unit": "°C", "rows": np.array(["äb", "cd"])})
+    mdict = load_from_mat(file_path)
+
+    np.testing.assert_array_equal(mdict["unit"], np.array(["°C"]), strict=True)
+    np.testing.assert_array_equal(mdict["rows"], np.array(["äb", "cd"]), strict=True)
 
 
 def test_load_old_char_null(filename="char_array_old_null.mat"):
