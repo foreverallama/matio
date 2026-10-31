@@ -34,13 +34,13 @@ def mat_to_string(props, byte_order, **_kwargs):
     strings = []
     pos = 0
     encoding = "utf-16-le" if byte_order[0] == "<" else "utf-16-be"
-    for char_count in char_counts:
+    for char_count in char_counts.tolist():
         if char_count == MAT_STRING_MISSING:
             strings.append(np.nan)
             continue
         byte_length = char_count * 2  # UTF-16 encoding
         extracted_string = byte_data[pos : pos + byte_length].decode(encoding)
-        strings.append(np.str_(extracted_string))
+        strings.append(extracted_string)
         pos += byte_length
 
     arr = np.array(strings, dtype=np.dtypes.StringDType(na_object=np.nan)).reshape(
@@ -63,13 +63,13 @@ def string_to_mat(arr):
     for s in arr.ravel(order="F"):
         if not isinstance(s, str):
             # Missing string, e.g. NaN in StringDType(na_object=np.nan)
-            utf16_data_list.append(np.empty(0, dtype=np.uint16))
+            utf16_data_list.append(b"")
             char_counts.append(MAT_STRING_MISSING)
             continue
-        utf16_arr = np.frombuffer(s.encode(encoding), dtype=np.uint16)
-        utf16_data_list.append(utf16_arr)
-        char_counts.append(len(utf16_arr))
-    all_utf16 = np.hstack(utf16_data_list)
+        utf16_bytes = s.encode(encoding)
+        utf16_data_list.append(utf16_bytes)
+        char_counts.append(len(utf16_bytes) // 2)
+    all_utf16 = np.frombuffer(b"".join(utf16_data_list), dtype=np.uint16)
 
     # Pad
     pad_len = (-len(all_utf16)) % 4

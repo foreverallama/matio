@@ -35,22 +35,26 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
     char_len = char_dims[char_axis]
 
     # Move char axis to end and flatten
-    arr2 = np.moveaxis(arr, char_axis, -1)
+    arr2 = arr if char_axis == arr.ndim - 1 else np.moveaxis(arr, char_axis, -1)
     flat = arr2.reshape(-1, char_len)
 
-    strings = []
-    for char_data in flat:
-        if mdtype == 4:
+    if mdtype == 4:
+        strings = []
+        for char_data in flat:
             row = bytearray()
             for msb, lsb in zip(char_data[::2], char_data[1::2]):
                 if msb == 0:
                     row.append(lsb)
                 else:
                     row.extend((msb, lsb))
-        else:
-            row = char_data.tobytes()
-
-        strings.append(row.decode(codec, errors="surrogatepass"))
+            strings.append(row.decode(codec, errors="surrogatepass"))
+    else:
+        byte_data = flat.tobytes()
+        row_bytes = char_len * flat.dtype.itemsize
+        strings = [
+            byte_data[pos : pos + row_bytes].decode(codec, errors="surrogatepass")
+            for pos in range(0, len(byte_data), row_bytes)
+        ]
 
     out = np.array(strings, dtype=np.str_)
     return out.reshape(out_dims)
@@ -61,33 +65,16 @@ def encode_char_arrays(arr):
 
     arr = np.atleast_1d(arr)
     flat = arr.ravel(order="F")
-    encoded = [None] * len(flat)
-
-    # Track max utf-16 code units, value per string
-    max_units = 0
-    max_val = 0
-    for i, s in enumerate(flat):
-        # Encode string into utf-16
-        units = np.frombuffer(s.encode("utf-16-le"), dtype=np.uint16)
-        encoded[i] = units
-
-        u_len = len(units)
-        if u_len > max_units:
-            max_units = u_len
-        if u_len:
-            u_max = units.max()
-            if u_max > max_val:
-                max_val = u_max
-
-    out = np.zeros((len(flat), max_units), dtype=np.uint16)
-    for i, units in enumerate(encoded):
-        out[i, : len(units)] = units  # pad with zeros if shorter than max_units
-
-    if max_val <= 127:  # uint8 is written as miUTF8, so only ASCII fits
+    encoded = np.array([s.encode("utf-16-le") for s in flat], dtype="S")
+    if encoded.dtype.itemsize == 1:
+        # NumPy uses S1 when all encoded strings are empty.
+        out = np.empty((len(flat), 0), dtype=np.uint16)
+    else:
+        out = encoded.view(np.uint16).reshape(len(flat), -1)
+    if not out.size or out.max() <= 127:
         out = out.astype(np.uint8)
-
-    reshaped = out.reshape(arr.shape + (max_units,), order="F")
-    return np.moveaxis(reshaped, -1, 1)  # Move char axis to position 1
+    reshaped = out.reshape(arr.shape + (out.shape[1],), order="F")
+    return reshaped if reshaped.ndim == 2 else np.moveaxis(reshaped, -1, 1)
 
 
 def matlab_class_to_dtype(matlab_class, current_dtype):
