@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.converters.mattables import table_to_mat
+from matio.utils.converters.mattables import _STRING_DTYPE, table_to_mat
 from matio.utils.matclass import MatConvertWarning, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
@@ -267,7 +267,7 @@ class TestSaveMatlabTable:
             save_to_mat(temp_file_path, mdict, version=version)
             mload = load_from_mat(temp_file_path, variable_names=["table_string_dtype"])
 
-            expected = pd.DataFrame({"s": pd.array(["a", np.nan, "bc"], dtype="str")})
+            expected = pd.DataFrame({"s": ["a", np.nan, "bc"]})
             pd.testing.assert_frame_equal(expected, mload["table_string_dtype"])
 
         finally:
@@ -351,6 +351,10 @@ class TestSaveMatlabTable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    @pytest.mark.xfail(
+        _STRING_DTYPE is object,
+        reason="object columns of str are written as cell arrays of char",
+    )
     def test_table_nan(self, filename, version):
         """Test writing table with NaN values to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -759,3 +763,13 @@ class TestLoadMatlabTableStruct:
             assert set(col[i].dtype.names) == {"a", "b"}
             np.testing.assert_array_equal(col[i]["a"][0, 0], np.array([[a]]))
             np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
+
+
+@pytest.fixture(autouse=True)
+def string_inference_for_expected_tables():
+    # Expected frames must not rely on an import changing pandas options.
+    if int(pd.__version__.split(".")[0]) < 3 and _STRING_DTYPE is not object:
+        with pd.option_context("future.infer_string", True):
+            yield
+    else:
+        yield

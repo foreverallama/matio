@@ -21,11 +21,14 @@ TIMETABLE_LOAD_VERSION = 7
 TIMETABLE_SAVE_VERSION = 6
 MIN_TIMETABLE_VERSION = 2
 
-# Pandas marks this as experimental
-# Using it here as its the closest match to MATLAB tables
-# FIXME: Update with pandas 3.0 release
-# https://pandas.pydata.org/docs/user_guide/migration-3-strings.html
-pd.options.future.infer_string = True
+try:
+    _STRING_DTYPE = pd.StringDtype(na_value=np.nan)
+except TypeError:
+    # pandas 2.2 uses the storage name to select NaN semantics.
+    try:
+        _STRING_DTYPE = pd.StringDtype(storage="pyarrow_numpy")
+    except ImportError:
+        _STRING_DTYPE = object
 
 
 def use_original_names(props, flag):
@@ -98,8 +101,8 @@ def to_dataframe(data, nvars, varnames):
     """Creates a dataframe from coldata and column names"""
 
     def make_series(col, dtype_kind):
-        if dtype_kind == "T":
-            return pd.Series(col, dtype="str")
+        if dtype_kind in ("T", "U"):
+            return pd.Series(col, dtype=_STRING_DTYPE)
         elif dtype_kind == "V":
             # struct arrays are split into one 1x1 struct per row
             return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
@@ -130,7 +133,8 @@ def to_dataframe(data, nvars, varnames):
         else:
             rows[vname] = pd.Series(coldata)
 
-    df = pd.DataFrame(rows)
+    columns = pd.Index(list(rows), dtype=_STRING_DTYPE) if rows else None
+    df = pd.DataFrame(rows, columns=columns)
     return df
 
 
@@ -169,7 +173,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     if rownames.size > 0:
         rownames = [s.item() for s in rownames.ravel()]
         if len(rownames) == nrows:
-            df.index = rownames
+            df.index = pd.Index(rownames, dtype=_STRING_DTYPE)
 
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
@@ -305,6 +309,8 @@ def mat_to_categorical(props, **_kwargs):
 
     raw_names = props.get("categoryNames")
     category_names = [name.item() for name in raw_names.ravel()]
+    if category_names:
+        category_names = pd.Index(category_names, dtype=_STRING_DTYPE)
 
     # MATLAB codes are 1-indexed as uint integers
     codes = props.get("codes").astype(int) - 1
