@@ -510,6 +510,40 @@ class TestSaveMatlabTimetable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    @pytest.mark.xfail(
+        _STRING_DTYPE is object,
+        reason="object columns of str are written as cell arrays of char",
+    )
+    def test_timetable_nan(self, filename, version):
+        """Test writing timetable with NaN, NaT and missing strings to MAT-file"""
+        index = pd.DatetimeIndex(
+            ["2024-01-01", "2024-01-02", "2024-01-03"],
+            dtype="datetime64[ns]",
+            name="Time",
+        )
+        df = pd.DataFrame(
+            {
+                "x": [1.0, np.nan, 3.0],
+                "s": ["a", np.nan, "c"],
+                "t": np.array(
+                    ["2024-01-01", "NaT", "2024-01-03"], dtype="datetime64[ns]"
+                ),
+            },
+            index=index,
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"timetable_nan": df}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["timetable_nan"])
+            pd.testing.assert_frame_equal(mload["timetable_nan"], df, check_like=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     @pytest.mark.xfail(reason="Writing attributes not implemented")
     def test_timetable_with_attrs(self, filename, version):
         """Test writing numeric timetable to MAT-file"""
