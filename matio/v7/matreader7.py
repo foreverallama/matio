@@ -246,6 +246,9 @@ class MatRead7:
 
         for field in obj:
             obj_field = obj[field]
+            if not is_scalar:
+                # Read all references at once, one HDF5 read per element is slow
+                obj_field = obj_field[()]
             for idx in np.ndindex(arr.shape):
                 if is_scalar:
                     arr[idx][field] = self.read_h5_data(obj_field)
@@ -260,8 +263,9 @@ class MatRead7:
             return np.empty(shape=obj[()], dtype=object)
 
         arr = np.empty(shape=obj.shape, dtype=object)
+        refs = obj[()]
         for idx in np.ndindex(obj.shape):
-            ref_data = self.h5stream[obj[idx]]
+            ref_data = self.h5stream[refs[idx]]
             arr[idx] = self.read_h5_data(ref_data)
         return arr.T
 
