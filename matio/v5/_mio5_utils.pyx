@@ -577,7 +577,7 @@ cdef class VarReader5:
             cnp.uint32_t flags_class, nzmax
             cnp.uint16_t mc
             int i
-            long header_start
+            Py_ssize_t header_start
             long remaining_payload
             VarHeader5 header
         header_start = self.cstream.tell()

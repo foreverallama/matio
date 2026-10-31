@@ -841,3 +841,21 @@ def test_save_v7_threads(tmp_path):
     for k in range(8):
         for j in range(3):
             assert (tmp_path / f"thread{k}_{j}.mat").read_bytes()[128:] == expected
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_numpy_unicode_scalar(tmp_path, version):
+    file_path = tmp_path / "unicode_scalar.mat"
+    save_to_mat(file_path, {"label": np.str_("alpha")}, version=version)
+    actual = load_from_mat(file_path)["label"]
+    np.testing.assert_array_equal(actual, np.array(["alpha"]), strict=True)
+
+
+def test_large_stream_position():
+    from io import BytesIO
+
+    from matio.v5._streams import make_stream
+
+    stream = make_stream(BytesIO())
+    stream.seek(2**31 + 128)
+    assert stream.tell() == 2**31 + 128

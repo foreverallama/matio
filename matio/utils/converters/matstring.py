@@ -56,7 +56,8 @@ def string_to_mat(arr):
     shape = arr.shape
     encoding = "utf-16-le" if np.little_endian else "utf-16-be"
 
-    utf16_data_list = []
+    # Start non-empty so that zero-element arrays (e.g. 0x3) are written as header only
+    utf16_data_list = [np.empty(0, dtype=np.uint16)]
     char_counts = []
 
     for s in arr.ravel(order="F"):
