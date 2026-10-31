@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattimes import calendarduration_to_mat
 
 files = [("test_time_v7.mat", "v7"), ("test_time_v73.mat", "v7.3")]
 
@@ -354,3 +355,15 @@ class TestSaveMatlabCalendarDuration:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+def test_calendarDuration_nat():
+    """Test writing calendarDuration with NaT"""
+    cdur = np.array(
+        [[(2, 4, 3723000), ("NaT", "NaT", "NaT")]],
+        dtype=[("months", "<m8[M]"), ("days", "<m8[D]"), ("millis", "<m8[ms]")],
+    )
+    comps = calendarduration_to_mat(cdur)["components"]
+    # MATLAB saves missing components as NaN
+    for field in cdur.dtype.names:
+        assert np.isnan(comps[0, 0][field][0, 1])

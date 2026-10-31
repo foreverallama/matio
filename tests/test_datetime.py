@@ -165,6 +165,26 @@ class TestSaveMatlabDatetime:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_datetime_subms(self, filename, version):
+        """Test writing datetime with sub-millisecond precision to MAT-file"""
+        dt_subms = np.array(
+            [["2024-01-01T12:00:00.000000123", "1969-12-31T23:59:59.999999999", "NaT"]],
+            dtype="datetime64[ns]",
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"dt_subms": dt_subms}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["dt_subms"])
+
+            np.testing.assert_array_equal(mload["dt_subms"], dt_subms, strict=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
 
 precision_files = [
     ("test_datetime_precision_v7.mat", "v7"),
