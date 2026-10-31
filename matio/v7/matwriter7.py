@@ -395,11 +395,10 @@ class MatWrite7:
             dset = self.write_numeric_dset(parent, var_name, data)
         elif data.dtype.kind in ("U", "S"):
             dset = self.write_char_dset(parent, var_name, data)
+        elif data.dtype.names:
+            dset = self.write_struct_array(parent, var_name, data)
         elif data.dtype.hasobject:
-            if data.dtype.names:
-                dset = self.write_struct_array(parent, var_name, data)
-            else:
-                dset = self.write_cell_array(parent, var_name, data)
+            dset = self.write_cell_array(parent, var_name, data)
         else:
             warnings.warn(
                 f"Data type {data.dtype} not supported for variable {var_name}. Skipping.",
