@@ -35,7 +35,12 @@ from matio.utils.matheaders import (
     MAT_HDF_USER_BLOCK_BYTES,
     write_file_header,
 )
-from matio.utils.matutils import encode_char_arrays, mat_numeric, to_writeable
+from matio.utils.matutils import (
+    encode_char_arrays,
+    is_valid_matlab_varname,
+    mat_numeric,
+    to_writeable,
+)
 
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
@@ -416,14 +421,7 @@ class MatWrite7:
         """Writes variables to the HDF5 file."""
 
         for var_name, data in mdict.items():
-            if var_name[0] == "_":
-                msg = (
-                    f"Starting field name with a " f"underscore ({var_name}) is ignored"
-                )
-                warnings.warn(msg, MatWriteWarning, stacklevel=2)
-                continue
-            if not (var_name.isascii() and var_name.isidentifier()):
-                # S = load(f) fails for the whole file in MATLAB with such a name
+            if not is_valid_matlab_varname(var_name):
                 msg = f"'{var_name}' is not a valid MATLAB variable name. Skipping it"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue

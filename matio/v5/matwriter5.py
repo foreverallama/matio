@@ -64,7 +64,13 @@ from matio.utils.matheaders import (
     write_subsystem_offset,
     write_version,
 )
-from matio.utils.matutils import encode_char_arrays, mat_numeric, matdims, to_writeable
+from matio.utils.matutils import (
+    encode_char_arrays,
+    is_valid_matlab_varname,
+    mat_numeric,
+    matdims,
+    to_writeable,
+)
 
 # Constants and helper objects
 from matio.v5.matio5_params import (
@@ -424,12 +430,7 @@ class MatFile5Writer:
         for name, var in mdict.items():
             if name == "__subsystem__":
                 name = ""
-            elif name[0] in "_0123456789":
-                msg = f"Variable names cannot start with '{name[0]}'. Skipping '{name}'"
-                warnings.warn(msg, MatWriteWarning, stacklevel=2)
-                continue
-            elif not (name.isascii() and name.isidentifier()):
-                # S = load(f) fails for the whole file in MATLAB with such a name
+            elif not is_valid_matlab_varname(name):
                 msg = f"'{name}' is not a valid MATLAB variable name. Skipping it"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue

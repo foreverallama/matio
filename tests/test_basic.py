@@ -757,7 +757,14 @@ class TestWriteNonSupportedNumeric:
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
 def test_save_invalid_variable_names(version):
     """Test that variable names MATLAB cannot load are skipped with a warning"""
-    mdict = {"ok": 1.0, "gr\u00f6\u00dfe": 2.0, "p [bar]": 3.0, "a-b": 4.0}
+    mdict = {
+        "ok": 1.0,
+        "gr\u00f6\u00dfe": 2.0,
+        "p [bar]": 3.0,
+        "a-b": 4.0,
+        "_a": 5.0,
+        "1a": 6.0,
+    }
 
     with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
         temp_file_path = tmpfile.name
