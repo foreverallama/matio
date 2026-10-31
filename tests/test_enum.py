@@ -1,5 +1,6 @@
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
@@ -129,6 +130,23 @@ class TestLoadMatlabEnum:
         assert (
             mdict["enum_nested"].properties["c"][0, 0]["InnerProp"][0, 0].name
             == "enum3"
+        )
+
+    def test_load_enum_raw_data(self, filename, version):
+        """Test reading nested enum with raw_data=True from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            mdict = load_from_mat(
+                file_path, variable_names=["enum_nested"], raw_data=True
+            )
+        enum_obj = mdict["enum_nested"].properties["a"]
+        assert isinstance(enum_obj, MatlabOpaque)
+        assert enum_obj.classname == f"{namespace}.EnumClass"
+        np.testing.assert_array_equal(
+            enum_obj.properties[0, 0]["ValueNames"],
+            np.array([["enum1"]], dtype=np.str_),
+            strict=True,
         )
 
 

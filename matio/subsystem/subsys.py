@@ -952,7 +952,8 @@ class MatSubsystem:
     def load_mcos_enumeration(self, metadata, type_system):
         """Loads MATLAB MCOS enumeration instance array"""
 
-        classname = self.get_classname(metadata[0, 0]["ClassName"].item())
+        class_id = metadata[0, 0]["ClassName"].item()
+        classname = self.get_classname(class_id)
         builtin_class_idx = metadata[0, 0]["BuiltinClassName"].item()
         if builtin_class_idx != 0:
             builtin_class_name = self.get_classname(builtin_class_idx)
@@ -1001,7 +1002,7 @@ class MatSubsystem:
             metadata,
             classname,
             type_system,
-            self.get_class_alias(metadata[0, 0]["ClassName"].item()),
+            self.get_class_alias(class_id),
         )
 
     def load_mcos_object(self, metadata, type_system=OpaqueType.MCOS):
