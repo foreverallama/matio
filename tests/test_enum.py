@@ -80,6 +80,27 @@ class TestLoadMatlabEnum:
                 np.array([[expected_vals[idx]]], dtype=np.float64),
             )
 
+    def test_enum_repeated(self, filename, version):
+        """Test reading enum array with repeated members from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_repeated"])
+        assert isinstance(mdict["enum_repeated"], MatlabEnumerationArray)
+        assert mdict["enum_repeated"].shape == (2, 3)
+
+        expected_names = np.array(
+            [["enum2", "enum2", "enum1"], ["enum3", "enum2", "enum1"]], dtype=np.str_
+        )
+        expected_vals = np.array([[2, 2, 1], [3, 2, 1]], dtype=np.float64)
+
+        for idx in np.ndindex(mdict["enum_repeated"].shape):
+            enum_obj = mdict["enum_repeated"][idx]
+            assert enum_obj.name == expected_names[idx]
+            np.testing.assert_array_equal(
+                enum_obj.value["val"],
+                np.array([[expected_vals[idx]]], dtype=np.float64),
+                strict=True,
+            )
+
     def test_load_enum_nested(self, filename, version):
         """Test reading nested enum data from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -227,6 +248,17 @@ class TestSaveMatlabEnum:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_enum_repeated(self, filename, version, tmp_path):
+        """Test writing enum array with repeated members to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_repeated"])
+        save_to_mat(tmp_path / "enum.mat", mdict, version=version)
+        mload = load_from_mat(tmp_path / "enum.mat")
+        assert mload["enum_repeated"].shape == (2, 3)
+        assert [e.name for e in mload["enum_repeated"].ravel(order="F")] == [
+            e.name for e in mdict["enum_repeated"].ravel(order="F")
+        ]
 
     def test_save_enum_nested(self, filename, version):
         """Test writing nested enum data to MAT-file"""
