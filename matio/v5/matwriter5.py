@@ -428,6 +428,11 @@ class MatFile5Writer:
                 msg = f"Variable names cannot start with '{name[0]}'. Skipping '{name}'"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue
+            elif not (name.isascii() and name.isidentifier()):
+                # S = load(f) fails for the whole file in MATLAB with such a name
+                msg = f"'{name}' is not a valid MATLAB variable name. Skipping it"
+                warnings.warn(msg, MatWriteWarning, stacklevel=2)
+                continue
             is_global = name in global_vars
             if do_compression:
                 stream = BytesIO()

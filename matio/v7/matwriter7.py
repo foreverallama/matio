@@ -422,6 +422,11 @@ class MatWrite7:
                 )
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue
+            if not (var_name.isascii() and var_name.isidentifier()):
+                # S = load(f) fails for the whole file in MATLAB with such a name
+                msg = f"'{var_name}' is not a valid MATLAB variable name. Skipping it"
+                warnings.warn(msg, MatWriteWarning, stacklevel=2)
+                continue
 
             dset = self.write_variable(var_name, data)
             if dset is not None and var_name in global_vars:
