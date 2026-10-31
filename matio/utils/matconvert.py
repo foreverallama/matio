@@ -9,7 +9,12 @@ from matio.utils.converters.matenum import (
     enum_to_opaque,
     mat_to_enum,
 )
-from matio.utils.converters.matmap import containermap_to_mat, mat_to_containermap
+from matio.utils.converters.matmap import (
+    containermap_to_mat,
+    dictionary_to_mat,
+    mat_to_containermap,
+    mat_to_dictionary,
+)
 from matio.utils.converters.matstring import mat_to_string, string_to_mat
 from matio.utils.converters.mattables import (
     categorical_to_mat,
@@ -30,6 +35,7 @@ from matio.utils.converters.mattimes import (
 )
 from matio.utils.matclass import (
     MatlabContainerMap,
+    MatlabDictionary,
     MatlabEnumerationArray,
     MatlabOpaque,
     OpaqueType,
@@ -47,7 +53,7 @@ matlab_classdef_types = [
     "categorical",
     "containers.Map",
     "datetime",
-    # "dictionary",
+    "dictionary",
     "duration",
     "string",
     "table",
@@ -59,7 +65,7 @@ MAT_TO_PY = {
     "categorical": mat_to_categorical,
     "containers.Map": mat_to_containermap,
     "datetime": mat_to_datetime,
-    # "dictionary": mat_to_dictionary,
+    "dictionary": mat_to_dictionary,
     "duration": mat_to_duration,
     "string": mat_to_string,
     "table": mat_to_table,
@@ -71,7 +77,7 @@ PY_TO_MAT = {
     "categorical": categorical_to_mat,
     "containers.Map": containermap_to_mat,
     "datetime": datetime_to_mat,
-    # "dictionary": dictionary_to_mat,
+    "dictionary": dictionary_to_mat,
     "duration": duration_to_mat,
     "string": string_to_mat,
     "table": table_to_mat,
@@ -122,6 +128,8 @@ def guess_class_name(data):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
     elif isinstance(data, MatlabContainerMap):
         return "containers.Map"
+    elif isinstance(data, MatlabDictionary):
+        return "dictionary"
     elif isinstance(data, (np.ndarray, np.generic)):
         if data.dtype.kind == "T":
             return "string"

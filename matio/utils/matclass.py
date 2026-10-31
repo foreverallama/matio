@@ -176,6 +176,23 @@ class MatlabContainerMap(UserDict):
     classname = "container.Map"
 
 
+class MatlabDictionary:
+    """Class to represent a MATLAB dictionary object."""
+
+    classname = "dictionary"
+
+    def __init__(self, keys=None, values=None):
+        """Keys and values as arrays of equal length, None if unconfigured"""
+        self.keys = keys
+        self.values = values
+
+    def to_dict(self):
+        """Returns a dict of the entries, for keys that are hashable in Python"""
+        if self.keys is None:
+            return {}
+        return dict(zip(self.keys.ravel(), self.values.ravel()))
+
+
 class EmptyMatStruct(np.ndarray):
     """Class to represent an empty MATLAB struct."""
 
