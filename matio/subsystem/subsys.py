@@ -590,6 +590,7 @@ class MatSubsystem:
             isinstance(prop_value, np.ndarray)
             and prop_value.dtype.hasobject
             and prop_value.dtype.kind != "T"
+            and not isinstance(prop_value, MatlabOpaqueArray)
         ):
             # Iterate through cell arrays and struct arrays
             # Ignore StringDType(): Used for MATLAB strings which uses 'O' internally
