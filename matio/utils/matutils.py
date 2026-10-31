@@ -182,8 +182,7 @@ def mat_numeric(arr, version, classname=None, int_decode=None):
         int_decode = IntegerDecodingHint.LOGICAL_HINT
         classname = MatlabClasses.LOGICAL
 
-    # arr = arr.astype(target_dtype, copy=True)
-    arr = arr.astype(target_dtype)
+    arr = arr.astype(target_dtype, copy=False)
     return arr, classname, int_decode
 
 

@@ -21,7 +21,6 @@ from matio.utils.matclass import (
 from matio.utils.matconvert import guess_type_system
 from matio.utils.matheaders import (
     MAT_HDF_ATTRS,
-    MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MCOS_MAGIC_NUMBER,
 )
@@ -38,11 +37,14 @@ def loadmat7(
     variable_names,
     raw_data,
     add_table_attrs,
+    datetime_unit="ns",
 ):
     """Reads MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        subsystem = read_subsystem(f, byte_order, raw_data, add_table_attrs)
+        subsystem = read_subsystem(
+            f, byte_order, raw_data, add_table_attrs, datetime_unit
+        )
         mat_reader = MatRead7(f, subsystem)
         matfile_dict = mat_reader.get_variables(variable_names)
 
@@ -55,7 +57,9 @@ def whosmat7(file_path):
     with h5py.File(file_path, "r") as f:
         vars = {}
         for var in f:
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            # MATLAB keeps internal data in groups like #refs#, #subsystem# and
+            # #sigstream# (Simulink logs), variable names cannot start with "#"
+            if var.startswith("#"):
                 continue
 
             class_name = f[var].attrs.get(MAT_HDF_ATTRS.CLASS, None)
@@ -94,10 +98,12 @@ def whosmat7(file_path):
                 if len(keys) == 0:
                     # Struct with no fields
                     shape = (1, 1)
-                f[var][keys[0]]
-                if isinstance(f[var][keys[0]], h5py.Dataset) and f[var][
-                    keys[0]
-                ].dtype == np.dtype("O"):
+                first = f[var][keys[0]]
+                if (
+                    isinstance(first, h5py.Dataset)
+                    and first.dtype == np.dtype("O")
+                    and MAT_HDF_ATTRS.CLASS not in first.attrs
+                ):
                     # Struct array
                     shape = f[var][keys[0]].shape[::-1]
                 else:
@@ -211,17 +217,22 @@ class MatRead7:
     def read_struct(self, obj, is_empty=0):
         """Reads MATLAB struct arrays from the v7.3 MAT-file."""
 
-        if is_empty:
+        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        if is_empty and field_order is None:
             return EmptyMatStruct(np.empty(shape=obj[()], dtype=object))
 
-        fields = list(obj.keys())
-        field_order = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)
+        # Empty struct arrays are datasets, their fields are only in the attribute
+        fields = [] if is_empty else list(obj.keys())
         if field_order is not None:
             if isinstance(field_order, h5py.Reference):
                 # MATLAB writes large field lists as a reference to dset
                 fields = ["".join(x.astype(str)) for x in self.h5stream[field_order]]
             else:
                 fields = ["".join(x.astype(str)) for x in field_order]
+
+        if is_empty:
+            dt = [(name, object) for name in fields]
+            return np.empty(shape=obj[()], dtype=dt)
 
         if self.is_struct_matrix(obj):
             is_scalar = False
@@ -269,7 +280,9 @@ class MatRead7:
                 data = data.astype(dtype)
             ir = obj["ir"][()]
         else:
-            data = np.array([], dtype=np.float64)
+            matlab_class = obj.attrs.get(MAT_HDF_ATTRS.CLASS, b"double")
+            dtype = matlab_class_to_dtype(matlab_class, np.dtype(np.float64))
+            data = np.array([], dtype=dtype)
             ir = np.array([], dtype=np.int32)
 
         return csc_array((data, ir, jc), shape=(nrows, ncols))
@@ -388,7 +401,7 @@ class MatRead7:
 
         for var in self.h5stream:
             obj = self.h5stream[var]
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            if var.startswith("#"):
                 continue
             if variable_names is not None and var not in variable_names:
                 continue
@@ -408,7 +421,7 @@ class MatRead7:
         return mdict
 
 
-def read_subsystem(f, byte_order, raw_data, add_table_attrs):
+def read_subsystem(f, byte_order, raw_data, add_table_attrs, datetime_unit="ns"):
     """Read subsystem data if present"""
 
     if MAT_HDF_SUBSYS_GROUP not in f:
@@ -417,7 +430,9 @@ def read_subsystem(f, byte_order, raw_data, add_table_attrs):
     subsys_group = f[MAT_HDF_SUBSYS_GROUP]
     MR7 = MatRead7(f, None)
     subsys_data = MR7.read_struct(subsys_group)
-    subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)
+    subsystem = MatSubsystem(
+        byte_order, raw_data, add_table_attrs, datetime_unit=datetime_unit
+    )
     subsystem.load_subsystem(subsys_data)
 
     return subsystem

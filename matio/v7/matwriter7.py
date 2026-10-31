@@ -210,9 +210,7 @@ class MatWrite7:
             struct_group = parent.create_group(var_name)
             if fields is not None:
                 for field in fields:
-                    self.write_variable(
-                        field, data[field][0, 0], group=struct_group.name
-                    )
+                    self.write_variable(field, data[field][0, 0], group=struct_group)
         else:
             # Struct arrays are stored as dset of references to each struct
             struct_group = parent.create_group(var_name)
@@ -296,7 +294,11 @@ class MatWrite7:
         """Writes a sparse array to the HDF5 file."""
 
         A = data.tocsc()
-        A.sort_indices()
+        if not A.has_canonical_format:
+            # MATLAB expects sorted row indices without duplicates
+            # scipy.sparse copies only native byte order
+            A = A.astype(A.dtype.newbyteorder("="))
+            A.sum_duplicates()
         ir = A.indices.astype("uint64")
         jc = A.indptr.astype("uint64")
 
@@ -366,6 +368,8 @@ class MatWrite7:
 
         if group is None:
             parent = self.h5file
+        elif isinstance(group, h5py.Group):
+            parent = group
         else:
             parent = self.h5file.require_group(group)
 
@@ -391,11 +395,10 @@ class MatWrite7:
             dset = self.write_numeric_dset(parent, var_name, data)
         elif data.dtype.kind in ("U", "S"):
             dset = self.write_char_dset(parent, var_name, data)
+        elif data.dtype.names:
+            dset = self.write_struct_array(parent, var_name, data)
         elif data.dtype.hasobject:
-            if data.dtype.names:
-                dset = self.write_struct_array(parent, var_name, data)
-            else:
-                dset = self.write_cell_array(parent, var_name, data)
+            dset = self.write_cell_array(parent, var_name, data)
         else:
             warnings.warn(
                 f"Data type {data.dtype} not supported for variable {var_name}. Skipping.",

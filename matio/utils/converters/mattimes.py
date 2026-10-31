@@ -13,12 +13,12 @@ caldur_dtype = [
 ]
 
 
-def mat_to_datetime(props, **_kwargs):
+def mat_to_datetime(props, datetime_unit="ns", **_kwargs):
     """Convert MATLAB datetime to Numpy datetime64 array"""
 
     data = props.get("data", None)
     if data is None or data.size == 0:
-        return np.empty((0, 0), dtype="datetime64[ns]")
+        return np.empty((0, 0), dtype=f"datetime64[{datetime_unit}]")
 
     tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
@@ -46,12 +46,24 @@ def mat_to_datetime(props, **_kwargs):
         # MATLAB keeps sub-ms precision as a double-double:
         # the imaginary part is the rounding error of the real part
         ms_frac = ms_frac + data.imag
-    ns_int = ms_int_float.astype(np.int64) * 1000_000
-    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
-    total_ns = ns_int + ns_frac
+    per_ms = {"ms": 1, "us": 1_000, "ns": 1_000_000}[datetime_unit]
+    # datetime64[ns] covers about the years 1678 to 2262, [us] and [ms] much more
+    outside = np.abs(ms_int_float) > np.iinfo(np.int64).max // per_ms
+    int_part = np.where(outside, 0, ms_int_float).astype(np.int64) * per_ms
+    frac_part = np.round(ms_frac * per_ms).astype(np.int64)
+    total = int_part + frac_part
+    # the sign flips if the sub-ms part pushed the sum past the int64 limit
+    outside |= (int_part > 0) & (total < 0) | (int_part < 0) & (total > 0)
+    if outside.any():
+        warnings.warn(
+            f"MATLAB datetime outside the datetime64[{datetime_unit}] range was set to NaT.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+        nat |= outside
 
-    dt = total_ns.astype("datetime64[ns]")
-    dt[nat] = np.datetime64("NaT", "ns")
+    dt = total.astype(f"datetime64[{datetime_unit}]")
+    dt[nat] = np.datetime64("NaT", datetime_unit)
     return dt
 
 
@@ -154,14 +166,17 @@ def datetime_to_mat(arr):
 
     unit = np.datetime_data(arr.dtype)[0]
 
-    # For sub-millisecond precision, preserve in decimal portion
+    # For sub-millisecond precision, write a double-double like MATLAB:
+    # the imaginary part is the rounding error of the real part
     if unit in ["us", "ns", "ps", "fs", "as"]:
-        dt_int = arr.astype(np.int64)
-
-        unit_to_ms = {"us": 1e-3, "ns": 1e-6, "ps": 1e-9, "fs": 1e-12, "as": 1e-15}
-
-        conversion_factor = unit_to_ms[unit]
-        millis = dt_int.astype(np.float64) * conversion_factor
+        per_ms = {"us": 10**3, "ns": 10**6, "ps": 10**9, "fs": 10**12, "as": 10**15}
+        ms_int, rest = np.divmod(arr.astype(np.int64), per_ms[unit])
+        ms_int = ms_int.astype(np.float64)
+        ms_frac = rest / per_ms[unit]
+        millis = ms_int + ms_frac
+        error = (ms_int - millis) + ms_frac
+        if np.any(error[~np.isnat(arr)] != 0):
+            millis = millis + 1j * error
     else:
         millis = arr.astype("datetime64[ms]").astype(np.int64).astype(np.float64)
     millis = np.where(np.isnat(arr), np.nan, millis)  # MATLAB saves NaT as NaN
@@ -178,6 +193,8 @@ def duration_to_mat(arr):
 
     unit, _ = np.datetime_data(arr.dtype)
     millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6
+    # MATLAB saves missing durations as NaN
+    millis = np.where(np.isnat(arr), np.nan, millis)
     allowed_units = ("s", "m", "h", "D", "Y")
     if unit not in allowed_units:
         warnings.warn(
@@ -213,7 +230,8 @@ def numpy_to_matcaldur(arr):
             reduced = np.array([[arr[f].flat[0]]], dtype=arr[f].dtype)
             comps[0, 0][f] = reduced.astype(np.float64)
         else:
-            comps[0, 0][f] = arr[f].astype(np.float64)
+            # MATLAB saves missing components as NaN
+            comps[0, 0][f] = np.where(np.isnat(arr[f]), np.nan, arr[f].astype(float))
 
     return comps
 
