@@ -4,11 +4,13 @@ import warnings
 from collections.abc import Mapping
 
 import numpy as np
+import pandas as pd
 from scipy.sparse import issparse
 
 from matio.utils.matclass import (
     EmptyMatStruct,
     IntegerDecodingHint,
+    MatConvertWarning,
     MatlabCanonicalEmpty,
     MatlabClasses,
     MatlabOpaque,
@@ -211,6 +213,12 @@ def to_writeable(source, oned_as="col"):
     if issparse(source):
         return source
 
+    # Single pandas time values, a Timestamp takes the index path for its time zone
+    if isinstance(source, pd.Timestamp):
+        source = pd.DatetimeIndex([source])
+    elif isinstance(source, pd.Timedelta):
+        source = source.to_numpy()
+
     classname = guess_class_name(source)
     if classname is not None:
         if isinstance(source, (np.ndarray, np.generic)):
@@ -234,7 +242,17 @@ def to_writeable(source, oned_as="col"):
         return narr
 
     if hasattr(source, "__array__"):
-        return np.asarray(source)
+        if isinstance(source, pd.DatetimeIndex) and source.tz is not None:
+            warnings.warn(
+                f"Timezone '{source.tz}' is converted to UTC. "
+                "The timezone information will be lost.",
+                MatConvertWarning,
+            )
+            source = source.tz_convert(None)
+        source = np.asarray(source)
+        if source.dtype.kind in ("M", "m"):
+            return to_writeable(source, oned_as)
+        return source
 
     if isinstance(source, Mapping):
         is_mapping = True

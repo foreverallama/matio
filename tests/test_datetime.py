@@ -2,6 +2,7 @@ import os
 import tempfile
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
@@ -190,6 +191,44 @@ precision_files = [
     ("test_datetime_precision_v7.mat", "v7"),
     ("test_datetime_precision_v73.mat", "v7.3"),
 ]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("kind", ["datetime", "timedelta", "timezone"])
+def test_save_pandas_time_index(tmp_path, version, kind):
+    if kind == "timedelta":
+        index = pd.to_timedelta([0, 1, 2], unit="s").as_unit("s")
+        expected = index.to_numpy().astype("timedelta64[s]").reshape(1, -1)
+    else:
+        index = pd.date_range("2020-01-01", periods=3, freq="s")
+        if kind == "timezone":
+            index = index.tz_localize("Europe/Berlin")
+        expected = (
+            index.tz_convert(None) if index.tz is not None else index
+        ).to_numpy()
+        expected = expected.astype("datetime64[ns]").reshape(1, -1)
+    path = tmp_path / "time_index.mat"
+    if kind == "timezone":
+        with pytest.warns(MatConvertWarning, match="converted to UTC"):
+            save_to_mat(path, {"t": index}, version=version)
+    else:
+        save_to_mat(path, {"t": index}, version=version)
+    np.testing.assert_array_equal(load_from_mat(path)["t"], expected, strict=True)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_pandas_time_scalars(tmp_path, version):
+    path = tmp_path / "time_scalars.mat"
+    mdict = {
+        "ts": pd.Timestamp("2020-01-01 00:00:01.5"),
+        "td": pd.Timedelta(minutes=2).as_unit("s"),
+    }
+    save_to_mat(path, mdict, version=version)
+    mload = load_from_mat(path)
+    expected = np.array([["2020-01-01T00:00:01.5"]], dtype="datetime64[ns]")
+    np.testing.assert_array_equal(mload["ts"], expected, strict=True)
+    assert mload["td"].shape == (1, 1)
+    assert mload["td"][0, 0] == np.timedelta64(120, "s")
 
 
 @pytest.mark.parametrize("filename, version", precision_files)
