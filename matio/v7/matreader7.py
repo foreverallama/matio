@@ -37,11 +37,14 @@ def loadmat7(
     variable_names,
     raw_data,
     add_table_attrs,
+    datetime_unit="ns",
 ):
     """Reads MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        subsystem = read_subsystem(f, byte_order, raw_data, add_table_attrs)
+        subsystem = read_subsystem(
+            f, byte_order, raw_data, add_table_attrs, datetime_unit
+        )
         mat_reader = MatRead7(f, subsystem)
         matfile_dict = mat_reader.get_variables(variable_names)
 
@@ -164,7 +167,10 @@ class MatRead7:
             # complex number
             real = arr["real"]
             imag = arr["imag"]
-            arr = np.empty(shape=arr.shape, dtype=np.complex128)
+            arr = np.empty(
+                shape=arr.shape,
+                dtype=np.complex64 if real.dtype == np.float32 else np.complex128,
+            )
             arr.real = real
             arr.imag = imag
 
@@ -243,6 +249,9 @@ class MatRead7:
 
         for field in obj:
             obj_field = obj[field]
+            if not is_scalar:
+                # Read all references at once, one HDF5 read per element is slow
+                obj_field = obj_field[()]
             for idx in np.ndindex(arr.shape):
                 if is_scalar:
                     arr[idx][field] = self.read_h5_data(obj_field)
@@ -257,8 +266,9 @@ class MatRead7:
             return np.empty(shape=obj[()], dtype=object)
 
         arr = np.empty(shape=obj.shape, dtype=object)
+        refs = obj[()]
         for idx in np.ndindex(obj.shape):
-            ref_data = self.h5stream[obj[idx]]
+            ref_data = self.h5stream[refs[idx]]
             arr[idx] = self.read_h5_data(ref_data)
         return arr.T
 
@@ -418,7 +428,7 @@ class MatRead7:
         return mdict
 
 
-def read_subsystem(f, byte_order, raw_data, add_table_attrs):
+def read_subsystem(f, byte_order, raw_data, add_table_attrs, datetime_unit="ns"):
     """Read subsystem data if present"""
 
     if MAT_HDF_SUBSYS_GROUP not in f:
@@ -427,7 +437,9 @@ def read_subsystem(f, byte_order, raw_data, add_table_attrs):
     subsys_group = f[MAT_HDF_SUBSYS_GROUP]
     MR7 = MatRead7(f, None)
     subsys_data = MR7.read_struct(subsys_group)
-    subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)
+    subsystem = MatSubsystem(
+        byte_order, raw_data, add_table_attrs, datetime_unit=datetime_unit
+    )
     subsystem.load_subsystem(subsys_data)
 
     return subsystem

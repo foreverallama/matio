@@ -6,10 +6,23 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattables import mat_to_categorical
 from matio.utils.matclass import MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"
+
+
+def test_categorical_empty_row():
+    """Test that an empty 1x0 MATLAB categorical is converted"""
+    props = {
+        "categoryNames": np.empty((0, 0), dtype=object),
+        "codes": np.empty((1, 0), dtype=np.uint8),
+        "isOrdinal": np.array([[False]]),
+    }
+    cat = mat_to_categorical(props)
+    assert isinstance(cat, pd.Categorical)
+    assert cat.shape == (1, 0)
 
 
 @pytest.mark.parametrize("filename, version", files)
