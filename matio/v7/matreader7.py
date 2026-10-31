@@ -21,7 +21,6 @@ from matio.utils.matclass import (
 from matio.utils.matconvert import guess_type_system
 from matio.utils.matheaders import (
     MAT_HDF_ATTRS,
-    MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MCOS_MAGIC_NUMBER,
 )
@@ -55,7 +54,9 @@ def whosmat7(file_path):
     with h5py.File(file_path, "r") as f:
         vars = {}
         for var in f:
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            # MATLAB keeps internal data in groups like #refs#, #subsystem# and
+            # #sigstream# (Simulink logs), variable names cannot start with "#"
+            if var.startswith("#"):
                 continue
 
             class_name = f[var].attrs.get(MAT_HDF_ATTRS.CLASS, None)
@@ -397,7 +398,7 @@ class MatRead7:
 
         for var in self.h5stream:
             obj = self.h5stream[var]
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            if var.startswith("#"):
                 continue
             if variable_names is not None and var not in variable_names:
                 continue
