@@ -18,7 +18,8 @@ def mat_to_datetime(props, datetime_unit="ns", **_kwargs):
 
     data = props.get("data", None)
     if data is None or data.size == 0:
-        return np.empty((0, 0), dtype=f"datetime64[{datetime_unit}]")
+        shape = (0, 0) if data is None else data.shape
+        return np.empty(shape, dtype=f"datetime64[{datetime_unit}]")
 
     tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
