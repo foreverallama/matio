@@ -1,13 +1,39 @@
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.converters.mattimes import calendarduration_to_mat
+from matio.utils.converters.mattimes import (
+    calendarduration_to_mat,
+    mat_to_calendarduration,
+)
 
 files = [("test_time_v7.mat", "v7"), ("test_time_v73.mat", "v7.3")]
+
+
+def test_calendarDuration_missing():
+    """NaN calendarDuration components become NaT on every platform"""
+    # calmonths(2) + caldays([1 NaN 3]) as stored by MATLAB
+    comps = np.empty(
+        (1, 1), dtype=[("months", object), ("days", object), ("millis", object)]
+    )
+    comps[0, 0]["months"] = np.array([[2.0, np.nan, 2.0]])
+    comps[0, 0]["days"] = np.array([[1.0, np.nan, 3.0]])
+    comps[0, 0]["millis"] = np.array([[0.0]])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        cdur = mat_to_calendarduration({"components": comps})
+
+    expected = {
+        "months": np.array([[2, "NaT", 2]], dtype="timedelta64[M]"),
+        "days": np.array([[1, "NaT", 3]], dtype="timedelta64[D]"),
+        "millis": np.array([[0, 0, 0]], dtype="timedelta64[ms]"),
+    }
+    for field, values in expected.items():
+        np.testing.assert_array_equal(cdur[field], values, strict=True)
 
 
 @pytest.mark.parametrize("filename, version", files)
