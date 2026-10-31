@@ -331,7 +331,8 @@ class MatRead7:
                 f"Opaque object with object decode {object_decode} not supported. Data may be corrupted"
             )
 
-        if classname == MCOS_SUBSYSTEM_CLASS:
+        if classname == MCOS_SUBSYSTEM_CLASS or self.subsystem is None:
+            # Opaque values inside the subsystem are nested FileWrapper__ streams
             return self.read_cell(obj)
 
         type_system = guess_type_system(classname)

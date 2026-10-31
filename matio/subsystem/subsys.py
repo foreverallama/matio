@@ -151,13 +151,13 @@ class MatSubsystem:
             )
             self.version = None  # Indicate failure
 
-    def load_fwrap_metadata(self, fwrap_metadata):
+    def load_fwrap_metadata(self, fwrap_metadata, min_version=MIN_FILEWRAPPER_VERSION):
         """Parse and cache FileWrapper__ metadata"""
 
         self.version = np.frombuffer(
             fwrap_metadata, dtype=self.byte_order, count=1, offset=0
         )[0]
-        if not MIN_FILEWRAPPER_VERSION <= self.version <= FILEWRAPPER_VERSION:
+        if not min_version <= self.version <= FILEWRAPPER_VERSION:
             raise MatReadError(
                 f"{MCOS_SUBSYSTEM_CLASS} version {self.version} is not supported"
             )
@@ -175,7 +175,7 @@ class MatSubsystem:
         # A list of null terminated Property and Class Names
         data = fwrap_metadata[40 : region_offsets[0]].tobytes()
         raw_strings = data.split(b"\x00")
-        self.mcos_names = [s.decode("ascii") for s in raw_strings if s]
+        self.mcos_names = [s.decode("ascii") for s in raw_strings[: self.num_names]]
 
         # Region 1: Class ID Metadata
         self.class_id_metadata = np.frombuffer(
@@ -274,6 +274,29 @@ class MatSubsystem:
 
         return True
 
+    def is_valid_nested_fwrap(self, prop):
+        """Checks if property value is a nested FileWrapper__ v1 stream
+
+        Some builtin classes save objects in a property as a (n, 1) cell of
+        {v1 metadata, {root object reference}, property values...}
+        """
+
+        return (
+            prop.ndim == 2
+            and prop.shape[0] >= 2
+            and prop.shape[1] == 1
+            and isinstance(prop[0, 0], np.ndarray)
+            and prop[0, 0].dtype == np.uint8
+            and prop[0, 0].ndim == 2
+            and prop[0, 0].shape[1] == 1
+            and prop[0, 0].size >= 40
+            and np.frombuffer(prop[0, 0], dtype=self.byte_order, count=1)[0] == 1
+            and isinstance(prop[1, 0], np.ndarray)
+            and prop[1, 0].shape == (1, 1)
+            and isinstance(prop[1, 0][0, 0], np.ndarray)
+            and self.is_valid_mcos_object(prop[1, 0][0, 0])
+        )
+
     def is_valid_opaque_object(self, metadata):
         """Checks if property value is a valid opaque object metadata array"""
 
@@ -298,6 +321,17 @@ class MatSubsystem:
                         for name in prop.dtype.names:
                             field_val = prop[idx][name]
                             prop[idx][name] = self.check_prop_for_opaque(field_val)
+
+            elif self.is_valid_nested_fwrap(prop):
+                nested = MatSubsystem(
+                    self.byte_order,
+                    self.raw_data,
+                    self.add_table_attrs,
+                    datetime_unit=self.datetime_unit,
+                )
+                nested.load_fwrap_metadata(prop[0, 0], min_version=1)
+                nested.mcos_props_saved = prop[2:, 0]
+                return nested.load_opaque_object(prop[1, 0][0, 0], OpaqueType.MCOS)
 
             else:
                 # Iterate through cell arrays
@@ -370,6 +404,9 @@ class MatSubsystem:
 
     def get_default_properties(self, class_id):
         """Returns the default properties (as dict) for a given class ID"""
+
+        if self.mcos_props_defaults is None:
+            return {}  # Nested v1 streams save no defaults
 
         prop_arr = self.mcos_props_defaults[class_id, 0]
         prop_map = {}
@@ -1015,7 +1052,14 @@ class MatSubsystem:
         nobjects = np.prod(dims)
         object_ids = metadata[2 + ndims : 2 + ndims + nobjects, 0]
 
-        class_id = metadata[-1, 0]
+        if self.version != 1:
+            class_id = metadata[-1, 0]
+        elif object_ids.size > 0:
+            # v1 references have no class ID, it is in the object metadata
+            class_id = self.get_object_metadata(object_ids[0])[0]
+        else:
+            # Empty v1 object arrays do not save their class
+            return MatlabOpaque(tuple(dims), None, type_system)
         classname = self.get_classname(class_id)
         class_alias = self.get_class_alias(class_id)
 
