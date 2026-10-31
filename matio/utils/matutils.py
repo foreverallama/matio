@@ -59,6 +59,7 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
 def encode_char_arrays(arr):
     """Convert numpy string array into matlab integer array"""
 
+    arr = np.atleast_1d(arr)
     flat = arr.ravel(order="F")
     encoded = [None] * len(flat)
 
