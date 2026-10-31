@@ -800,3 +800,13 @@ def test_numpy_unicode_scalar(tmp_path, version):
     save_to_mat(file_path, {"label": np.str_("alpha")}, version=version)
     actual = load_from_mat(file_path)["label"]
     np.testing.assert_array_equal(actual, np.array(["alpha"]), strict=True)
+
+
+def test_large_stream_position():
+    from io import BytesIO
+
+    from matio.v5._streams import make_stream
+
+    stream = make_stream(BytesIO())
+    stream.seek(2**31 + 128)
+    assert stream.tell() == 2**31 + 128

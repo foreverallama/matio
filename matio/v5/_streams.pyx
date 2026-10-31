@@ -57,11 +57,11 @@ cdef class GenericStream:
     def __init__(self, fobj):
         self.fobj = fobj
 
-    cpdef int seek(self, long int offset, int whence=0) except -1:
+    cpdef int seek(self, Py_ssize_t offset, int whence=0) except -1:
         self.fobj.seek(offset, whence)
         return 0
 
-    cpdef long int tell(self) except -1:
+    cpdef Py_ssize_t tell(self) except -1:
         return self.fobj.tell()
 
     def read(self, n_bytes):
@@ -213,12 +213,12 @@ cdef class ZlibInputStream(GenericStream):
         return (self._max_length == self._read_bytes) and \
                (self._buffer_size == self._buffer_position)
 
-    cpdef long int tell(self) except -1:
+    cpdef Py_ssize_t tell(self) except -1:
         if self._total_position == -1:
             raise OSError("Invalid file position.")
         return self._total_position
 
-    cpdef int seek(self, long int offset, int whence=0) except -1:
+    cpdef int seek(self, Py_ssize_t offset, int whence=0) except -1:
         cdef ssize_t new_pos, size
         if whence == 1:
             new_pos = <ssize_t>self._total_position + offset
