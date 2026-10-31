@@ -239,11 +239,18 @@ def to_writeable(source, oned_as="col"):
     if isinstance(source, Mapping):
         is_mapping = True
     elif hasattr(source, "__dict__"):
+        name = type(source).__name__
         source = {
             key: value
             for key, value in source.__dict__.items()
             if not key.startswith("_")
         }
+        if not source:
+            msg = (
+                f"{name} object has no public instance attributes "
+                f"and is saved as an empty struct"
+            )
+            warnings.warn(msg, MatWriteWarning, stacklevel=2)
         is_mapping = True
     else:
         is_mapping = False
@@ -262,6 +269,9 @@ def to_writeable(source, oned_as="col"):
                         f"or a digit ({field}) is ignored"
                     )
                     warnings.warn(msg, MatWriteWarning, stacklevel=2)
+            else:
+                msg = f"Non-string field name ({field!r}) is ignored"
+                warnings.warn(msg, MatWriteWarning, stacklevel=2)
         if dtype:
             return np.array([tuple(values)], dtype).reshape((1, 1))
         else:
