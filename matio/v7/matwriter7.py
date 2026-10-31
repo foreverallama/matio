@@ -296,7 +296,11 @@ class MatWrite7:
         """Writes a sparse array to the HDF5 file."""
 
         A = data.tocsc()
-        A.sort_indices()
+        if not A.has_canonical_format:
+            # MATLAB expects sorted row indices without duplicates
+            # scipy.sparse copies only native byte order
+            A = A.astype(A.dtype.newbyteorder("="))
+            A.sum_duplicates()
         ir = A.indices.astype("uint64")
         jc = A.indptr.astype("uint64")
 

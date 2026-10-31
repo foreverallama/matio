@@ -130,10 +130,10 @@ def write_subsystem(subsystem, oned_as):
 class VarWriter5:
     """Generic matlab matrix writing class"""
 
-    mat_tag = np.zeros((), NDT_TAG_FULL)
-    mat_tag["mdtype"] = miTypes.miMATRIX
-
     def __init__(self, file_writer):
+        # Thread safety, see https://github.com/scipy/scipy/pull/26491
+        self.mat_tag = np.zeros((), NDT_TAG_FULL)
+        self.mat_tag["mdtype"] = miTypes.miMATRIX
         self.file_stream = file_writer.file_stream
         self.oned_as = file_writer.oned_as
         self.subsystem = file_writer.subsystem
@@ -153,7 +153,7 @@ class VarWriter5:
         if mdtype is None:
             mdtype = NP_TO_MTYPES[arr.dtype.str[1:]]
         # Array needs to be in native byte order
-        if arr.dtype.byteorder == (SYS_BYTE_ORDER == ">"):
+        if not arr.dtype.isnative:
             arr = arr.byteswap().view(arr.dtype.newbyteorder())
         byte_count = arr.size * arr.itemsize
         if byte_count <= 4:
@@ -313,7 +313,11 @@ class VarWriter5:
     def write_sparse(self, arr):
         """Sparse matrices are 2D"""
         A = arr.tocsc()  # convert to sparse CSC format
-        A.sort_indices()  # MATLAB expects sorted row indices
+        if not A.has_canonical_format:
+            # MATLAB expects sorted row indices without duplicates
+            # scipy.sparse copies only native byte order
+            A = A.astype(A.dtype.newbyteorder("="))
+            A.sum_duplicates()
         is_complex = A.dtype.kind == "c"
         is_logical = A.dtype.kind == "b"
         nz = A.nnz

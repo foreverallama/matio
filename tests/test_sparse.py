@@ -3,6 +3,7 @@ import tempfile
 
 import numpy as np
 import pytest
+from scipy.sparse import csc_array
 
 from matio import load_from_mat, save_to_mat
 
@@ -411,3 +412,62 @@ class TestSaveSparse:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+    def test_sparse_duplicates(self, filename, version):
+        """Test writing sparse with duplicate entries to MAT-file"""
+        # Entry (0, 0) is stored twice, MATLAB does not sum such duplicates
+        data = np.array([4.0, 1.0, 2.0])
+        sparse_dup = csc_array(
+            (data, np.array([1, 0, 0]), np.array([0, 3, 3])), shape=(2, 2)
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"sparse_dup": sparse_dup}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["sparse_dup"])
+
+            assert mload["sparse_dup"].nnz == 2
+            np.testing.assert_array_equal(
+                mload["sparse_dup"].toarray(),
+                np.array([[3.0, 0.0], [4.0, 0.0]]),
+                strict=True,
+            )
+            # the input is not changed
+            np.testing.assert_array_equal(sparse_dup.indices, [1, 0, 0])
+
+            # non-native byte order, unsorted
+            data = np.array([1.0, 2.0], dtype=">f8")
+            sparse_be = csc_array(
+                (data, np.array([1, 0]), np.array([0, 2, 2])), shape=(2, 2)
+            )
+            save_to_mat(temp_file_path, {"sparse_be": sparse_be}, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["sparse_be"])
+            np.testing.assert_array_equal(
+                mload["sparse_be"].toarray(),
+                np.array([[2.0, 0.0], [1.0, 0.0]]),
+                strict=True,
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("dtype", ["f8", "c16"])
+def test_write_sparse_foreign_byteorder(tmp_path, dtype):
+    from scipy.sparse import csc_array
+
+    dtype = np.dtype(dtype).newbyteorder("S")
+    data = np.array([1, 2, 3], dtype=dtype)
+    if dtype.kind == "c":
+        data.imag = [2, -1, 4]
+    expected = np.diag(data.astype(dtype.newbyteorder("=")))
+    arr = csc_array((data, [0, 1, 2], [0, 1, 2, 3]), shape=(3, 3))
+    before = arr.data.tobytes()
+    path = tmp_path / "foreign_sparse.mat"
+    save_to_mat(path, {"a": arr}, version="v7")
+    actual = load_from_mat(path)["a"]
+    np.testing.assert_array_equal(actual.toarray(), expected, strict=True)
+    assert arr.data.tobytes() == before

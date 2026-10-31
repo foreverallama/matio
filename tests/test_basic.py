@@ -1,5 +1,7 @@
 import os
+import sys
 import tempfile
+import threading
 
 import h5py
 import numpy as np
@@ -414,6 +416,27 @@ class TestSaveBasicDatatypes:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_numeric_non_native_byte_order(self, filename, version):
+        """Test writing integer data with non-native byte order to MAT-file"""
+        arr = np.array([[1, -2], [3, -4]], dtype=np.int32)
+        mdict = {"x": arr.astype(arr.dtype.newbyteorder())}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["x"])
+
+            # v7.3 keeps the byte order of the written dataset, so compare natively
+            actual = mload["x"]
+            actual = actual.astype(actual.dtype.newbyteorder("="))
+            np.testing.assert_array_equal(actual, arr, strict=True)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_numeric_uint32(self, filename, version):
         """Test writing uint32 data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -792,6 +815,32 @@ def test_save_compression_v73():
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+def test_save_v7_threads(tmp_path):
+    """Test writing v7 files from several threads at once"""
+    mdict = {f"v{i}": np.arange(i % 50 + 1.0) for i in range(300)}
+    save_to_mat(str(tmp_path / "serial.mat"), mdict, version="v7")
+    expected = (tmp_path / "serial.mat").read_bytes()[128:]  # header has a timestamp
+
+    def write(k):
+        for j in range(3):
+            save_to_mat(str(tmp_path / f"thread{k}_{j}.mat"), mdict, version="v7")
+
+    switch_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        threads = [threading.Thread(target=write, args=(k,)) for k in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        sys.setswitchinterval(switch_interval)
+
+    for k in range(8):
+        for j in range(3):
+            assert (tmp_path / f"thread{k}_{j}.mat").read_bytes()[128:] == expected
 
 
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
