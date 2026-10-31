@@ -154,27 +154,24 @@ def mat_numeric(arr, version, classname=None, int_decode=None):
                 MatWriteWarning,
             )
     elif dt.kind == "c":
-        if version == MAT_FILE_VERSIONS.V5:
-            target_dtype = np.dtype(np.complex128)
-            if dt.itemsize != 16:
-                warnings.warn(
-                    f"Complex type {dt} not supported in MATLAB. Converting to {target_dtype}.",
-                    MatWriteWarning,
-                )
-        elif version == MAT_FILE_VERSIONS.HDF:
-            target_dtype = np.dtype([("real", np.float64), ("imag", np.float64)])
-            classname = "double"
-            if dt.itemsize != 16:
-                warnings.warn(
-                    f"Complex type {dt} not supported in MATLAB. Converting to {target_dtype}.",
-                    MatWriteWarning,
-                )
-
-            data_new = np.empty(arr.shape, dtype=target_dtype)
+        # MATLAB stores complex single and complex double
+        target_dtype = np.dtype(np.complex64 if dt.itemsize == 8 else np.complex128)
+        if dt.itemsize not in (8, 16):
+            warnings.warn(
+                f"Complex type {dt} not supported in MATLAB. Converting to {target_dtype}.",
+                MatWriteWarning,
+            )
+        if version == MAT_FILE_VERSIONS.HDF:
+            part = np.float32 if target_dtype == np.complex64 else np.float64
+            classname = (
+                MatlabClasses.SINGLE if part == np.float32 else MatlabClasses.DOUBLE
+            )
+            data_new = np.empty(arr.shape, dtype=[("real", part), ("imag", part)])
             data_new["real"] = arr.real
             data_new["imag"] = arr.imag
             arr = data_new
-        else:
+            target_dtype = data_new.dtype
+        elif version != MAT_FILE_VERSIONS.V5:
             raise ValueError(f"Unknown MAT-file version '{version}' specified")
 
     elif dt.kind == "b":

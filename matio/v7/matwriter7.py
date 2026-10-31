@@ -304,7 +304,15 @@ class MatWrite7:
         ir = A.indices.astype("uint64")
         jc = A.indptr.astype("uint64")
 
-        data, classname, int_decode = mat_numeric(A.data, version=MAT_FILE_VERSIONS.HDF)
+        values = A.data
+        if values.dtype.kind == "c" and values.dtype.itemsize != 16:
+            # Complex sparse stays double, R2022b converts single sparse with a warning
+            warnings.warn(
+                f"Complex sparse type {values.dtype} is written as complex128.",
+                MatWriteWarning,
+            )
+            values = values.astype(np.complex128)
+        data, classname, int_decode = mat_numeric(values, version=MAT_FILE_VERSIONS.HDF)
 
         sparse_group = parent.create_group(var_name)
         sparse_group.create_dataset(

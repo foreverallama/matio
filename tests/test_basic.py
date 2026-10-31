@@ -629,6 +629,25 @@ class TestSaveBasicDatatypes:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_complex_single(self, filename, version):
+        """Test writing complex single data to MAT-file"""
+        mdict = {"complex_single": np.array([[1 + 2j, 3 - 4j]], dtype=np.complex64)}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["complex_single"])
+
+            np.testing.assert_array_equal(
+                mdict["complex_single"], mload["complex_single"], strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_char(self, filename, version):
         """Test writing char data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -724,10 +743,9 @@ class TestWriteNonSupportedNumeric:
         not HAS_COMPLEX256, reason="np.complex256 not available on this platform"
     )
     def test_numpy_complex(self, filename, version):
-        """Test writing numpy complex64 and complex256 data to MAT-file"""
-        arr_c64 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64).reshape(1, 3)
+        """Test writing numpy complex256 data to MAT-file"""
         arr_c256 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex256).reshape(1, 3)
-        mdict = {"complex64_array": arr_c64, "complex256_array": arr_c256}
+        mdict = {"complex256_array": arr_c256}
 
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
             temp_file_path = tmpfile.name
@@ -738,11 +756,6 @@ class TestWriteNonSupportedNumeric:
 
             mload = load_from_mat(temp_file_path, variable_names=None)
 
-            np.testing.assert_array_equal(
-                mload["complex64_array"],
-                mdict["complex64_array"].astype("complex128"),
-                strict=True,
-            )
             np.testing.assert_array_equal(
                 mload["complex256_array"],
                 mdict["complex256_array"].astype("complex128"),

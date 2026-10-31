@@ -164,7 +164,10 @@ class MatRead7:
             # complex number
             real = arr["real"]
             imag = arr["imag"]
-            arr = np.empty(shape=arr.shape, dtype=np.complex128)
+            arr = np.empty(
+                shape=arr.shape,
+                dtype=np.complex64 if real.dtype == np.float32 else np.complex128,
+            )
             arr.real = real
             arr.imag = imag
 
