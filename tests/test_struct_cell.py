@@ -645,3 +645,27 @@ def test_struct_duplicate_fieldnames():
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("shape", [(1, 1), (1, 2)])
+@pytest.mark.parametrize("nested", [False, True])
+def test_numeric_struct_v73(tmp_path, shape, nested):
+    data = np.zeros(shape, dtype=[("value", "f8"), ("count", "i4")])
+    data["value"] = 1.5
+    data["count"] = 7
+    value = {"records": data} if nested else data
+    files = [tmp_path / "reference.mat", tmp_path / "actual.mat"]
+    for path, version in zip(files, ["v7", "v7.3"]):
+        save_to_mat(path, {"x": value}, version=version)
+    expected = load_from_mat(files[0])["x"]
+    actual = load_from_mat(files[1])["x"]
+    if nested:
+        actual = actual["records"][0, 0]
+        expected = expected["records"][0, 0]
+    assert actual.shape == expected.shape == shape
+    assert actual.dtype == expected.dtype
+    for field in data.dtype.names:
+        for index in np.ndindex(shape):
+            np.testing.assert_array_equal(
+                actual[field][index], expected[field][index], strict=True
+            )

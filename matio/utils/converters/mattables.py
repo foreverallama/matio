@@ -193,12 +193,15 @@ def get_row_times(row_times, num_rows):
     start = row_times[0, 0]["origin"]
     if row_times[0, 0]["specifiedAsRate"]:
         fs = row_times[0, 0]["sampleRate"].item()
+        unit = np.datetime_data(start.dtype)[0] if start.dtype.kind == "M" else "ns"
         warnings.warn(
-            "get_row_times: MATLAB sampleRate row times are rounded to nanoseconds for NumPy compatibility.",
+            f"get_row_times: MATLAB sampleRate row times are rounded to {unit} for NumPy compatibility.",
             MatConvertWarning,
         )
         # Row k is at k / fs, adding a rounded step would drift over many rows
-        offsets = np.round(np.arange(num_rows) * (1e9 / fs)).astype("timedelta64[ns]")
+        per_s = np.timedelta64(1, "s") // np.timedelta64(1, unit)
+        offsets = np.round(np.arange(num_rows) * (per_s / fs))
+        offsets = offsets.astype(f"timedelta64[{unit}]")
         return (start + offsets).ravel()
     else:
         step = None
@@ -220,7 +223,7 @@ def get_row_times(row_times, num_rows):
                 # MATLAB saves explicit row times if the start day is past the 28th
                 month = start.astype("datetime64[M]")
                 times = (month + step * np.arange(num_rows) + (start - month)).ravel()
-                return times.astype("datetime64[ns]")
+                return times.astype(start.dtype)
         else:
             step = comps
 
@@ -236,8 +239,8 @@ def get_row_times(row_times, num_rows):
     # NumPy uses the finer unit of start and step, so neither is truncated
     times = (start + step * np.arange(num_rows)).ravel()
     if times.dtype.kind == "M":
-        # MATLAB saves datetime as [ms] data
-        times = times.astype("datetime64[ns]")
+        # Keep the unit of the start time, set by datetime_unit
+        times = times.astype(start.dtype)
     return times
 
 
@@ -405,6 +408,10 @@ def table_to_mat(df):
     # All serialized data must be the exact same types (including shape) as expected by MATLAB
     # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
+    extras["DimensionNames"][0, 0] = np.array(
+        [np.array([f"{d}_1" if d in varnames else d]) for d in ("Row", "Variables")],
+        dtype=object,
+    ).reshape((1, 2))
     prop_map = {
         "data": data,
         "varnames": varnames,
@@ -465,8 +472,10 @@ def timetable_to_mat(df):
     varnames = np.array([str(col) for col in df.columns], dtype=object)
 
     dim1 = df.index.name if df.index.name is not None else "Time"
+    # MATLAB rejects dimension names equal to a variable name, readtable appends "_1"
     dimnames = np.array(
-        [np.array([dim1]), np.array(["Variables"])], dtype=object
+        [np.array([f"{d}_1" if d in varnames else d]) for d in (dim1, "Variables")],
+        dtype=object,
     ).reshape((1, 2))
 
     if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:

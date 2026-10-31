@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.converters.mattables import get_row_times
 from matio.utils.matclass import MatConvertWarning, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
@@ -151,6 +152,22 @@ class TestLoadMatlabTimetable:
         pd.testing.assert_frame_equal(
             mdict["timetable_from_starttime_datetime"], df, check_like=True
         )
+
+    def test_timetable_datetime_unit(self, filename, version):
+        """Test reading timetable row times with datetime_unit"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(
+            file_path,
+            variable_names=["timetable_from_starttime_datetime"],
+            datetime_unit="ms",
+        )
+        times = mdict["timetable_from_starttime_datetime"].index.to_numpy()
+
+        expected = np.array(
+            ["2020-01-01T00:00:00", "2020-01-01T00:00:01", "2020-01-01T00:00:02"],
+            dtype="datetime64[ms]",
+        )
+        np.testing.assert_array_equal(times, expected, strict=True)
 
     def test_timetable_from_starttime_duration(self, filename, version):
         """Test reading timetable with duration starttime in MAT-file"""
@@ -532,6 +549,19 @@ class TestSaveMatlabTimetable:
                 os.remove(temp_file_path)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_dimension_names_unique(tmp_path, version):
+    times = pd.date_range("2020-01-01", periods=2, freq="s")
+    tt = pd.DataFrame({"t": times, "y": [1.0, 2.0]}).set_index("t", drop=False)
+    tab = pd.DataFrame({"Row": [1.0, 2.0], "Variables": [3.0, 4.0]})
+    path = tmp_path / "dimnames.mat"
+    save_to_mat(path, {"tt": tt, "tab": tab}, version=version)
+    mload = load_from_mat(path, add_table_attrs=True)
+    assert mload["tt"].index.name == "t_1"
+    assert list(mload["tt"].columns) == ["t", "y"]
+    assert mload["tab"].attrs["DimensionNames"] == ["Row_1", "Variables_1"]
+
+
 timetablev7_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
 
 
@@ -691,6 +721,25 @@ class TestLoadMatlabTimetableSteps:
         pd.testing.assert_frame_equal(
             mdict["timetable_sample_rate"], df, check_like=True
         )
+
+
+def test_row_times_sample_rate_datetime_unit():
+    """SampleRate row times keep the unit of a datetime start time"""
+    fields = ("origin", "specifiedAsRate", "sampleRate")
+    row_times = np.empty((1, 1), dtype=[(f, object) for f in fields])
+    row_times[0, 0] = (
+        np.array([["2500-01-01"]], dtype="datetime64[us]"),
+        np.array([[True]]),
+        np.array([[100.0]]),
+    )
+    with pytest.warns(MatConvertWarning, match="get_row_times"):
+        times = get_row_times(row_times, 3)
+
+    expected = np.array(
+        ["2500-01-01T00:00:00", "2500-01-01T00:00:00.01", "2500-01-01T00:00:00.02"],
+        dtype="datetime64[us]",
+    )
+    np.testing.assert_array_equal(times, expected, strict=True)
 
 
 categorical_files = [

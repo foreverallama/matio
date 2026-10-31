@@ -35,7 +35,12 @@ from matio.utils.matheaders import (
     MAT_HDF_USER_BLOCK_BYTES,
     write_file_header,
 )
-from matio.utils.matutils import encode_char_arrays, mat_numeric, to_writeable
+from matio.utils.matutils import (
+    encode_char_arrays,
+    is_valid_matlab_varname,
+    mat_numeric,
+    to_writeable,
+)
 
 SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
@@ -210,9 +215,7 @@ class MatWrite7:
             struct_group = parent.create_group(var_name)
             if fields is not None:
                 for field in fields:
-                    self.write_variable(
-                        field, data[field][0, 0], group=struct_group.name
-                    )
+                    self.write_variable(field, data[field][0, 0], group=struct_group)
         else:
             # Struct arrays are stored as dset of references to each struct
             struct_group = parent.create_group(var_name)
@@ -370,6 +373,8 @@ class MatWrite7:
 
         if group is None:
             parent = self.h5file
+        elif isinstance(group, h5py.Group):
+            parent = group
         else:
             parent = self.h5file.require_group(group)
 
@@ -395,11 +400,10 @@ class MatWrite7:
             dset = self.write_numeric_dset(parent, var_name, data)
         elif data.dtype.kind in ("U", "S"):
             dset = self.write_char_dset(parent, var_name, data)
+        elif data.dtype.names:
+            dset = self.write_struct_array(parent, var_name, data)
         elif data.dtype.hasobject:
-            if data.dtype.names:
-                dset = self.write_struct_array(parent, var_name, data)
-            else:
-                dset = self.write_cell_array(parent, var_name, data)
+            dset = self.write_cell_array(parent, var_name, data)
         else:
             warnings.warn(
                 f"Data type {data.dtype} not supported for variable {var_name}. Skipping.",
@@ -416,10 +420,8 @@ class MatWrite7:
         """Writes variables to the HDF5 file."""
 
         for var_name, data in mdict.items():
-            if var_name[0] == "_":
-                msg = (
-                    f"Starting field name with a " f"underscore ({var_name}) is ignored"
-                )
+            if not is_valid_matlab_varname(var_name):
+                msg = f"'{var_name}' is not a valid MATLAB variable name. Skipping it"
                 warnings.warn(msg, MatWriteWarning, stacklevel=2)
                 continue
 
