@@ -193,12 +193,15 @@ def get_row_times(row_times, num_rows):
     start = row_times[0, 0]["origin"]
     if row_times[0, 0]["specifiedAsRate"]:
         fs = row_times[0, 0]["sampleRate"].item()
+        unit = np.datetime_data(start.dtype)[0] if start.dtype.kind == "M" else "ns"
         warnings.warn(
-            "get_row_times: MATLAB sampleRate row times are rounded to nanoseconds for NumPy compatibility.",
+            f"get_row_times: MATLAB sampleRate row times are rounded to {unit} for NumPy compatibility.",
             MatConvertWarning,
         )
         # Row k is at k / fs, adding a rounded step would drift over many rows
-        offsets = np.round(np.arange(num_rows) * (1e9 / fs)).astype("timedelta64[ns]")
+        per_s = np.timedelta64(1, "s") // np.timedelta64(1, unit)
+        offsets = np.round(np.arange(num_rows) * (per_s / fs))
+        offsets = offsets.astype(f"timedelta64[{unit}]")
         return (start + offsets).ravel()
     else:
         step = None
@@ -220,7 +223,7 @@ def get_row_times(row_times, num_rows):
                 # MATLAB saves explicit row times if the start day is past the 28th
                 month = start.astype("datetime64[M]")
                 times = (month + step * np.arange(num_rows) + (start - month)).ravel()
-                return times.astype("datetime64[ns]")
+                return times.astype(start.dtype)
         else:
             step = comps
 
@@ -236,8 +239,8 @@ def get_row_times(row_times, num_rows):
     # NumPy uses the finer unit of start and step, so neither is truncated
     times = (start + step * np.arange(num_rows)).ravel()
     if times.dtype.kind == "M":
-        # MATLAB saves datetime as [ms] data
-        times = times.astype("datetime64[ns]")
+        # Keep the unit of the start time, set by datetime_unit
+        times = times.astype(start.dtype)
     return times
 
 

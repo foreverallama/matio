@@ -48,10 +48,12 @@ class MatSubsystem:
         add_table_attrs=False,
         oned_as="col",
         saveobj_classes=[],
+        datetime_unit="ns",
     ):
         self.byte_order = "<i4" if byte_order[0] == "<" else ">i4"
         self.raw_data = raw_data
         self.add_table_attrs = add_table_attrs
+        self.datetime_unit = datetime_unit
         self.oned_as = oned_as
 
         self.mcos_object_cache = {}
@@ -1038,6 +1040,7 @@ class MatSubsystem:
                             classname,
                             byte_order=self.byte_order,
                             add_table_attrs=self.add_table_attrs,
+                            datetime_unit=self.datetime_unit,
                         )
                     except Exception as e:
                         warnings.warn(

@@ -54,7 +54,13 @@ SYS_BYTE_ORDER = "<" if sys.byteorder == "little" else ">"
 
 
 def loadmat5(
-    file_path, subsystem_offset, byte_order, variable_names, raw_data, add_table_attrs
+    file_path,
+    subsystem_offset,
+    byte_order,
+    variable_names,
+    raw_data,
+    add_table_attrs,
+    datetime_unit="ns",
 ):
     """Load MATLAB file."""
 
@@ -66,6 +72,7 @@ def loadmat5(
             byte_order,
             raw_data=raw_data,
             add_table_attrs=add_table_attrs,
+            datetime_unit=datetime_unit,
         )
 
         MR = MatFile5Reader(f, byte_order=byte_order, subsystem=subsystem)
@@ -246,7 +253,9 @@ def load_subsys_stream(f, subsystem_offset, byte_order):
     return BytesIO(res)
 
 
-def read_subsystem(f, subsystem_offset, byte_order, raw_data, add_table_attrs):
+def read_subsystem(
+    f, subsystem_offset, byte_order, raw_data, add_table_attrs, datetime_unit="ns"
+):
     """Read subsystem data if present"""
 
     if subsystem_offset <= 0:
@@ -267,7 +276,10 @@ def read_subsystem(f, subsystem_offset, byte_order, raw_data, add_table_attrs):
         raise MatReadError(f'Unreadable subsystem data because "{err}"')
 
     subsystem = MatSubsystem(
-        byte_order, raw_data=raw_data, add_table_attrs=add_table_attrs
+        byte_order,
+        raw_data=raw_data,
+        add_table_attrs=add_table_attrs,
+        datetime_unit=datetime_unit,
     )
     subsystem.load_subsystem(subsys_data)
 
