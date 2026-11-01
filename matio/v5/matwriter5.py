@@ -301,7 +301,7 @@ class VarWriter5:
     def write_char(self, arr, codec="ascii"):
         """Write char array (from numpy string array)"""
 
-        if arr.size == 0 or np.all(arr == ""):
+        if arr.size == 0 or np.all(arr == arr.dtype.type()):
             # Empty String Array
             # MATLAB only recognizes 0-D char array
             shape = (0,) * np.max([arr.ndim, 2])
