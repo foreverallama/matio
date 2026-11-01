@@ -770,7 +770,7 @@ def test_period_column(tmp_path, version):
 
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
 def test_period_index(tmp_path, version):
-    index = pd.period_range("2020-01", periods=2, freq="M")
+    index = pd.period_range("2020-01", periods=2, freq="M", name=0)
     frame = pd.DataFrame({"x": [1.0, 2.0]}, index=index)
     with pytest.warns(MatConvertWarning, match="Period dtype"):
         save_to_mat(tmp_path / "period.mat", {"tt": frame}, version=version)
@@ -778,6 +778,8 @@ def test_period_index(tmp_path, version):
     loaded = load_from_mat(tmp_path / "period.mat")["tt"]
     expected = index.to_timestamp().astype("datetime64[ns]")
     pd.testing.assert_index_equal(loaded.index, expected, check_names=False)
+    # MATLAB needs a text dimension name
+    assert loaded.index.name == "0"
 
 
 struct_files = [

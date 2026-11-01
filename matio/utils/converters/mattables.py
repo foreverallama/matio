@@ -485,7 +485,8 @@ def timetable_to_mat(df):
 
     varnames = np.array([str(col) for col in df.columns], dtype=object)
 
-    dim1 = df.index.name if df.index.name is not None else "Time"
+    # MATLAB needs a text dimension name, pandas allows any hashable index name
+    dim1 = str(df.index.name) if df.index.name is not None else "Time"
     # MATLAB rejects dimension names equal to a variable name, readtable appends "_1"
     dimnames = np.array(
         [np.array([f"{d}_1" if d in varnames else d]) for d in (dim1, "Variables")],
@@ -510,7 +511,7 @@ def timetable_to_mat(df):
         rowtimes = df.index.to_timestamp().to_numpy()
     else:
         raise MatConvertError(
-            "timetable_to_mat: DataFrame index must be DatetimeIndex or TimedeltaIndex."
+            "timetable_to_mat: DataFrame index must be DatetimeIndex, TimedeltaIndex or PeriodIndex."
         )
 
     # Define timetable struct dtype
