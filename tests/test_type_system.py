@@ -71,3 +71,22 @@ def test_java_property():
         mdict_v73["obj"].properties["a"], java_v7, strict=True
     )
     np.testing.assert_array_equal(mdict_v73["after"], np.array([[42.0]]), strict=True)
+
+
+def test_handle_object_without_com_prefix(tmp_path):
+    """Test reading a v7.3 handle object whose class name does not start with COM."""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_type_systems_v73.mat"
+    )
+    with pytest.warns(MatReadWarning):
+        handle = load_from_mat(file_path, variable_names=["handletype"])["handletype"]
+    # Older Simulink classes like Simulink.ConfigSet are handle objects as well
+    handle.classname = "Simulink.ConfigSet"
+
+    save_to_mat(tmp_path / "handle.mat", {"cs": handle}, version="v7.3")
+    with pytest.warns(MatReadWarning):
+        mload = load_from_mat(tmp_path / "handle.mat")
+
+    assert mload["cs"].classname == "Simulink.ConfigSet"
+    assert mload["cs"].type_system == "handle"
+    assert mload["cs"].properties.shape == (139, 1)
