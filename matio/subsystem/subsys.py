@@ -751,9 +751,12 @@ class MatSubsystem:
 
         if isinstance(obj, MatlabOpaqueArray):
             for obj_elem in obj.ravel(order="F"):
-                object_id, class_id = self.set_object_id(obj_elem, saveobj_ret_type)
+                # Elements of a heterogeneous array can be subclasses of the array class
+                elem_saveobj = obj_elem.classname in self.saveobj_class_names
+                object_id, _ = self.set_object_id(obj_elem, elem_saveobj)
                 arr_ids.append(object_id)
             dims = obj.shape
+            class_id = self.set_class_id(classname)
         else:
             if isinstance(obj.properties, tuple):
                 # 0x0, 1x0, 0x1 objects
@@ -1066,11 +1069,18 @@ class MatSubsystem:
                         self.release_saved_properties(object_id)
                     self.mcos_object_cache[object_id] = obj
                 else:
+                    # Elements of a heterogeneous array keep their own class.
+                    # Deleted objects have ID 0 and no metadata of their own.
+                    elem_class_id = class_id
+                    if object_id != 0:
+                        elem_class_id = self.get_object_metadata(object_id)[0]
                     obj = MatlabOpaque(
-                        properties=None, classname=classname, type_system=type_system
+                        properties=None,
+                        classname=self.get_classname(elem_class_id),
+                        type_system=type_system,
                     )
                     self.mcos_object_cache[object_id] = obj
-                    obj.class_alias = class_alias
+                    obj.class_alias = self.get_class_alias(elem_class_id)
                     obj.properties = self.get_properties(object_id)
             array_objs.append(obj)
 

@@ -465,6 +465,37 @@ class TestSaveMatlabUserDefined:
                 os.remove(temp_file_path)
 
 
+het_files = [
+    ("test_heterogeneous_v7.mat", "v7"),
+    ("test_heterogeneous_v73.mat", "v7.3"),
+]
+
+
+@pytest.mark.parametrize("filename, version", het_files)
+def test_heterogeneous_array(filename, version, tmp_path):
+    """Test reading and writing an object array with elements of different subclasses"""
+    file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+    het = load_from_mat(file_path)["het"]
+    elem_classes = [f"{namespace}.HetA", f"{namespace}.HetB"]
+    assert het.classname == f"{namespace}.HetBase"
+    assert [obj.classname for obj in het.ravel()] == elem_classes
+
+    save_to_mat(tmp_path / "het.mat", {"het": het}, version=version)
+    mload = load_from_mat(tmp_path / "het.mat")["het"]
+    assert mload.classname == f"{namespace}.HetBase"
+    assert [obj.classname for obj in mload.ravel()] == elem_classes
+    np.testing.assert_array_equal(
+        mload[0, 0].properties["a"], np.array([[5.0]]), strict=True
+    )
+
+    # A deleted element has no metadata of its own and keeps the array class
+    het[0, 1] = MatlabOpaque(properties=None, classname=f"{namespace}.HetB")
+    save_to_mat(tmp_path / "deleted.mat", {"het": het}, version=version)
+    mload = load_from_mat(tmp_path / "deleted.mat")["het"]
+    assert mload[0, 1].properties is None
+    assert mload[0, 1].classname == f"{namespace}.HetBase"
+
+
 saveobj_files = [("test_saveobj_v7.mat", "v7"), ("test_saveobj_v73.mat", "v7.3")]
 
 
