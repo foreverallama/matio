@@ -121,6 +121,7 @@ class MatSubsystem:
         """Initializes save with metadata for object ID = 0"""
 
         self.version = FILEWRAPPER_VERSION
+        self.raw_type_systems = []
         self.class_id_metadata.extend([0, 0, 0, 0])
         self.dynprop_metadata.extend([0, 0])
         self.mcos_class_alias_metadata.append(0)
@@ -778,11 +779,10 @@ class MatSubsystem:
 
         type_system = obj.type_system
         if type_system != OpaqueType.MCOS:
-            warnings.warn(
-                "subsystem:set_object_metadata: Only MCOS objects are supported currently. This item will be skipped",
-                MatWriteWarning,
-            )
-            return np.empty((0, 0), dtype=np.uint8)
+            # java and handle objects are read as raw data, write it back unchanged
+            if type_system not in self.raw_type_systems:
+                self.raw_type_systems.append(type_system)
+            return obj.properties
 
         return self.set_mcos_object_metadata(obj)
 
@@ -944,12 +944,18 @@ class MatSubsystem:
         """Creates subsystem struct array"""
 
         fwrap_data = self.set_fwrap_data()
-        if fwrap_data is None:
+        type_systems = [] if fwrap_data is None else [OpaqueType.MCOS]
+        type_systems += self.raw_type_systems
+        if not type_systems:
             return None
 
-        dtype = [(OpaqueType.MCOS, object)]
+        dtype = [(type_system, object) for type_system in type_systems]
         subsys_metadata = np.empty((1, 1), dtype=dtype)
-        subsys_metadata[0, 0][OpaqueType.MCOS] = fwrap_data
+        if fwrap_data is not None:
+            subsys_metadata[0, 0][OpaqueType.MCOS] = fwrap_data
+        # Like MATLAB, java and handle objects only get an empty field
+        for type_system in self.raw_type_systems:
+            subsys_metadata[0, 0][type_system] = MatlabCanonicalEmpty()
 
         return subsys_metadata
 
