@@ -89,7 +89,8 @@ class MatSubsystem:
         self.class_id_counter = 0
         self.object_id_counter = 0
 
-        self.saveobj_class_names = matlab_saveobj_ret_types + saveobj_classes
+        self.saveobj_classes = set(saveobj_classes)
+        self.saveobj_class_names = matlab_saveobj_ret_types | self.saveobj_classes
 
     def check_unknowns(self, cell2):
         """Log warnings for unknown metadata regions"""
@@ -698,6 +699,10 @@ class MatSubsystem:
         if obj in self.mcos_object_cache:
             class_id = self.set_class_id(obj.classname, obj.class_alias)
             return self.mcos_object_cache[obj], class_id
+
+        if saveobj_ret_type and obj.classname not in self.saveobj_classes:
+            # Older MATLAB releases save some of these classes as regular objects
+            saveobj_ret_type = set(obj.properties) == {"any"}
 
         self.object_id_counter += 1
         mat_obj_id = self.object_id_counter
