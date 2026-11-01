@@ -111,9 +111,11 @@ def guess_class_name(data):
     """Guess the MATLAB class name for a given Python object"""
 
     if isinstance(data, pd.DataFrame):
-        if pd.api.types.is_datetime64_any_dtype(
-            data.index
-        ) or pd.api.types.is_timedelta64_dtype(data.index):
+        if (
+            pd.api.types.is_datetime64_any_dtype(data.index)
+            or pd.api.types.is_timedelta64_dtype(data.index)
+            or isinstance(data.index, pd.PeriodIndex)
+        ):
             return "timetable"
         else:
             return "table"

@@ -501,6 +501,13 @@ def timetable_to_mat(df):
         rowtimes = df.index.tz_convert(None).to_numpy()
     elif isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
         rowtimes = df.index.to_numpy()
+    elif isinstance(df.index, pd.PeriodIndex):
+        warnings.warn(
+            "timetable_to_mat: Row times with Period dtype are converted to the start of each period. "
+            "Call .to_timestamp(how='end') on the index before saving to keep the end instead.",
+            MatConvertWarning,
+        )
+        rowtimes = df.index.to_timestamp().to_numpy()
     else:
         raise MatConvertError(
             "timetable_to_mat: DataFrame index must be DatetimeIndex or TimedeltaIndex."

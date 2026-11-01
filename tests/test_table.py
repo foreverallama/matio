@@ -768,6 +768,18 @@ def test_period_column(tmp_path, version):
     pd.testing.assert_series_equal(loaded["month"], expected)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_period_index(tmp_path, version):
+    index = pd.period_range("2020-01", periods=2, freq="M")
+    frame = pd.DataFrame({"x": [1.0, 2.0]}, index=index)
+    with pytest.warns(MatConvertWarning, match="Period dtype"):
+        save_to_mat(tmp_path / "period.mat", {"tt": frame}, version=version)
+
+    loaded = load_from_mat(tmp_path / "period.mat")["tt"]
+    expected = index.to_timestamp().astype("datetime64[ns]")
+    pd.testing.assert_index_equal(loaded.index, expected, check_names=False)
+
+
 struct_files = [
     ("test_table_struct_v7.mat", "v7"),
     ("test_table_struct_v73.mat", "v7.3"),
