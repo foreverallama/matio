@@ -850,6 +850,12 @@ cdef class VarReader5:
             raise ValueError('Type %d does not appear to be char type'
                              % mdtype)
 
+        if mdtype == miUTF8 and byte_count != length:
+            # Writers like scipy store multibyte UTF-8, so there are more bytes than
+            # characters. Decode all bytes and keep one code point per character.
+            arr = np.frombuffer(data.decode('utf-8').encode('utf-32-le'), dtype='<u4')
+            return decode_char_arrays(arr.reshape(header.dims, order='F'), 'utf-32-le')
+
         dt = <cnp.dtype>self.dtypes[mdtype]
         arr = np.ndarray(shape=(length,), dtype=dt, buffer=data)
         arr = arr.reshape(header.dims, order='F')
