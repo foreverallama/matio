@@ -3,6 +3,7 @@
 import warnings
 
 import numpy as np
+import pandas as pd
 
 from matio.utils.matclass import MatConvertWarning
 
@@ -13,12 +14,13 @@ caldur_dtype = [
 ]
 
 
-def mat_to_datetime(props, **_kwargs):
+def mat_to_datetime(props, datetime_unit="ns", **_kwargs):
     """Convert MATLAB datetime to Numpy datetime64 array"""
 
     data = props.get("data", None)
     if data is None or data.size == 0:
-        return np.empty((0, 0), dtype="datetime64[ns]")
+        shape = (0, 0) if data is None else data.shape
+        return np.empty(shape, dtype=f"datetime64[{datetime_unit}]")
 
     tz = props.get("tz", None)
     if tz is not None and tz.size > 0:
@@ -46,12 +48,24 @@ def mat_to_datetime(props, **_kwargs):
         # MATLAB keeps sub-ms precision as a double-double:
         # the imaginary part is the rounding error of the real part
         ms_frac = ms_frac + data.imag
-    ns_int = ms_int_float.astype(np.int64) * 1000_000
-    ns_frac = np.round(ms_frac * 1e6).astype(np.int64)
-    total_ns = ns_int + ns_frac
+    per_ms = {"ms": 1, "us": 1_000, "ns": 1_000_000}[datetime_unit]
+    # datetime64[ns] covers about the years 1678 to 2262, [us] and [ms] much more
+    outside = np.abs(ms_int_float) > np.iinfo(np.int64).max // per_ms
+    int_part = np.where(outside, 0, ms_int_float).astype(np.int64) * per_ms
+    frac_part = np.round(ms_frac * per_ms).astype(np.int64)
+    total = int_part + frac_part
+    # the sign flips if the sub-ms part pushed the sum past the int64 limit
+    outside |= (int_part > 0) & (total < 0) | (int_part < 0) & (total > 0)
+    if outside.any():
+        warnings.warn(
+            f"MATLAB datetime outside the datetime64[{datetime_unit}] range was set to NaT.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+        nat |= outside
 
-    dt = total_ns.astype("datetime64[ns]")
-    dt[nat] = np.datetime64("NaT", "ns")
+    dt = total.astype(f"datetime64[{datetime_unit}]")
+    dt[nat] = np.datetime64("NaT", datetime_unit)
     return dt
 
 
@@ -152,6 +166,16 @@ def mat_to_calendarduration(props, **_kwargs):
 def datetime_to_mat(arr):
     """Convert numpy.datetime64 array to MATLAB datetime format."""
 
+    if isinstance(arr, (pd.Timestamp, pd.DatetimeIndex)):
+        if arr.tz is not None:
+            warnings.warn(
+                f"datetime_to_mat: Timezone '{arr.tz}' is converted to UTC. "
+                "The timezone information will be lost.",
+                MatConvertWarning,
+            )
+            arr = arr.tz_convert(None)
+        arr = np.atleast_2d(arr.to_numpy())
+
     unit = np.datetime_data(arr.dtype)[0]
 
     # For sub-millisecond precision, write a double-double like MATLAB:
@@ -178,6 +202,9 @@ def datetime_to_mat(arr):
 
 def duration_to_mat(arr):
     """Convert numpy timedelta64 array to MATLAB duration format."""
+
+    if isinstance(arr, (pd.Timedelta, pd.TimedeltaIndex)):
+        arr = np.atleast_2d(arr.to_numpy())
 
     unit, _ = np.datetime_data(arr.dtype)
     millis = arr.astype("timedelta64[ns]").astype(np.float64) / 1e6

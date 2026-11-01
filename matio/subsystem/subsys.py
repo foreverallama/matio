@@ -48,10 +48,12 @@ class MatSubsystem:
         add_table_attrs=False,
         oned_as="col",
         saveobj_classes=[],
+        datetime_unit="ns",
     ):
         self.byte_order = "<i4" if byte_order[0] == "<" else ">i4"
         self.raw_data = raw_data
         self.add_table_attrs = add_table_attrs
+        self.datetime_unit = datetime_unit
         self.oned_as = oned_as
 
         self.mcos_object_cache = {}
@@ -588,6 +590,7 @@ class MatSubsystem:
             isinstance(prop_value, np.ndarray)
             and prop_value.dtype.hasobject
             and prop_value.dtype.kind != "T"
+            and not isinstance(prop_value, MatlabOpaqueArray)
         ):
             # Iterate through cell arrays and struct arrays
             # Ignore StringDType(): Used for MATLAB strings which uses 'O' internally
@@ -792,13 +795,15 @@ class MatSubsystem:
         values = []
         value_indices = []
 
-        for i, enum_member in enumerate(enum_array.ravel(order="F")):
-            value_name = enum_member.name
-
-            value_class = enum_to_opaque(classname, enum_member.value)
-            values.append(self.set_object_metadata(value_class))
-            value_indices.append(i)
-            value_names_idx.append(self.set_mcos_name(value_name))
+        # Like MATLAB, store each member once and map the elements to it
+        member_indices = {}
+        for enum_member in enum_array.ravel(order="F"):
+            if enum_member not in member_indices:
+                member_indices[enum_member] = len(values)
+                value_class = enum_to_opaque(classname, enum_member.value)
+                values.append(self.set_object_metadata(value_class))
+                value_names_idx.append(self.set_mcos_name(enum_member.name))
+            value_indices.append(member_indices[enum_member])
 
         prop_name = next(iter(enum_array[0, 0].value))
         builtin_classname, _, _ = prop_name.rpartition(".")
@@ -950,7 +955,8 @@ class MatSubsystem:
     def load_mcos_enumeration(self, metadata, type_system):
         """Loads MATLAB MCOS enumeration instance array"""
 
-        classname = self.get_classname(metadata[0, 0]["ClassName"].item())
+        class_id = metadata[0, 0]["ClassName"].item()
+        classname = self.get_classname(class_id)
         builtin_class_idx = metadata[0, 0]["BuiltinClassName"].item()
         if builtin_class_idx != 0:
             builtin_class_name = self.get_classname(builtin_class_idx)
@@ -963,6 +969,8 @@ class MatSubsystem:
 
         enum_vals = []
         value_idx = metadata[0, 0]["ValueIndices"]
+        # ValueNames and Values hold each member once, ValueIndices maps elements to them
+        value_names = [value_names[i] for i in value_idx.ravel(order="F")]
         mmdata = metadata[0, 0]["Values"]  # Array is N x 1 shape
         if mmdata.size != 0:
             mmdata_map = mmdata[value_idx]
@@ -999,7 +1007,7 @@ class MatSubsystem:
             metadata,
             classname,
             type_system,
-            self.get_class_alias(metadata[0, 0]["ClassName"].item()),
+            self.get_class_alias(class_id),
         )
 
     def load_mcos_object(self, metadata, type_system=OpaqueType.MCOS):
@@ -1038,6 +1046,7 @@ class MatSubsystem:
                             classname,
                             byte_order=self.byte_order,
                             add_table_attrs=self.add_table_attrs,
+                            datetime_unit=self.datetime_unit,
                         )
                     except Exception as e:
                         warnings.warn(

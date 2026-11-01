@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pytest
 
-from matio import load_from_mat, save_to_mat
+from matio import load_from_mat, save_to_mat, whosmat
 from matio.utils.matclass import MatWriteWarning
 
 # Check for availability of extended precision types in numpy
@@ -33,6 +33,18 @@ def skip_unsupported_v4(version, request):
     request_name = request.node.name.split("[")[0]
     if version == "v4" and request_name not in SUPPORTED_V4_TESTS:
         pytest.skip(f"MAT-file v4 does not support the test '{request_name}'")
+
+
+def test_load_nul_padded_variable_names():
+    """Test variable names padded with NUL bytes by non-MATLAB writers"""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_padded_varnames.mat"
+    )
+    mdict = load_from_mat(file_path, variable_names=["x"])
+    np.testing.assert_array_equal(
+        mdict["x"], np.array([[1.0], [2.0], [3.0]]), strict=True
+    )
+    assert set(whosmat(file_path)) == {"x", "y"}
 
 
 @pytest.mark.parametrize("filename, version", load_files)
@@ -629,6 +641,25 @@ class TestSaveBasicDatatypes:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_complex_single(self, filename, version):
+        """Test writing complex single data to MAT-file"""
+        mdict = {"complex_single": np.array([[1 + 2j, 3 - 4j]], dtype=np.complex64)}
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, mdict, version=version)
+            mload = load_from_mat(temp_file_path, variable_names=["complex_single"])
+
+            np.testing.assert_array_equal(
+                mdict["complex_single"], mload["complex_single"], strict=True
+            )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_char(self, filename, version):
         """Test writing char data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -724,10 +755,9 @@ class TestWriteNonSupportedNumeric:
         not HAS_COMPLEX256, reason="np.complex256 not available on this platform"
     )
     def test_numpy_complex(self, filename, version):
-        """Test writing numpy complex64 and complex256 data to MAT-file"""
-        arr_c64 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64).reshape(1, 3)
+        """Test writing numpy complex256 data to MAT-file"""
         arr_c256 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex256).reshape(1, 3)
-        mdict = {"complex64_array": arr_c64, "complex256_array": arr_c256}
+        mdict = {"complex256_array": arr_c256}
 
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
             temp_file_path = tmpfile.name
@@ -739,11 +769,6 @@ class TestWriteNonSupportedNumeric:
             mload = load_from_mat(temp_file_path, variable_names=None)
 
             np.testing.assert_array_equal(
-                mload["complex64_array"],
-                mdict["complex64_array"].astype("complex128"),
-                strict=True,
-            )
-            np.testing.assert_array_equal(
                 mload["complex256_array"],
                 mdict["complex256_array"].astype("complex128"),
                 strict=True,
@@ -752,6 +777,33 @@ class TestWriteNonSupportedNumeric:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_invalid_variable_names(version):
+    """Test that variable names MATLAB cannot load are skipped with a warning"""
+    mdict = {
+        "ok": 1.0,
+        "gr\u00f6\u00dfe": 2.0,
+        "p [bar]": 3.0,
+        "a-b": 4.0,
+        "_a": 5.0,
+        "1a": 6.0,
+    }
+
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        with pytest.warns(MatWriteWarning, match="not a valid MATLAB variable name"):
+            save_to_mat(temp_file_path, mdict, version=version)
+
+        mload = load_from_mat(temp_file_path)
+        assert [k for k in mload if not k.startswith("__")] == ["ok"]
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 
 def test_load_numeric_precision_v4(filename="test_basic_v4.mat"):
@@ -789,6 +841,28 @@ def test_load_numeric_precision_v4(filename="test_basic_v4.mat"):
         assert key in mdict
         expected_val = expected_dict[key]
         np.testing.assert_array_equal(mdict[key], expected_val, strict=True)
+
+
+def test_load_v73_skips_internal_groups():
+    """MATLAB saves Simulink logs with a #sigstream# group next to the variables"""
+    mdict = {"x": np.array([[1.0, 2.0]])}
+
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+        temp_file_path = tmpfile.name
+
+    try:
+        save_to_mat(temp_file_path, mdict, version="v7.3")
+        with h5py.File(temp_file_path, "a") as f:
+            f.create_group("#sigstream#")
+
+        mload = load_from_mat(temp_file_path)
+        assert "#sigstream#" not in mload
+        np.testing.assert_array_equal(mload["x"], mdict["x"], strict=True)
+        assert whosmat(temp_file_path) == {"x": ((1, 2), "double")}
+
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 
 def test_save_compression_v73():

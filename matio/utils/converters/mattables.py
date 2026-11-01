@@ -21,11 +21,14 @@ TIMETABLE_LOAD_VERSION = 7
 TIMETABLE_SAVE_VERSION = 6
 MIN_TIMETABLE_VERSION = 2
 
-# Pandas marks this as experimental
-# Using it here as its the closest match to MATLAB tables
-# FIXME: Update with pandas 3.0 release
-# https://pandas.pydata.org/docs/user_guide/migration-3-strings.html
-pd.options.future.infer_string = True
+try:
+    _STRING_DTYPE = pd.StringDtype(na_value=np.nan)
+except TypeError:
+    # pandas 2.2 uses the storage name to select NaN semantics.
+    try:
+        _STRING_DTYPE = pd.StringDtype(storage="pyarrow_numpy")
+    except ImportError:
+        _STRING_DTYPE = object
 
 
 def use_original_names(props, flag):
@@ -98,11 +101,14 @@ def to_dataframe(data, nvars, varnames):
     """Creates a dataframe from coldata and column names"""
 
     def make_series(col, dtype_kind):
-        if dtype_kind == "T":
-            return pd.Series(col, dtype="str")
+        if dtype_kind in ("T", "U"):
+            return pd.Series(col, dtype=_STRING_DTYPE)
         elif dtype_kind == "V":
             # struct arrays are split into one 1x1 struct per row
             return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
+        elif dtype_kind in "biufc":
+            # Plain arrays skip building and aligning one Series per column
+            return col
         else:
             return pd.Series(col)
 
@@ -130,7 +136,8 @@ def to_dataframe(data, nvars, varnames):
         else:
             rows[vname] = pd.Series(coldata)
 
-    df = pd.DataFrame(rows)
+    columns = pd.Index(list(rows), dtype=_STRING_DTYPE) if rows else None
+    df = pd.DataFrame(rows, columns=columns)
     return df
 
 
@@ -169,7 +176,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     if rownames.size > 0:
         rownames = [s.item() for s in rownames.ravel()]
         if len(rownames) == nrows:
-            df.index = rownames
+            df.index = pd.Index(rownames, dtype=_STRING_DTYPE)
 
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
@@ -193,12 +200,15 @@ def get_row_times(row_times, num_rows):
     start = row_times[0, 0]["origin"]
     if row_times[0, 0]["specifiedAsRate"]:
         fs = row_times[0, 0]["sampleRate"].item()
+        unit = np.datetime_data(start.dtype)[0] if start.dtype.kind == "M" else "ns"
         warnings.warn(
-            "get_row_times: MATLAB sampleRate row times are rounded to nanoseconds for NumPy compatibility.",
+            f"get_row_times: MATLAB sampleRate row times are rounded to {unit} for NumPy compatibility.",
             MatConvertWarning,
         )
         # Row k is at k / fs, adding a rounded step would drift over many rows
-        offsets = np.round(np.arange(num_rows) * (1e9 / fs)).astype("timedelta64[ns]")
+        per_s = np.timedelta64(1, "s") // np.timedelta64(1, unit)
+        offsets = np.round(np.arange(num_rows) * (per_s / fs))
+        offsets = offsets.astype(f"timedelta64[{unit}]")
         return (start + offsets).ravel()
     else:
         step = None
@@ -220,7 +230,7 @@ def get_row_times(row_times, num_rows):
                 # MATLAB saves explicit row times if the start day is past the 28th
                 month = start.astype("datetime64[M]")
                 times = (month + step * np.arange(num_rows) + (start - month)).ravel()
-                return times.astype("datetime64[ns]")
+                return times.astype(start.dtype)
         else:
             step = comps
 
@@ -236,8 +246,8 @@ def get_row_times(row_times, num_rows):
     # NumPy uses the finer unit of start and step, so neither is truncated
     times = (start + step * np.arange(num_rows)).ravel()
     if times.dtype.kind == "M":
-        # MATLAB saves datetime as [ms] data
-        times = times.astype("datetime64[ns]")
+        # Keep the unit of the start time, set by datetime_unit
+        times = times.astype(start.dtype)
     return times
 
 
@@ -302,11 +312,16 @@ def mat_to_categorical(props, **_kwargs):
 
     raw_names = props.get("categoryNames")
     category_names = [name.item() for name in raw_names.ravel()]
+    if category_names:
+        category_names = pd.Index(category_names, dtype=_STRING_DTYPE)
 
     # MATLAB codes are 1-indexed as uint integers
     codes = props.get("codes").astype(int) - 1
     ordered = bool(props.get("isOrdinal").item())
-    return pd.Categorical.from_codes(codes, categories=category_names, ordered=ordered)
+    # pandas validation fails on empty codes with a non-zero first dimension (1x0)
+    return pd.Categorical.from_codes(
+        codes, categories=category_names, ordered=ordered, validate=codes.size > 0
+    )
 
 
 def make_table_props():
@@ -399,6 +414,10 @@ def table_to_mat(df):
     # All serialized data must be the exact same types (including shape) as expected by MATLAB
     # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
+    extras["DimensionNames"][0, 0] = np.array(
+        [np.array([f"{d}_1" if d in varnames else d]) for d in ("Row", "Variables")],
+        dtype=object,
+    ).reshape((1, 2))
     prop_map = {
         "data": data,
         "varnames": varnames,
@@ -459,8 +478,10 @@ def timetable_to_mat(df):
     varnames = np.array([str(col) for col in df.columns], dtype=object)
 
     dim1 = df.index.name if df.index.name is not None else "Time"
+    # MATLAB rejects dimension names equal to a variable name, readtable appends "_1"
     dimnames = np.array(
-        [np.array([dim1]), np.array(["Variables"])], dtype=object
+        [np.array([f"{d}_1" if d in varnames else d]) for d in (dim1, "Variables")],
+        dtype=object,
     ).reshape((1, 2))
 
     if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:

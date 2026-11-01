@@ -1,5 +1,6 @@
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
@@ -485,3 +486,18 @@ def test_write_sparse_foreign_byteorder(tmp_path, dtype):
     actual = load_from_mat(path)["a"]
     np.testing.assert_array_equal(actual.toarray(), expected, strict=True)
     assert arr.data.tobytes() == before
+
+
+@pytest.mark.parametrize("dtype", ["c8", ">c16"])
+def test_write_complex_sparse_v73(tmp_path, dtype):
+    data = np.array([1 + 2j, 3 - 1j], dtype=dtype)
+    arr = csc_array((data, [0, 1], [0, 1, 2]), shape=(2, 2))
+    path = tmp_path / "complex_sparse.mat"
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        save_to_mat(path, {"a": arr}, version="v7.3")
+    # Only complex single is converted with a warning, complex128 in any byte order is not
+    assert len(caught) == (1 if dtype == "c8" else 0)
+    actual = load_from_mat(path)["a"]
+    expected = np.diag(data.astype(np.complex128))
+    np.testing.assert_array_equal(actual.toarray(), expected, strict=True)

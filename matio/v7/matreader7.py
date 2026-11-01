@@ -21,7 +21,6 @@ from matio.utils.matclass import (
 from matio.utils.matconvert import guess_type_system
 from matio.utils.matheaders import (
     MAT_HDF_ATTRS,
-    MAT_HDF_REFS_GROUP,
     MAT_HDF_SUBSYS_GROUP,
     MCOS_MAGIC_NUMBER,
 )
@@ -38,11 +37,14 @@ def loadmat7(
     variable_names,
     raw_data,
     add_table_attrs,
+    datetime_unit="ns",
 ):
     """Reads MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        subsystem = read_subsystem(f, byte_order, raw_data, add_table_attrs)
+        subsystem = read_subsystem(
+            f, byte_order, raw_data, add_table_attrs, datetime_unit
+        )
         mat_reader = MatRead7(f, subsystem)
         matfile_dict = mat_reader.get_variables(variable_names)
 
@@ -55,7 +57,9 @@ def whosmat7(file_path):
     with h5py.File(file_path, "r") as f:
         vars = {}
         for var in f:
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            # MATLAB keeps internal data in groups like #refs#, #subsystem# and
+            # #sigstream# (Simulink logs), variable names cannot start with "#"
+            if var.startswith("#"):
                 continue
 
             class_name = f[var].attrs.get(MAT_HDF_ATTRS.CLASS, None)
@@ -163,9 +167,15 @@ class MatRead7:
             # complex number
             real = arr["real"]
             imag = arr["imag"]
-            arr = np.empty(shape=arr.shape, dtype=np.complex128)
-            arr.real = real
-            arr.imag = imag
+            dtype = np.complex64 if real.dtype == np.float32 else np.complex128
+            part = np.finfo(dtype).dtype
+            if arr.dtype == np.dtype([("real", part), ("imag", part)]):
+                # packed (real, imag) float pairs have the memory layout of numpy complex
+                arr = arr.view(dtype)
+            else:
+                arr = np.empty(shape=arr.shape, dtype=dtype)
+                arr.real = real
+                arr.imag = imag
 
         if int_decode == IntegerDecodingHint.LOGICAL_HINT:
             arr = arr.astype(np.bool_)
@@ -242,6 +252,9 @@ class MatRead7:
 
         for field in obj:
             obj_field = obj[field]
+            if not is_scalar:
+                # Read all references at once, one HDF5 read per element is slow
+                obj_field = obj_field[()]
             for idx in np.ndindex(arr.shape):
                 if is_scalar:
                     arr[idx][field] = self.read_h5_data(obj_field)
@@ -256,8 +269,9 @@ class MatRead7:
             return np.empty(shape=obj[()], dtype=object)
 
         arr = np.empty(shape=obj.shape, dtype=object)
+        refs = obj[()]
         for idx in np.ndindex(obj.shape):
-            ref_data = self.h5stream[obj[idx]]
+            ref_data = self.h5stream[refs[idx]]
             arr[idx] = self.read_h5_data(ref_data)
         return arr.T
 
@@ -397,7 +411,7 @@ class MatRead7:
 
         for var in self.h5stream:
             obj = self.h5stream[var]
-            if var in (MAT_HDF_REFS_GROUP, MAT_HDF_SUBSYS_GROUP):
+            if var.startswith("#"):
                 continue
             if variable_names is not None and var not in variable_names:
                 continue
@@ -417,7 +431,7 @@ class MatRead7:
         return mdict
 
 
-def read_subsystem(f, byte_order, raw_data, add_table_attrs):
+def read_subsystem(f, byte_order, raw_data, add_table_attrs, datetime_unit="ns"):
     """Read subsystem data if present"""
 
     if MAT_HDF_SUBSYS_GROUP not in f:
@@ -426,7 +440,9 @@ def read_subsystem(f, byte_order, raw_data, add_table_attrs):
     subsys_group = f[MAT_HDF_SUBSYS_GROUP]
     MR7 = MatRead7(f, None)
     subsys_data = MR7.read_struct(subsys_group)
-    subsystem = MatSubsystem(byte_order, raw_data, add_table_attrs)
+    subsystem = MatSubsystem(
+        byte_order, raw_data, add_table_attrs, datetime_unit=datetime_unit
+    )
     subsystem.load_subsystem(subsys_data)
 
     return subsystem

@@ -87,6 +87,7 @@ def convert_mat_to_py(props, classname, **kwargs):
         props,
         byte_order=kwargs.get("byte_order", None),
         add_table_attrs=kwargs.get("add_table_attrs", None),
+        datetime_unit=kwargs.get("datetime_unit", "ns"),
     )
 
 
@@ -120,6 +121,10 @@ def guess_class_name(data):
         return "categorical"
     elif isinstance(data, pd.Series):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
+    elif isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
+        return "datetime"
+    elif isinstance(data, (pd.TimedeltaIndex, pd.Timedelta)):
+        return "duration"
     elif isinstance(data, MatlabContainerMap):
         return "containers.Map"
     elif isinstance(data, (np.ndarray, np.generic)):
