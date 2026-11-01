@@ -925,6 +925,19 @@ def test_numpy_unicode_scalar(tmp_path, version):
     np.testing.assert_array_equal(actual, np.array(["alpha"]), strict=True)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_ascii_bytes_as_char(tmp_path, version):
+    file_path = tmp_path / "bytes.mat"
+    mdict = {"x": np.array([b"ab", b"cd"]), "s": b"xy", "e": b"", "f": ""}
+    save_to_mat(file_path, mdict, version=version)
+    mdict = load_from_mat(file_path)
+    np.testing.assert_array_equal(mdict["x"], np.array(["ab", "cd"]), strict=True)
+    np.testing.assert_array_equal(mdict["s"], np.array(["xy"]), strict=True)
+    np.testing.assert_array_equal(mdict["e"], mdict["f"], strict=True)
+    with pytest.raises(UnicodeDecodeError):
+        save_to_mat(file_path, {"x": np.array([b"\xe4"])}, version=version)
+
+
 def test_large_stream_position():
     from io import BytesIO
 

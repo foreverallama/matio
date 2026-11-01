@@ -148,7 +148,7 @@ class MatWrite7:
     def write_char_dset(self, parent, var_name, data):
         """Writes a char dataset to the HDF5 file."""
 
-        if data.size == 0 or np.all(data == ""):
+        if data.size == 0 or np.all(data == data.dtype.type()):
             # Empty String Array
             # MATLAB only recognizes 0-D char array
             shape = (0,) * np.max([data.ndim, 2])
