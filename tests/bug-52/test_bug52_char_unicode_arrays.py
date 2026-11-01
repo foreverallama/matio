@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatWriteWarning
+from matio.utils.matclass import MatReadWarning, MatWriteWarning
 
 files = [("chars.mat", "v7"), ("chars_hdf.mat", "v7.3")]
 
@@ -142,7 +142,8 @@ def test_load_old_char_null(filename="char_array_old_null.mat"):
 def test_load_v6_windows_char(filename="chars_v6_windows.mat"):
     """Test reading -v6 char data that MATLAB on Windows writes in cp1252"""
     file_path = os.path.join(os.path.dirname(__file__), filename)
-    mdict = load_from_mat(file_path)
+    with pytest.warns(MatReadWarning, match="cp1252"):
+        mdict = load_from_mat(file_path)
 
     np.testing.assert_array_equal(mdict["units"], np.array(["°C"]), strict=True)
     np.testing.assert_array_equal(mdict["currency"], np.array(["a€b"]), strict=True)
