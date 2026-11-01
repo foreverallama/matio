@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pytest
 
-from matio import load_from_mat
+from matio import load_from_mat, save_to_mat
 from matio.utils.matclass import MatlabOpaque, MatReadWarning
 
 files = [("test_type_systems_v7.mat", "v7"), ("test_type_systems_v73.mat", "v7.3")]
@@ -34,6 +34,28 @@ class TestLoadTypeSystems:
         assert isinstance(handle_properties[0, 0], np.ndarray)
         assert handle_properties[0, 0].shape == (4520, 1)
         assert handle_properties[0, 0].dtype == np.uint8
+
+    def test_type_system_write(self, filename, version, tmp_path):
+        """Test writing java and handle objects back with their raw data"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with pytest.warns(MatReadWarning):
+            mdict = load_from_mat(file_path, variable_names=["javatype", "handletype"])
+
+        save_to_mat(tmp_path / "type_systems.mat", mdict, version=version)
+        with pytest.warns(MatReadWarning):
+            mload = load_from_mat(tmp_path / "type_systems.mat")
+
+        for name in ("javatype", "handletype"):
+            assert mload[name].classname == mdict[name].classname
+            assert mload[name].type_system == mdict[name].type_system
+        np.testing.assert_array_equal(
+            mload["javatype"].properties, mdict["javatype"].properties, strict=True
+        )
+        handle_properties = mload["handletype"].properties
+        assert handle_properties.shape == (139, 1)
+        np.testing.assert_array_equal(
+            handle_properties[0, 0], mdict["handletype"].properties[0, 0], strict=True
+        )
 
 
 def test_java_property():

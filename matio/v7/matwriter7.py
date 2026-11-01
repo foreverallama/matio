@@ -357,7 +357,11 @@ class MatWrite7:
                 )
             else:
                 metadata = self.subsystem.set_object_metadata(data)
-                dset = parent.create_dataset(var_name, data=metadata.T)
+                if metadata.dtype == object:
+                    # MATLAB stores handle objects as a cell of uint8 arrays
+                    dset = self.write_cell_array(parent, var_name, metadata)
+                else:
+                    dset = parent.create_dataset(var_name, data=metadata.T)
 
         classname = data.classname
 
