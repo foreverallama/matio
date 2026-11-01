@@ -34,3 +34,18 @@ class TestLoadTypeSystems:
         assert isinstance(handle_properties[0, 0], np.ndarray)
         assert handle_properties[0, 0].shape == (4520, 1)
         assert handle_properties[0, 0].dtype == np.uint8
+
+
+def test_java_property():
+    """Test reading a Java object stored in a property of a classdef object"""
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    mdict_v7 = load_from_mat(os.path.join(data_dir, "test_java_property_v7.mat"))
+    mdict_v73 = load_from_mat(os.path.join(data_dir, "test_java_property_v73.mat"))
+
+    # The Java object stays raw uint8 data, in v7.3 as in v7
+    java_v7 = mdict_v7["obj"].properties["a"]
+    assert java_v7.dtype == np.uint8
+    np.testing.assert_array_equal(
+        mdict_v73["obj"].properties["a"], java_v7, strict=True
+    )
+    np.testing.assert_array_equal(mdict_v73["after"], np.array([[42.0]]), strict=True)

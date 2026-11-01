@@ -337,6 +337,10 @@ class MatRead7:
         if classname == MCOS_SUBSYSTEM_CLASS:
             return self.read_cell(obj)
 
+        if self.subsystem is None:
+            # Opaque values inside the subsystem itself (Java properties) stay raw, as in v5
+            return obj[()].T
+
         type_system = guess_type_system(classname)
 
         # Check Enumeration Instances
