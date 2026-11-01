@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
+from matio.utils.matclass import EmptyMatStruct, MatWriteWarning
 
 files = [("test_basic_v7.mat", "v7"), ("test_basic_v73.mat", "v7.3")]
 
@@ -495,6 +496,36 @@ class TestSaveStructCell:
             assert "struct_no_fields" in mload
             assert isinstance(mload["struct_no_fields"], EmptyMatStruct)
             assert mload["struct_no_fields"].shape == mdict["struct_no_fields"].shape
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    def test_struct_dropped_fields(self, filename, version):
+        """Test warnings for struct fields that cannot be written to MAT-file"""
+
+        class NoFields:
+            pass
+
+        mdict = {
+            "struct_keys": {1: 10, "gr\u00f6\u00dfe": 30, "p [bar]": 40, "ok": 20},
+            "struct_obj": NoFields(),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            with pytest.warns(MatWriteWarning) as record:
+                save_to_mat(temp_file_path, mdict, version=version)
+            messages = [str(w.message) for w in record]
+            assert any("1 is not a valid MATLAB field name" in msg for msg in messages)
+            assert any("'gr\u00f6\u00dfe' is not a valid" in msg for msg in messages)
+            assert any("NoFields object has no public" in msg for msg in messages)
+
+            mload = load_from_mat(temp_file_path, variable_names=None)
+            assert mload["struct_keys"].dtype.names == ("p [bar]", "ok")
+            assert isinstance(mload["struct_obj"], EmptyMatStruct)
 
         finally:
             if os.path.exists(temp_file_path):

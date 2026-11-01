@@ -757,6 +757,31 @@ class TestLoadMatlabTableOriginalNames:
         ]
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_period_column(tmp_path, version):
+    frame = pd.DataFrame({"month": pd.period_range("2020-01", periods=2, freq="M")})
+    with pytest.warns(MatConvertWarning, match="'month' with Period dtype"):
+        save_to_mat(tmp_path / "period.mat", {"table": frame}, version=version)
+
+    loaded = load_from_mat(tmp_path / "period.mat")["table"]
+    expected = frame["month"].dt.to_timestamp().astype("datetime64[ns]")
+    pd.testing.assert_series_equal(loaded["month"], expected)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_period_index(tmp_path, version):
+    index = pd.period_range("2020-01", periods=2, freq="M", name=0)
+    frame = pd.DataFrame({"x": [1.0, 2.0]}, index=index)
+    with pytest.warns(MatConvertWarning, match="Period dtype"):
+        save_to_mat(tmp_path / "period.mat", {"tt": frame}, version=version)
+
+    loaded = load_from_mat(tmp_path / "period.mat")["tt"]
+    expected = index.to_timestamp().astype("datetime64[ns]")
+    pd.testing.assert_index_equal(loaded.index, expected, check_names=False)
+    # MATLAB needs a text dimension name
+    assert loaded.index.name == "0"
+
+
 struct_files = [
     ("test_table_struct_v7.mat", "v7"),
     ("test_table_struct_v73.mat", "v7.3"),

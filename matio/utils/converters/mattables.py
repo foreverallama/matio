@@ -372,6 +372,14 @@ def make_table_props():
 def get_column_data(col):
     """Converts a pandas Series to a column variable of a MATLAB table"""
 
+    if isinstance(col.dtype, pd.PeriodDtype):
+        warnings.warn(
+            f"table_to_mat: Column '{col.name}' with Period dtype is converted to the start of each period. "
+            "Call .dt.to_timestamp(how='end') before saving to keep the end instead.",
+            MatConvertWarning,
+        )
+        col = col.dt.to_timestamp()
+
     if isinstance(col.dtype, pd.StringDtype):
         # Covers both "str" (NaN) and "string" (pd.NA) dtypes
         return col.to_numpy(
@@ -477,7 +485,8 @@ def timetable_to_mat(df):
 
     varnames = np.array([str(col) for col in df.columns], dtype=object)
 
-    dim1 = df.index.name if df.index.name is not None else "Time"
+    # MATLAB needs a text dimension name, pandas allows any hashable index name
+    dim1 = str(df.index.name) if df.index.name is not None else "Time"
     # MATLAB rejects dimension names equal to a variable name, readtable appends "_1"
     dimnames = np.array(
         [np.array([f"{d}_1" if d in varnames else d]) for d in (dim1, "Variables")],
@@ -493,9 +502,16 @@ def timetable_to_mat(df):
         rowtimes = df.index.tz_convert(None).to_numpy()
     elif isinstance(df.index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
         rowtimes = df.index.to_numpy()
+    elif isinstance(df.index, pd.PeriodIndex):
+        warnings.warn(
+            "timetable_to_mat: Row times with Period dtype are converted to the start of each period. "
+            "Call .to_timestamp(how='end') on the index before saving to keep the end instead.",
+            MatConvertWarning,
+        )
+        rowtimes = df.index.to_timestamp().to_numpy()
     else:
         raise MatConvertError(
-            "timetable_to_mat: DataFrame index must be DatetimeIndex or TimedeltaIndex."
+            "timetable_to_mat: DataFrame index must be DatetimeIndex, TimedeltaIndex or PeriodIndex."
         )
 
     # Define timetable struct dtype
