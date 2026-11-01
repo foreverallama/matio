@@ -167,9 +167,15 @@ class MatRead7:
             # complex number
             real = arr["real"]
             imag = arr["imag"]
-            arr = np.empty(shape=arr.shape, dtype=np.complex128)
-            arr.real = real
-            arr.imag = imag
+            dtype = np.complex64 if real.dtype == np.float32 else np.complex128
+            part = np.finfo(dtype).dtype
+            if arr.dtype == np.dtype([("real", part), ("imag", part)]):
+                # packed (real, imag) float pairs have the memory layout of numpy complex
+                arr = arr.view(dtype)
+            else:
+                arr = np.empty(shape=arr.shape, dtype=dtype)
+                arr.real = real
+                arr.imag = imag
 
         if int_decode == IntegerDecodingHint.LOGICAL_HINT:
             arr = arr.astype(np.bool_)
@@ -246,6 +252,9 @@ class MatRead7:
 
         for field in obj:
             obj_field = obj[field]
+            if not is_scalar:
+                # Read all references at once, one HDF5 read per element is slow
+                obj_field = obj_field[()]
             for idx in np.ndindex(arr.shape):
                 if is_scalar:
                     arr[idx][field] = self.read_h5_data(obj_field)
@@ -260,8 +269,9 @@ class MatRead7:
             return np.empty(shape=obj[()], dtype=object)
 
         arr = np.empty(shape=obj.shape, dtype=object)
+        refs = obj[()]
         for idx in np.ndindex(obj.shape):
-            ref_data = self.h5stream[obj[idx]]
+            ref_data = self.h5stream[refs[idx]]
             arr[idx] = self.read_h5_data(ref_data)
         return arr.T
 

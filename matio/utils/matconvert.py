@@ -121,6 +121,10 @@ def guess_class_name(data):
         return "categorical"
     elif isinstance(data, pd.Series):
         raise NotImplementedError("pandas.Series to MATLAB object not yet supported")
+    elif isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
+        return "datetime"
+    elif isinstance(data, (pd.TimedeltaIndex, pd.Timedelta)):
+        return "duration"
     elif isinstance(data, MatlabContainerMap):
         return "containers.Map"
     elif isinstance(data, (np.ndarray, np.generic)):

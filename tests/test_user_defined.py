@@ -334,6 +334,33 @@ class TestSaveMatlabUserDefined:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
+    def test_obj_array_in_prop(self, filename, version):
+        """Test writing an object array stored in a property of another object"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        obj_array = load_from_mat(file_path, variable_names=["obj_array"])["obj_array"]
+        obj = MatlabOpaque({"a": obj_array}, f"{namespace}.BasicClass")
+
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmpfile:
+            temp_file_path = tmpfile.name
+
+        try:
+            save_to_mat(temp_file_path, {"obj": obj}, version=version)
+            prop = load_from_mat(temp_file_path)["obj"].properties["a"]
+
+            assert isinstance(prop, MatlabOpaqueArray)
+            assert prop.classname == obj_array.classname
+            assert prop.shape == obj_array.shape
+            for idx in np.ndindex(obj_array.shape):
+                assert prop[idx].classname == obj_array[idx].classname
+                for key, val in obj_array[idx].properties.items():
+                    np.testing.assert_array_equal(
+                        prop[idx].properties[key], val, strict=True
+                    )
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def test_obj_with_nested_props(self, filename, version):
         """Test writing objects with nested properties to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
