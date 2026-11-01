@@ -1,11 +1,15 @@
 import os
 import tempfile
 
+import h5py
 import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
 from matio.utils.matclass import MatlabOpaque, MatlabOpaqueArray
+from matio.utils.matheaders import read_mat_header
+from matio.v5.matreader5 import read_subsystem as read_subsystem5
+from matio.v7.matreader7 import read_subsystem as read_subsystem7
 
 files = [("test_user_defined_v7.mat", "v7"), ("test_user_defined_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -491,3 +495,31 @@ def test_obj_saveobj(filename, version, tmp_path):
     saved = mload.properties["any"][0, 0]
     np.testing.assert_array_equal(saved["gain"], np.array([[5.0]]), strict=True)
     np.testing.assert_array_equal(saved["name"], np.array(["motor"]), strict=True)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_builtin_saveobj_class(version, tmp_path):
+    """Test writing MATLAB classes that use saveobj without listing them in saveobj_classes"""
+    saved = np.empty((1, 1), dtype=[("Name", object)])
+    saved[0, 0]["Name"] = np.array(["logsout"])
+    obj = MatlabOpaque(
+        properties={"any": saved}, classname="Simulink.SimulationData.Dataset"
+    )
+    # Older releases saved the same class as a regular object
+    old = MatlabOpaque(
+        properties={"Name": np.array(["old"])},
+        classname="Simulink.SimulationData.Dataset",
+    )
+    path = tmp_path / "dataset.mat"
+    save_to_mat(path, {"logsout": obj, "old": old}, version=version)
+
+    if version == "v7":
+        subsystem_offset, _, byte_order = read_mat_header(path)
+        with open(path, "rb") as f:
+            subsystem = read_subsystem5(f, subsystem_offset, byte_order, False, False)
+    else:
+        with h5py.File(path, "r") as f:
+            subsystem = read_subsystem7(f, "<", False, False)
+    saveobj_ids = [subsystem.get_object_metadata(i)[1] for i in (1, 2)]
+    assert saveobj_ids[0] != 0
+    assert saveobj_ids[1] == 0
