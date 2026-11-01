@@ -1,5 +1,6 @@
 from .matclass import (
     MatlabContainerMap,
+    MatlabDictionary,
     MatlabEnumerationArray,
     MatlabFunction,
     MatlabObject,
@@ -9,6 +10,7 @@ from .matclass import (
 
 __all__ = [
     "MatlabContainerMap",
+    "MatlabDictionary",
     "MatlabEnumerationArray",
     "MatlabOpaque",
     "MatlabOpaqueArray",
