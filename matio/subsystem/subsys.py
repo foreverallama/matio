@@ -795,13 +795,15 @@ class MatSubsystem:
         values = []
         value_indices = []
 
-        for i, enum_member in enumerate(enum_array.ravel(order="F")):
-            value_name = enum_member.name
-
-            value_class = enum_to_opaque(classname, enum_member.value)
-            values.append(self.set_object_metadata(value_class))
-            value_indices.append(i)
-            value_names_idx.append(self.set_mcos_name(value_name))
+        # Like MATLAB, store each member once and map the elements to it
+        member_indices = {}
+        for enum_member in enum_array.ravel(order="F"):
+            if enum_member not in member_indices:
+                member_indices[enum_member] = len(values)
+                value_class = enum_to_opaque(classname, enum_member.value)
+                values.append(self.set_object_metadata(value_class))
+                value_names_idx.append(self.set_mcos_name(enum_member.name))
+            value_indices.append(member_indices[enum_member])
 
         prop_name = next(iter(enum_array[0, 0].value))
         builtin_classname, _, _ = prop_name.rpartition(".")
@@ -966,6 +968,8 @@ class MatSubsystem:
 
         enum_vals = []
         value_idx = metadata[0, 0]["ValueIndices"]
+        # ValueNames and Values hold each member once, ValueIndices maps elements to them
+        value_names = [value_names[i] for i in value_idx.ravel(order="F")]
         mmdata = metadata[0, 0]["Values"]  # Array is N x 1 shape
         if mmdata.size != 0:
             mmdata_map = mmdata[value_idx]
