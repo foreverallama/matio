@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatWriteWarning
+from matio.utils.matclass import MatReadWarning, MatWriteWarning
 
 files = [("chars.mat", "v7"), ("chars_hdf.mat", "v7.3")]
 
@@ -103,6 +103,7 @@ empty_string = np.empty((0,), dtype="U1")
 concatenated_strings = np.array(["this is a string      ", "this is another string"])
 accented_string = np.array(["thé qüîck browñ fòx"])
 
+
 files_old = ["chars2_v7.mat", "chars2_hdf.mat", "chars2_v6.mat"]
 
 
@@ -129,6 +130,18 @@ def test_load_old_char(filename):
     )
 
 
+def test_load_multibyte_utf8_char(tmp_path):
+    """Test reading char data that scipy.io.savemat stores as multibyte UTF-8"""
+    from scipy.io import savemat
+
+    file_path = tmp_path / "utf8.mat"
+    savemat(file_path, {"unit": "°C", "rows": np.array(["äb", "cd"])})
+    mdict = load_from_mat(file_path)
+
+    np.testing.assert_array_equal(mdict["unit"], np.array(["°C"]), strict=True)
+    np.testing.assert_array_equal(mdict["rows"], np.array(["äb", "cd"]), strict=True)
+
+
 def test_load_old_char_null(filename="char_array_old_null.mat"):
     """Test reading char data with trailing NULL characters from older MAT-files"""
     file_path = os.path.join(os.path.dirname(__file__), filename)
@@ -137,3 +150,17 @@ def test_load_old_char_null(filename="char_array_old_null.mat"):
     mdict = load_from_mat(file_path)
     assert "simple_string" in mdict
     np.testing.assert_array_equal(mdict["simple_string"], simple_string, strict=True)
+
+
+def test_load_v6_windows_char(filename="chars_v6_windows.mat"):
+    """Test reading -v6 char data that MATLAB on Windows writes in cp1252"""
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    with pytest.warns(MatReadWarning, match="cp1252"):
+        mdict = load_from_mat(file_path)
+
+    np.testing.assert_array_equal(mdict["units"], np.array(["°C"]), strict=True)
+    np.testing.assert_array_equal(mdict["currency"], np.array(["a€b"]), strict=True)
+    np.testing.assert_array_equal(mdict["word"], np.array(["Größe"]), strict=True)
+    np.testing.assert_array_equal(
+        mdict["rows"], np.array(["°C  ", "V×µA"]), strict=True
+    )

@@ -106,6 +106,9 @@ def to_dataframe(data, nvars, varnames):
         elif dtype_kind == "V":
             # struct arrays are split into one 1x1 struct per row
             return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
+        elif dtype_kind in "biufc":
+            # Plain arrays skip building and aligning one Series per column
+            return col
         else:
             return pd.Series(col)
 
@@ -530,7 +533,8 @@ def categorical_to_mat(cat):
     # 1-based indexing, as the smallest unsigned integer type that fits all categories
     codes = (cat.codes + 1).astype(np.min_scalar_type(len(cat.categories)))
     is_ordinal = np.bool_(cat.ordered)
-    is_protected = np.bool_(False)  # not supported in pandas
+    # MATLAB requires ordinal categoricals to be protected
+    is_protected = np.bool_(cat.ordered)
 
     return {
         "categoryNames": category_names,

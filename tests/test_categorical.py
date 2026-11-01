@@ -366,6 +366,11 @@ class TestSaveMatlabCategorical:
                 mload["cat_ordered"].ordered, mdict["cat_ordered"].ordered, strict=True
             )
 
+            raw = load_from_mat(
+                temp_file_path, variable_names=["cat_ordered"], raw_data=True
+            )
+            assert raw["cat_ordered"].properties["isProtected"].item()
+
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)

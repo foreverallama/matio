@@ -167,12 +167,15 @@ class MatRead7:
             # complex number
             real = arr["real"]
             imag = arr["imag"]
-            arr = np.empty(
-                shape=arr.shape,
-                dtype=np.complex64 if real.dtype == np.float32 else np.complex128,
-            )
-            arr.real = real
-            arr.imag = imag
+            dtype = np.complex64 if real.dtype == np.float32 else np.complex128
+            part = np.finfo(dtype).dtype
+            if arr.dtype == np.dtype([("real", part), ("imag", part)]):
+                # packed (real, imag) float pairs have the memory layout of numpy complex
+                arr = arr.view(dtype)
+            else:
+                arr = np.empty(shape=arr.shape, dtype=dtype)
+                arr.real = real
+                arr.imag = imag
 
         if int_decode == IntegerDecodingHint.LOGICAL_HINT:
             arr = arr.astype(np.bool_)
@@ -331,9 +334,15 @@ class MatRead7:
                 f"Opaque object with object decode {object_decode} not supported. Data may be corrupted"
             )
 
-        if classname == MCOS_SUBSYSTEM_CLASS or self.subsystem is None:
-            # Opaque values inside the subsystem are nested FileWrapper__ streams
+        if classname == MCOS_SUBSYSTEM_CLASS:
             return self.read_cell(obj)
+
+        if self.subsystem is None:
+            # Inside the subsystem, nested FileWrapper__ streams are cells of references,
+            # Java properties are raw uint8 and stay raw as in v5
+            if h5py.check_dtype(ref=obj.dtype) is not None:
+                return self.read_cell(obj)
+            return obj[()].T
 
         type_system = guess_type_system(classname)
 

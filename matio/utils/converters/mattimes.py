@@ -73,6 +73,15 @@ def count_to_timedelta(count, unit, millis):
     """Cast to the coarsest of unit, ms, us, ns that holds the values exactly"""
 
     finite = np.isfinite(millis)
+    if np.isinf(millis).any():
+        warnings.warn(
+            "MATLAB duration Inf was set to NaT.",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+    # NumPy casts only NaN to NaT, the cast of Inf depends on the platform
+    count = np.where(finite, count, np.nan)
+    millis = np.where(finite, millis, np.nan)
     candidates = [
         (count, unit),
         (millis, "ms"),
@@ -134,10 +143,14 @@ def mat_caldur_to_numpy(arr):
     """Converts MATLAB caledarDuration struct to numpy timedelta record"""
 
     def _broadcast_to_ref(x, dtype):
-        x = np.asarray(x).astype(int)
+        x = np.asarray(x)
+        if x.dtype.kind == "f":
+            # NumPy casts only NaN to NaT, the cast of Inf depends on the platform
+            x = np.where(np.isfinite(x), x, np.nan)
+        x = x.astype(dtype)
         if x.size == 1:
-            return np.full(ref_shape, x.item(), dtype=dtype)
-        return x.astype(dtype)
+            return np.full(ref_shape, x.reshape(-1)[0], dtype=dtype)
+        return x
 
     months = arr[0, 0]["months"]
     days = arr[0, 0]["days"]

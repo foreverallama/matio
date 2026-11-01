@@ -10,6 +10,10 @@ data.enum_scalar = enum_scalar;
 data.enum_uint32 = enum_uint32;
 data.enum_array = enum_array;
 
+enum_repeated = [TestClasses.EnumClass.enum2, TestClasses.EnumClass.enum2, TestClasses.EnumClass.enum1;
+    TestClasses.EnumClass.enum3, TestClasses.EnumClass.enum2, TestClasses.EnumClass.enum1];
+data.enum_repeated = enum_repeated;
+
 %% Enum Nested
 
 e1 = TestClasses.EnumClass.enum1;
