@@ -7,7 +7,7 @@ import pytest
 
 from matio import load_from_mat, save_to_mat
 from matio.utils.converters.mattables import _STRING_DTYPE, table_to_mat
-from matio.utils.matclass import MatConvertError, MatConvertWarning, MatlabOpaque
+from matio.utils.matclass import MatConvertWarning, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -758,14 +758,14 @@ class TestLoadMatlabTableOriginalNames:
 
 
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
-def test_period_column_rejected(tmp_path, version):
+def test_period_column(tmp_path, version):
     frame = pd.DataFrame({"month": pd.period_range("2020-01", periods=2, freq="M")})
-    with pytest.raises(MatConvertError, match="'month' with Period dtype"):
+    with pytest.warns(MatConvertWarning, match="'month' with Period dtype"):
         save_to_mat(tmp_path / "period.mat", {"table": frame}, version=version)
 
-    # An empty column has no values to lose and is written as before
-    save_to_mat(tmp_path / "empty.mat", {"table": frame.iloc[:0]}, version=version)
-    assert load_from_mat(tmp_path / "empty.mat")["table"].shape == (0, 1)
+    loaded = load_from_mat(tmp_path / "period.mat")["table"]
+    expected = frame["month"].dt.to_timestamp().astype("datetime64[ns]")
+    pd.testing.assert_series_equal(loaded["month"], expected)
 
 
 struct_files = [

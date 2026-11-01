@@ -372,11 +372,13 @@ def make_table_props():
 def get_column_data(col):
     """Converts a pandas Series to a column variable of a MATLAB table"""
 
-    if isinstance(col.dtype, pd.PeriodDtype) and not col.empty:
-        raise MatConvertError(
-            f"table_to_mat: Column '{col.name}' with Period dtype is not supported. "
-            "Convert it to timestamps first."
+    if isinstance(col.dtype, pd.PeriodDtype):
+        warnings.warn(
+            f"table_to_mat: Column '{col.name}' with Period dtype is converted to the start of each period. "
+            "Call .dt.to_timestamp(how='end') before saving to keep the end instead.",
+            MatConvertWarning,
         )
+        col = col.dt.to_timestamp()
 
     if isinstance(col.dtype, pd.StringDtype):
         # Covers both "str" (NaN) and "string" (pd.NA) dtypes
