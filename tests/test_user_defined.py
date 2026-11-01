@@ -463,3 +463,31 @@ class TestSaveMatlabUserDefined:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+saveobj_files = [("test_saveobj_v7.mat", "v7"), ("test_saveobj_v73.mat", "v7.3")]
+
+
+@pytest.mark.parametrize("filename, version", saveobj_files)
+def test_obj_saveobj(filename, version, tmp_path):
+    """Test reading and writing an object whose saveobj returns a struct"""
+    file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+    obj = load_from_mat(file_path)["obj_saveobj"]
+    assert obj.classname == f"{namespace}.SaveObjClass"
+    assert list(obj.properties) == ["any"]
+    saved = obj.properties["any"][0, 0]
+    np.testing.assert_array_equal(saved["gain"], np.array([[5.0]]), strict=True)
+    np.testing.assert_array_equal(saved["name"], np.array(["motor"]), strict=True)
+
+    path = tmp_path / "saveobj.mat"
+    save_to_mat(
+        path,
+        {"obj_saveobj": obj},
+        version=version,
+        saveobj_classes=[f"{namespace}.SaveObjClass"],
+    )
+    mload = load_from_mat(path)["obj_saveobj"]
+    assert list(mload.properties) == ["any"]
+    saved = mload.properties["any"][0, 0]
+    np.testing.assert_array_equal(saved["gain"], np.array([[5.0]]), strict=True)
+    np.testing.assert_array_equal(saved["name"], np.array(["motor"]), strict=True)

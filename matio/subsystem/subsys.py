@@ -538,7 +538,8 @@ class MatSubsystem:
             saveobj_ret_type = False
             obj_type_id = normobj_id
 
-        prop_map = self.get_default_properties(class_id)
+        # A saveobj return value replaces the object, so class defaults do not apply
+        prop_map = {} if saveobj_ret_type else self.get_default_properties(class_id)
         prop_map.update(self.get_saved_properties(obj_type_id, saveobj_ret_type))
         prop_map.update(self.get_dynamic_properties(dep_id))
 
