@@ -6,8 +6,12 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.converters.mattables import _STRING_DTYPE, table_to_mat
-from matio.utils.matclass import MatConvertWarning, MatlabOpaque
+from matio.utils.converters.mattables import (
+    _STRING_DTYPE,
+    get_column_data,
+    table_to_mat,
+)
+from matio.utils.matclass import MatConvertWarning, MatlabObject, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -811,6 +815,61 @@ class TestLoadMatlabTableStruct:
             np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
 
 
+@pytest.mark.parametrize("filename, version", struct_files)
+@pytest.mark.parametrize("save_version", ["v7", "v7.3"])
+@pytest.mark.parametrize("name", ["table_struct", "timetable_struct"])
+def test_table_struct_roundtrip(filename, version, save_version, name):
+    """Struct columns stay struct arrays when saved again"""
+    file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+    original = load_from_mat(file_path, variable_names=[name])[name]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = os.path.join(tmpdir, "out.mat")
+        save_to_mat(out, {name: original}, version=save_version)
+        raw = load_from_mat(out, variable_names=[name], raw_data=True)[name]
+        result = load_from_mat(out, variable_names=[name])[name]
+
+    props = raw.properties
+    columns = (props["any"][0, 0] if name == "timetable_struct" else props)["data"]
+    columns = columns.ravel()
+    assert columns[0].dtype.names == ("a", "b")
+    assert columns[0].shape == (2, 1)
+    for i, (a, b) in enumerate([(1.0, "x"), (2.0, "y")]):
+        np.testing.assert_array_equal(result["S"].iloc[i]["a"][0, 0], [[a]])
+        np.testing.assert_array_equal(result["S"].iloc[i]["b"][0, 0], [b])
+
+
+def test_table_column_from_struct_fields_stays_cell():
+    """A column derived from the fields of a struct column is not a struct array"""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_table_struct_v7.mat"
+    )
+    table = load_from_mat(file_path, variable_names=["table_struct"])["table_struct"]
+
+    actual = get_column_data(table["S"].map(lambda row: row["a"]))
+
+    assert actual.dtype == object
+    assert actual.shape == (2, 1)
+
+
+@pytest.mark.parametrize("second_field", ["a", "b"])
+def test_table_cell_columns_of_structs_stay_cells(second_field):
+    """Only columns that were struct arrays when read become struct arrays again"""
+    first = np.empty((1, 1), dtype=[("a", object)])
+    first["a"][0, 0] = np.array([[1.0]])
+    second = np.empty((1, 1), dtype=[(second_field, object)])
+    second[second_field][0, 0] = np.array([[2.0]])
+    column = pd.Series([first, second], dtype=object)
+    df = pd.DataFrame({"S": column})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = os.path.join(tmpdir, "out.mat")
+        save_to_mat(out, {"t": df}, version="v7")
+        raw = load_from_mat(out, variable_names=["t"], raw_data=True)["t"]
+
+    assert raw.properties["data"][0, 0].dtype == object
+
+
 @pytest.fixture(autouse=True)
 def string_inference_for_expected_tables():
     # Expected frames must not rely on an import changing pandas options.
@@ -819,3 +878,17 @@ def string_inference_for_expected_tables():
             yield
     else:
         yield
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_object_column_keeps_its_class(version, tmp_path):
+    obj = np.empty((2, 1), dtype=[("a", object)])
+    obj["a"][0, 0] = np.array([[1.0]])
+    obj["a"][1, 0] = np.array([[2.0]])
+    raw = MatlabOpaque(table_to_mat(pd.DataFrame({"S": [1.0, 2.0]})), "table")
+    raw.properties["data"][0, 0] = MatlabObject(obj, "Legacy")
+    source, target = tmp_path / "source.mat", tmp_path / "target.mat"
+    save_to_mat(source, {"T": raw}, version=version)
+    save_to_mat(target, {"T": load_from_mat(source)["T"]}, version=version)
+    column = load_from_mat(target, raw_data=True)["T"].properties["data"][0, 0]
+    assert column[0, 0].classname == "Legacy"

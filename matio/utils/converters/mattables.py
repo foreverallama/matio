@@ -97,6 +97,10 @@ def add_timetable_props(df, tab_props):
     return df
 
 
+class _StructRow(np.ndarray):
+    """1x1 struct of a row, to tell a struct array column from a cell column"""
+
+
 def to_dataframe(data, nvars, varnames):
     """Creates a dataframe from coldata and column names"""
 
@@ -105,7 +109,10 @@ def to_dataframe(data, nvars, varnames):
             return pd.Series(col, dtype=_STRING_DTYPE)
         elif dtype_kind == "V":
             # struct arrays are split into one 1x1 struct per row
-            return pd.Series(list(col.reshape(-1, 1, 1)), dtype=object)
+            rows = col.reshape(-1, 1, 1)
+            if type(col) is np.ndarray:  # MATLAB objects keep their class
+                rows = rows.view(_StructRow)
+            return pd.Series(list(rows), dtype=object)
         elif dtype_kind in "biufc":
             # Plain arrays skip building and aligning one Series per column
             return col
@@ -399,7 +406,16 @@ def get_column_data(col):
         )
         col = col.dt.tz_convert(None)
 
-    return col.to_numpy().reshape(-1, 1)
+    values = col.to_numpy()
+    # to_dataframe splits struct arrays into one 1x1 struct per row
+    if (
+        len(values)
+        and all(isinstance(v, _StructRow) and v.dtype.names for v in values)
+        and len({v.dtype for v in values}) == 1
+    ):
+        values = np.concatenate([np.asarray(v).reshape(1) for v in values])
+
+    return values.reshape(-1, 1)
 
 
 def table_to_mat(df):
