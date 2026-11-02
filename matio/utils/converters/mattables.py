@@ -188,6 +188,7 @@ def mat_to_table(props, add_table_attrs=False, **_kwargs):
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
         df = add_table_props(df, table_attrs, ver)
+        df.attrs["VariableNames"] = [name.item() for name in varnames.ravel()]
 
     return df
 
@@ -304,6 +305,7 @@ def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
     if add_table_attrs:
         # Since pandas lists this as experimental, flag so we can switch off if it breaks
         df = add_timetable_props(df, timetable_data[0, 0])
+        df.attrs["varNames"] = [name.item() for name in var_names.ravel()]
 
     return df
 
@@ -418,6 +420,38 @@ def get_column_data(col):
     return values.reshape(-1, 1)
 
 
+def attrs_to_cellstr(df, key, names_key):
+    """Per-variable properties from DataFrame.attrs as a 1xN cell of char vectors.
+    Matched to the columns by name when attrs has the names, since a reordered
+    or split DataFrame keeps its attrs unchanged"""
+    texts = df.attrs[key]
+    names = df.attrs.get(names_key)
+    columns = [str(col) for col in df.columns]
+    if texts and names is not None and len(names) == len(texts):
+        lookup = dict(zip(names, texts))
+        missing = [col for col in columns if col not in lookup]
+        if missing and any(texts):
+            warnings.warn(
+                f"attrs['{key}'] has no entry for columns {missing}, written empty",
+                MatConvertWarning,
+                stacklevel=2,
+            )
+        texts = [lookup.get(col, "") for col in columns]
+    elif texts and len(texts) != len(columns):
+        warnings.warn(
+            f"attrs['{key}'] has {len(texts)} entries for {len(columns)} columns, not written",
+            MatConvertWarning,
+            stacklevel=2,
+        )
+        texts = []
+    if not texts:
+        return np.empty((0, 0), dtype=object)
+    cells = np.empty((1, len(texts)), dtype=object)
+    for i, text in enumerate(texts):
+        cells[0, i] = np.array([text]) if text else np.empty((0, 0), dtype=np.str_)
+    return cells
+
+
 def table_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB table"""
 
@@ -439,9 +473,25 @@ def table_to_mat(df):
     # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
     extras["DimensionNames"][0, 0] = np.array(
-        [np.array([f"{d}_1" if d in varnames else d]) for d in ("Row", "Variables")],
+        [
+            np.array([f"{d}_1" if d in varnames else d])
+            for d in df.attrs.get("DimensionNames", ("Row", "Variables"))
+        ],
         dtype=object,
     ).reshape((1, 2))
+    if df.attrs.get("Description"):
+        extras["Description"][0, 0] = np.array([df.attrs["Description"]])
+    if "VariableDescriptions" in df.attrs:
+        extras["VariableDescriptions"][0, 0] = attrs_to_cellstr(
+            df, "VariableDescriptions", "VariableNames"
+        )
+    if "VariableUnits" in df.attrs:
+        extras["VariableUnits"][0, 0] = attrs_to_cellstr(
+            df, "VariableUnits", "VariableNames"
+        )
+    if "UserData" in df.attrs:
+        extras["UserData"][0, 0] = df.attrs["UserData"]
+
     prop_map = {
         "data": data,
         "varnames": varnames,
@@ -551,6 +601,15 @@ def timetable_to_mat(df):
     timetable[0, 0]["numRows"] = nrows
     timetable[0, 0]["numVars"] = nvars
     timetable[0, 0]["rowTimes"] = rowtimes.reshape((-1, 1))
+
+    if "varDescriptions" in df.attrs:
+        extras["varDescriptions"] = attrs_to_cellstr(df, "varDescriptions", "varNames")
+    if "varUnits" in df.attrs:
+        extras["varUnits"] = attrs_to_cellstr(df, "varUnits", "varNames")
+    if df.attrs.get("Description"):
+        extras["arrayProps"]["Description"][0, 0] = np.array([df.attrs["Description"]])
+    if "UserData" in df.attrs:
+        extras["arrayProps"]["UserData"][0, 0] = df.attrs["UserData"]
 
     for key, value in extras.items():
         timetable[0, 0][key] = value

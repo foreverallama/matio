@@ -195,6 +195,7 @@ class TestLoadMatlabTable:
         pd.testing.assert_frame_equal(mdict["table_with_attrs"], df, check_like=True)
 
         attrs = {
+            "VariableNames": ["ID", "Label"],
             "Description": "Test table with full metadata",
             "DimensionNames": ["RowId", "Features"],
             "VariableUnits": ["", "category"],
@@ -523,7 +524,6 @@ class TestSaveMatlabTable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
-    @pytest.mark.xfail(reason="Writing attributes not implemented")
     def test_table_with_attrs(self, filename, version):
         """Test writing table with attributes to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -549,6 +549,8 @@ class TestSaveMatlabTable:
             )
 
             for key in mdict["table_with_attrs"].attrs.keys():
+                if key == "VariableContinuity":  # MATLAB enum, not written yet
+                    continue
                 assert key in mload["table_with_attrs"].attrs
                 val_orig = mdict["table_with_attrs"].attrs[key]
                 val_load = mload["table_with_attrs"].attrs[key]
@@ -892,3 +894,61 @@ def test_object_column_keeps_its_class(version, tmp_path):
     save_to_mat(target, {"T": load_from_mat(source)["T"]}, version=version)
     column = load_from_mat(target, raw_data=True)["T"].properties["data"][0, 0]
     assert column[0, 0].classname == "Legacy"
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_follow_the_columns(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs.update(
+        VariableNames=["a", "b"],
+        VariableUnits=["K", "bar"],
+        VariableDescriptions=["temperature", "pressure"],
+    )
+    path = tmp_path / "t.mat"
+    save_to_mat(path, {"T": df.iloc[:, ::-1]}, version=version)
+    out = load_from_mat(path, add_table_attrs=True)["T"]
+    assert list(out.columns) == ["b", "a"]
+    assert out.attrs["VariableUnits"] == ["bar", "K"]
+    assert out.attrs["VariableDescriptions"] == ["pressure", "temperature"]
+
+    save_to_mat(path, {"T": df[["b"]]}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == [
+        "bar"
+    ]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_with_wrong_length_are_not_written(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs["VariableUnits"] = ["K"]
+    path = tmp_path / "t.mat"
+    with pytest.warns(MatConvertWarning, match="VariableUnits"):
+        save_to_mat(path, {"T": df}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == []
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("name", ["table_original_names", "timetable_original_names"])
+def test_attrs_with_original_variable_names(name, version, tmp_path):
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_table_original_names_v7.mat"
+    )
+    df = load_from_mat(file_path, variable_names=[name], add_table_attrs=True)[name]
+    key = "VariableUnits" if "VariableNames" in df.attrs else "varUnits"
+    df.attrs[key] = ["unit"] * df.shape[1]
+    path = tmp_path / "t.mat"
+    save_to_mat(path, {name: df}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)[name].attrs[key] == df.attrs[key]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_warn_for_renamed_column(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs.update(VariableNames=["a", "b"], VariableUnits=["K", "bar"])
+    path = tmp_path / "t.mat"
+    with pytest.warns(MatConvertWarning, match="no entry for columns"):
+        save_to_mat(path, {"T": df.rename(columns={"b": "c"})}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == [
+        "K",
+        "",
+    ]
