@@ -277,10 +277,9 @@ def to_writeable(source, oned_as="col"):
         # Backwards compatibility with scipy "chars_to_strings"
         return np.atleast_1d(narr)
 
-    narr = np.atleast_2d(narr)
-    if oned_as == "col":
-        narr = narr.T
-    return narr
+    if narr.ndim == 1 and oned_as == "col":
+        return narr.reshape(-1, 1)
+    return np.atleast_2d(narr)
 
 
 def shape_from_metadata(metadata):

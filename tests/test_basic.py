@@ -933,3 +933,17 @@ def test_large_stream_position():
     stream = make_stream(BytesIO())
     stream.seek(2**31 + 128)
     assert stream.tell() == 2**31 + 128
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_nested_list_keeps_rows(version):
+    """A list of rows is a matrix, only 1D lists follow oned_as"""
+    mdict = {"matrix": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], "flat": [1.0, 2.0, 3.0]}
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "lists.mat")
+        save_to_mat(file_path, mdict, version=version)
+        result = load_from_mat(file_path)
+    np.testing.assert_array_equal(
+        result["matrix"], [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], strict=True
+    )
+    assert result["flat"].shape == (3, 1)
