@@ -58,6 +58,8 @@ def savemat7(file_path, mdict, global_vars, saveobj_classes, oned_as):
 
         subsystem = MW7.subsystem.set_subsystem()
         if subsystem is not None:
+            # Object metadata stays in row vectors, whatever the user chose for oned_as
+            MW7.oned_as = "row"
             MW7.write_struct_array(f, MAT_HDF_SUBSYS_GROUP, subsystem)
 
     with open(file_path, "r+b") as f:

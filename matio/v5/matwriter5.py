@@ -107,9 +107,10 @@ def savemat5(file_path, mdict, global_vars, saveobj_classes, oned_as, do_compres
             return
 
         subsystem_offset = f.tell()
-        subsys_stream = write_subsystem(subsystem, oned_as)
+        # Object metadata stays in row vectors, whatever the user chose for oned_as
+        subsys_stream = write_subsystem(subsystem, "row")
 
-        temp_dict = {"__subsystem__": subsys_stream}
+        temp_dict = {"__subsystem__": np.atleast_2d(subsys_stream)}
         MW.put_variables(temp_dict, global_vars=[], do_compression=do_compression)
 
         write_subsystem_offset(f, subsystem_offset)

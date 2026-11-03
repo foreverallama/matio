@@ -65,7 +65,7 @@ save_to_mat(
 - `version`: The MAT-file version to save to. Supported versions are `v7.3` and `v7`. Defaults to `v7.3` which is based on the HDF5 format.
 - `global_vars`: A list of variable names that are to be marked as global variables.
 - `saveobj_classes`: A list of class names that implement `saveobj` methods.
-- `oned_as`: The 2D shape to apply to unit `numpy.ndarrays`. Either `row` or `col`. Defaults to `col`.
+- `oned_as`: The 2D shape to apply to 1D `numpy.ndarrays` and lists. Either `row` or `col`. Defaults to `col`.
 - `do_compression`: If `False`, does not compress data when saving.
 
 ### List variables in a MAT-file

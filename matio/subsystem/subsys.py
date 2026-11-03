@@ -606,17 +606,20 @@ class MatSubsystem:
                 for idx in np.ndindex(prop_value.shape):
                     for name in prop_value.dtype.names:
                         field_val = prop_value[idx][name]
-                        field_val = to_writeable(field_val)
+                        field_val = to_writeable(field_val, self.oned_as)
                         prop_value[idx][name] = self.serialize_nested_props(field_val)
             else:
                 # Cell array
                 for idx in np.ndindex(prop_value.shape):
                     cell_item = prop_value[idx]
-                    cell_item = to_writeable(cell_item)
+                    cell_item = to_writeable(cell_item, self.oned_as)
                     prop_value[idx] = self.serialize_nested_props(cell_item)
 
         else:
-            prop_value = to_writeable(prop_value)
+            is_mapping = isinstance(prop_value, dict)
+            prop_value = to_writeable(prop_value, self.oned_as)
+            if is_mapping:
+                return self.serialize_nested_props(prop_value)
 
         if isinstance(prop_value, (MatlabOpaque, MatlabOpaqueArray)):
             prop_value = self.set_object_metadata(prop_value)

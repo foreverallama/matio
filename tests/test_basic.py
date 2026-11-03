@@ -936,6 +936,30 @@ def test_large_stream_position():
 
 
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("oned_as, shape", [("col", (3, 1)), ("row", (1, 3))])
+def test_save_1d_array_follows_oned_as(version, oned_as, shape):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "arr.mat")
+        save_to_mat(file_path, {"a": np.arange(3.0)}, version=version, oned_as=oned_as)
+        assert load_from_mat(file_path)["a"].shape == shape
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("oned_as, shape", [("col", (3, 1)), ("row", (1, 3))])
+def test_save_object_property_lists_follow_oned_as(version, oned_as, shape):
+    from matio.utils.matclass import MatlabOpaque
+
+    values = [1.0, 2.0, 3.0]
+    obj = MatlabOpaque({"x": values, "d": {"y": values}}, "Example")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "obj.mat")
+        save_to_mat(file_path, {"o": obj}, version=version, oned_as=oned_as)
+        result = load_from_mat(file_path, raw_data=True)["o"].properties
+    assert result["x"].shape == shape
+    assert result["d"][0, 0]["y"].shape == shape
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
 def test_save_nested_list_keeps_rows(version):
     """A list of rows is a matrix, only 1D lists follow oned_as"""
     mdict = {"matrix": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], "flat": [1.0, 2.0, 3.0]}

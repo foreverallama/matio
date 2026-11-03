@@ -554,7 +554,7 @@ def categorical_to_mat(cat):
 
     return {
         "categoryNames": category_names,
-        "codes": codes,
+        "codes": np.atleast_2d(codes),
         "isOrdinal": is_ordinal,
         "isProtected": is_protected,
     }
