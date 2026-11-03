@@ -456,8 +456,9 @@ def table_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB table"""
 
     data = np.empty((1, len(df.columns)), dtype=object)
+    columns = pd.DataFrame(df)  # no attrs, df[col] would deep-copy them every time
     for i, col in enumerate(df.columns):
-        data[0, i] = get_column_data(df[col])
+        data[0, i] = get_column_data(columns[col])
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])
@@ -543,8 +544,9 @@ def timetable_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB timetable"""
 
     data = np.empty((1, len(df.columns)), dtype=object)
+    columns = pd.DataFrame(df)  # no attrs, df[col] would deep-copy them every time
     for i, col in enumerate(df.columns):
-        data[0, i] = get_column_data(df[col])
+        data[0, i] = get_column_data(columns[col])
 
     nrows = np.float64(df.shape[0])
     nvars = np.float64(df.shape[1])

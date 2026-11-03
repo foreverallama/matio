@@ -10,6 +10,7 @@ from matio.utils.converters.mattables import (
     _STRING_DTYPE,
     get_column_data,
     table_to_mat,
+    timetable_to_mat,
 )
 from matio.utils.matclass import MatConvertWarning, MatlabObject, MatlabOpaque
 
@@ -952,3 +953,21 @@ def test_table_attrs_warn_for_renamed_column(version, tmp_path):
         "K",
         "",
     ]
+
+
+@pytest.mark.parametrize("to_mat", [table_to_mat, timetable_to_mat])
+def test_table_attrs_not_copied_for_every_column(to_mat):
+    class Counted:
+        copies = 0
+
+        def __deepcopy__(self, memo):
+            Counted.copies += 1
+            return self
+
+    index = pd.date_range("2024-01-01", periods=2, name="Time")
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]}, index=index)
+    if to_mat is table_to_mat:
+        df = df.reset_index(drop=True)
+    df.attrs["other"] = Counted()
+    to_mat(df)
+    assert Counted.copies == 0
