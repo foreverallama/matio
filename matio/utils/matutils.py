@@ -205,6 +205,18 @@ def to_writeable(source, oned_as="col"):
     if issparse(source):
         return source
 
+    if isinstance(source, np.ma.MaskedArray) and source.dtype.kind in "biufc":
+        if not np.ma.is_masked(source):
+            source = source.data
+        else:
+            warnings.warn(
+                "Masked values are saved as NaN, since MATLAB has no masks.",
+                MatWriteWarning,
+                stacklevel=2,
+            )
+            dtype = source.dtype if source.dtype.kind in "fc" else float
+            source = source.astype(dtype).filled(np.nan)
+
     classname = guess_class_name(source)
     if classname is not None:
         if isinstance(source, (np.ndarray, np.generic)):
