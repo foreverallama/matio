@@ -64,29 +64,30 @@ def whosmat7(file_path):
             if var.startswith("#"):
                 continue
 
-            class_name = f[var].attrs.get(MAT_HDF_ATTRS.CLASS, None)
-            object_decode = f[var].attrs.get(MAT_HDF_ATTRS.OBJECT_DECODE, -1)
-            is_empty = f[var].attrs.get(MAT_HDF_ATTRS.EMPTY, 0)
-            is_sparse = f[var].attrs.get(MAT_HDF_ATTRS.SPARSE, -1)
+            obj = f[var]
+            class_name = obj.attrs.get(MAT_HDF_ATTRS.CLASS, None)
+            object_decode = obj.attrs.get(MAT_HDF_ATTRS.OBJECT_DECODE, -1)
+            is_empty = obj.attrs.get(MAT_HDF_ATTRS.EMPTY, 0)
+            is_sparse = obj.attrs.get(MAT_HDF_ATTRS.SPARSE, -1)
 
             if class_name is not None:
                 class_name = class_name.decode("ascii")
 
             if is_empty:
-                shape = tuple(int(x) for x in f[var][()])
+                shape = tuple(int(x) for x in obj[()])
             elif is_sparse >= 0:
-                ncols = f[var]["jc"].size - 1
+                ncols = obj["jc"].size - 1
                 shape = (int(is_sparse), ncols)
                 class_name = "sparse"
             elif object_decode > 0:
                 if object_decode == ObjectDecodingHint.OPAQUE_HINT:
-                    if isinstance(f[var], h5py.Dataset):
-                        objmetadata = f[var][()].T
+                    if isinstance(obj, h5py.Dataset):
+                        objmetadata = obj[()].T
                         shape = shape_from_metadata(objmetadata)
                     else:
-                        if MAT_HDF_ATTRS.FIELDS in f[var].attrs:
+                        if MAT_HDF_ATTRS.FIELDS in obj.attrs:
                             # Enumeration Array
-                            shape = f[var]["ValueIndices"].shape[::-1]
+                            shape = obj["ValueIndices"].shape[::-1]
                         else:
                             warnings.warn(
                                 f"Cannot determine shape of opaque object {var}",
@@ -96,28 +97,28 @@ def whosmat7(file_path):
                 else:
                     shape = (1, 1)
             elif class_name == "struct":
-                keys = list(f[var].keys())
+                keys = list(obj.keys())
                 if len(keys) == 0:
                     # Struct with no fields
                     shape = (1, 1)
-                first = f[var][keys[0]]
+                first = obj[keys[0]]
                 if (
                     isinstance(first, h5py.Dataset)
                     and first.dtype == np.dtype("O")
                     and MAT_HDF_ATTRS.CLASS not in first.attrs
                 ):
                     # Struct array
-                    shape = f[var][keys[0]].shape[::-1]
+                    shape = obj[keys[0]].shape[::-1]
                 else:
                     # Scalar struct
                     shape = (1, 1)
             else:
-                shape = f[var].shape[::-1]
+                shape = obj.shape[::-1]
 
             if (
-                isinstance(f[var], h5py.Dataset)
+                isinstance(obj, h5py.Dataset)
                 and not is_empty
-                and f[var].dtype.names is not None
+                and obj.dtype.names is not None
                 and class_name
                 in (
                     "int8",
@@ -422,11 +423,11 @@ class MatRead7:
         mdict["__globals__"] = []
 
         for var in self.h5stream:
-            obj = self.h5stream[var]
             if var.startswith("#"):
                 continue
             if variable_names is not None and var not in variable_names:
                 continue
+            obj = self.h5stream[var]
             try:
                 data = self.read_h5_data(obj)
             except Exception as err:
