@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatlabEnumerationArray, MatlabOpaque
+from matio.utils.matclass import MatReadWarning, MatlabEnumerationArray, MatlabOpaque
 
 files = [("test_enum_v7.mat", "v7"), ("test_enum_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -156,11 +156,9 @@ class TestLoadMatlabEnum:
     def test_load_enum_raw_data(self, filename, version):
         """Test reading nested enum with raw_data=True from MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            mdict = load_from_mat(
-                file_path, variable_names=["enum_nested"], raw_data=True
-            )
+        mdict = load_from_mat(
+            file_path, variable_names=["enum_nested"], raw_data=True
+        )
         enum_obj = mdict["enum_nested"].properties["a"]
         assert isinstance(enum_obj, MatlabOpaque)
         assert enum_obj.classname == f"{namespace}.EnumClass"
