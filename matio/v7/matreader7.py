@@ -338,7 +338,10 @@ class MatRead7:
             return self.read_cell(obj)
 
         if self.subsystem is None:
-            # Opaque values inside the subsystem itself (Java properties) stay raw, as in v5
+            # Inside the subsystem, nested FileWrapper__ streams are cells of references,
+            # Java properties are raw uint8 and stay raw as in v5
+            if h5py.check_dtype(ref=obj.dtype) is not None:
+                return self.read_cell(obj)
             return obj[()].T
 
         type_system = guess_type_system(classname)
