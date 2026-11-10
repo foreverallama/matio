@@ -6,8 +6,13 @@ import pandas as pd
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.converters.mattables import _STRING_DTYPE, table_to_mat
-from matio.utils.matclass import MatConvertWarning, MatlabOpaque
+from matio.utils.converters.mattables import (
+    _STRING_DTYPE,
+    get_column_data,
+    table_to_mat,
+    timetable_to_mat,
+)
+from matio.utils.matclass import MatConvertWarning, MatlabObject, MatlabOpaque
 
 files = [("test_tables_v7.mat", "v7"), ("test_tables_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -191,6 +196,7 @@ class TestLoadMatlabTable:
         pd.testing.assert_frame_equal(mdict["table_with_attrs"], df, check_like=True)
 
         attrs = {
+            "VariableNames": ["ID", "Label"],
             "Description": "Test table with full metadata",
             "DimensionNames": ["RowId", "Features"],
             "VariableUnits": ["", "category"],
@@ -519,7 +525,6 @@ class TestSaveMatlabTable:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
-    @pytest.mark.xfail(reason="Writing attributes not implemented")
     def test_table_with_attrs(self, filename, version):
         """Test writing table with attributes to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -545,6 +550,8 @@ class TestSaveMatlabTable:
             )
 
             for key in mdict["table_with_attrs"].attrs.keys():
+                if key == "VariableContinuity":  # MATLAB enum, not written yet
+                    continue
                 assert key in mload["table_with_attrs"].attrs
                 val_orig = mdict["table_with_attrs"].attrs[key]
                 val_load = mload["table_with_attrs"].attrs[key]
@@ -811,6 +818,61 @@ class TestLoadMatlabTableStruct:
             np.testing.assert_array_equal(col[i]["b"][0, 0], np.array([b]))
 
 
+@pytest.mark.parametrize("filename, version", struct_files)
+@pytest.mark.parametrize("save_version", ["v7", "v7.3"])
+@pytest.mark.parametrize("name", ["table_struct", "timetable_struct"])
+def test_table_struct_roundtrip(filename, version, save_version, name):
+    """Struct columns stay struct arrays when saved again"""
+    file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+    original = load_from_mat(file_path, variable_names=[name])[name]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = os.path.join(tmpdir, "out.mat")
+        save_to_mat(out, {name: original}, version=save_version)
+        raw = load_from_mat(out, variable_names=[name], raw_data=True)[name]
+        result = load_from_mat(out, variable_names=[name])[name]
+
+    props = raw.properties
+    columns = (props["any"][0, 0] if name == "timetable_struct" else props)["data"]
+    columns = columns.ravel()
+    assert columns[0].dtype.names == ("a", "b")
+    assert columns[0].shape == (2, 1)
+    for i, (a, b) in enumerate([(1.0, "x"), (2.0, "y")]):
+        np.testing.assert_array_equal(result["S"].iloc[i]["a"][0, 0], [[a]])
+        np.testing.assert_array_equal(result["S"].iloc[i]["b"][0, 0], [b])
+
+
+def test_table_column_from_struct_fields_stays_cell():
+    """A column derived from the fields of a struct column is not a struct array"""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_table_struct_v7.mat"
+    )
+    table = load_from_mat(file_path, variable_names=["table_struct"])["table_struct"]
+
+    actual = get_column_data(table["S"].map(lambda row: row["a"]))
+
+    assert actual.dtype == object
+    assert actual.shape == (2, 1)
+
+
+@pytest.mark.parametrize("second_field", ["a", "b"])
+def test_table_cell_columns_of_structs_stay_cells(second_field):
+    """Only columns that were struct arrays when read become struct arrays again"""
+    first = np.empty((1, 1), dtype=[("a", object)])
+    first["a"][0, 0] = np.array([[1.0]])
+    second = np.empty((1, 1), dtype=[(second_field, object)])
+    second[second_field][0, 0] = np.array([[2.0]])
+    column = pd.Series([first, second], dtype=object)
+    df = pd.DataFrame({"S": column})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = os.path.join(tmpdir, "out.mat")
+        save_to_mat(out, {"t": df}, version="v7")
+        raw = load_from_mat(out, variable_names=["t"], raw_data=True)["t"]
+
+    assert raw.properties["data"][0, 0].dtype == object
+
+
 @pytest.fixture(autouse=True)
 def string_inference_for_expected_tables():
     # Expected frames must not rely on an import changing pandas options.
@@ -819,3 +881,93 @@ def string_inference_for_expected_tables():
             yield
     else:
         yield
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_object_column_keeps_its_class(version, tmp_path):
+    obj = np.empty((2, 1), dtype=[("a", object)])
+    obj["a"][0, 0] = np.array([[1.0]])
+    obj["a"][1, 0] = np.array([[2.0]])
+    raw = MatlabOpaque(table_to_mat(pd.DataFrame({"S": [1.0, 2.0]})), "table")
+    raw.properties["data"][0, 0] = MatlabObject(obj, "Legacy")
+    source, target = tmp_path / "source.mat", tmp_path / "target.mat"
+    save_to_mat(source, {"T": raw}, version=version)
+    save_to_mat(target, {"T": load_from_mat(source)["T"]}, version=version)
+    column = load_from_mat(target, raw_data=True)["T"].properties["data"][0, 0]
+    assert column[0, 0].classname == "Legacy"
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_follow_the_columns(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs.update(
+        VariableNames=["a", "b"],
+        VariableUnits=["K", "bar"],
+        VariableDescriptions=["temperature", "pressure"],
+    )
+    path = tmp_path / "t.mat"
+    save_to_mat(path, {"T": df.iloc[:, ::-1]}, version=version)
+    out = load_from_mat(path, add_table_attrs=True)["T"]
+    assert list(out.columns) == ["b", "a"]
+    assert out.attrs["VariableUnits"] == ["bar", "K"]
+    assert out.attrs["VariableDescriptions"] == ["pressure", "temperature"]
+
+    save_to_mat(path, {"T": df[["b"]]}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == [
+        "bar"
+    ]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_with_wrong_length_are_not_written(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs["VariableUnits"] = ["K"]
+    path = tmp_path / "t.mat"
+    with pytest.warns(MatConvertWarning, match="VariableUnits"):
+        save_to_mat(path, {"T": df}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == []
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("name", ["table_original_names", "timetable_original_names"])
+def test_attrs_with_original_variable_names(name, version, tmp_path):
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_table_original_names_v7.mat"
+    )
+    df = load_from_mat(file_path, variable_names=[name], add_table_attrs=True)[name]
+    key = "VariableUnits" if "VariableNames" in df.attrs else "varUnits"
+    df.attrs[key] = ["unit"] * df.shape[1]
+    path = tmp_path / "t.mat"
+    save_to_mat(path, {name: df}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)[name].attrs[key] == df.attrs[key]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_table_attrs_warn_for_renamed_column(version, tmp_path):
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    df.attrs.update(VariableNames=["a", "b"], VariableUnits=["K", "bar"])
+    path = tmp_path / "t.mat"
+    with pytest.warns(MatConvertWarning, match="no entry for columns"):
+        save_to_mat(path, {"T": df.rename(columns={"b": "c"})}, version=version)
+    assert load_from_mat(path, add_table_attrs=True)["T"].attrs["VariableUnits"] == [
+        "K",
+        "",
+    ]
+
+
+@pytest.mark.parametrize("to_mat", [table_to_mat, timetable_to_mat])
+def test_table_attrs_not_copied_for_every_column(to_mat):
+    class Counted:
+        copies = 0
+
+        def __deepcopy__(self, memo):
+            Counted.copies += 1
+            return self
+
+    index = pd.date_range("2024-01-01", periods=2, name="Time")
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]}, index=index)
+    if to_mat is table_to_mat:
+        df = df.reset_index(drop=True)
+    df.attrs["other"] = Counted()
+    to_mat(df)
+    assert Counted.copies == 0
