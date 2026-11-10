@@ -71,6 +71,7 @@ class MatSubsystem:
         self.dynprop_metadata = []
         self._u6_metadata = None  # Unknown Object Metadata
         self._u7_metadata = None  # Unknown Object Metadata
+        self._u8_metadata = None  # Unknown Object Metadata
         self._record_offsets = {}  # Cached record offsets per metadata region
 
         self.mcos_props_saved = []
@@ -98,6 +99,7 @@ class MatSubsystem:
         if (
             (self._u6_metadata is not None and self._u6_metadata.size > 0)
             or (self._u7_metadata is not None and np.any(self._u7_metadata))
+            or (self._u8_metadata is not None and self._u8_metadata.size > 0)
             or not isinstance(cell2, MatlabCanonicalEmpty)
         ):
             warnings.warn(
@@ -223,8 +225,16 @@ class MatSubsystem:
         # Unknown data, kept raw
         if region_offsets[6] > 0:
             self._u6_metadata = fwrap_metadata[region_offsets[5] : region_offsets[6]]
+        else:
+            self._u6_metadata = fwrap_metadata[
+                region_offsets[5] : fwrap_metadata.nbytes
+            ]
+
         if region_offsets[7] > 0:
             self._u7_metadata = fwrap_metadata[region_offsets[6] : region_offsets[7]]
+            self._u8_metadata = fwrap_metadata[
+                region_offsets[7] : fwrap_metadata.nbytes
+            ]
 
     def load_mcos_data(self, fwrap_data):
         """Parse and cache MCOS FileWrapper__ data"""
