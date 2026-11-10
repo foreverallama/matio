@@ -209,9 +209,9 @@ def to_writeable(source, oned_as="col"):
     if classname is not None:
         if isinstance(source, (np.ndarray, np.generic)):
             source = np.asanyarray(source)
-            source = np.atleast_2d(source)
             if source.ndim == 1 and oned_as == "col":
-                source = source.T
+                source = source.reshape(-1, 1)
+            source = np.atleast_2d(source)
         return convert_py_to_mat(source, classname)
 
     if isinstance(source, (np.ndarray, np.generic)):
@@ -221,11 +221,10 @@ def to_writeable(source, oned_as="col"):
             # Backwards compatibility with scipy "chars_to_strings"
             return narr
 
-        narr = np.atleast_2d(narr)
         if narr.ndim == 1 and oned_as == "col":
-            narr = narr.T
+            narr = narr.reshape(-1, 1)
 
-        return narr
+        return np.atleast_2d(narr)
 
     if hasattr(source, "__array__"):
         return np.asarray(source)
@@ -277,10 +276,9 @@ def to_writeable(source, oned_as="col"):
         # Backwards compatibility with scipy "chars_to_strings"
         return np.atleast_1d(narr)
 
-    narr = np.atleast_2d(narr)
-    if oned_as == "col":
-        narr = narr.T
-    return narr
+    if narr.ndim == 1 and oned_as == "col":
+        return narr.reshape(-1, 1)
+    return np.atleast_2d(narr)
 
 
 def shape_from_metadata(metadata):
