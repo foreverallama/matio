@@ -654,7 +654,6 @@ class MatSubsystem:
                     prop_vals[2] = self.set_mcos_name(prop_value.item())
                 elif prop_value.ptype == PropertyType.INTEGER_VALUE:
                     prop_vals[1] = PropertyType.INTEGER_VALUE
-                    # The metadata is uint32, negative values like -1 wrap around as in MATLAB
                     prop_vals[2] = prop_value.astype(np.uint32).item()
                 else:
                     warnings.warn(
