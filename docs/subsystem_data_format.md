@@ -65,20 +65,20 @@ The `MCOS` field contains an array of type `mxOPAQUE_CLASS`, which contains all 
 - The subelement is of class type `FileWrapper__`
 - The object metadata is a `mxCELL_CLASS` array
 
-This cell array is what we need to look at closely. The cell array has a dimension `(N + 5, 1)`, where $N = \sum_{\text{objects}} \text{(number of properties of object)}$. The first cell in the array contains some metadata. The second cell is empty of size `0 bytes`, whose purpose is unknown. The third cell onwards contains the contents of each field for every object in the MAT-file, stored as a regular data element. Finally, there are 3 more cells in the array that appear at the end, which contain some properties of each class in the MAT-file. This structure is visualized below.
+This cell array is what we need to look at closely. The cell array has a dimension `(N + 5, 1)`, where $N = \sum_{\text{objects}} \text{(number of properties of object)}$. The first cell in the array contains some metadata. The second cell is empty of size `0 bytes`. The third cell onwards contains the contents of each field for every object in the MAT-file, stored as a regular data element. Finally, there are 3 more cells in the array that appear at the end, which contain some properties of each class in the MAT-file. This structure is visualized below.
 
 | Cell Array Index | fieldContentID | Cell Content |
 |-----------|-----------|-----------|
 | 1 | - | Metadata |
-| 2 | - | Empty Cell |
+| 2 | - | Empty Cell (since v2) |
 | 3 | 0 | Object Property Contents |
 | 4 | 1 | Object Property Contents |
 | . | . | . |
 | . | . | . |
 | N + 3 | N | Object Property Contents |
-| N + 4 | - | Unknown |
-| N + 5 | - | Class Alias Metadata |
-| N + 6 | - | Default Class Properties |
+| N + 4 | - | Unknown (since v4) |
+| N + 5 | - | Class Alias Metadata (since v3) |
+| N + 6 | - | Default Class Properties (since v2) |
 
 ### Cell 1 - Linking Metadata
 
@@ -150,13 +150,11 @@ This region links objects to any dynamic properties it contains (probably eventl
 
 #### Other Regions
 
-The 6th and 7th offset values indicate other metadata regions whose purpose is unknown. These offsets are apparently not present/reserved in earlier version of `FileWrapper__` metadata, and is probably related to the handling of certain special types of objects.
-
-The last offset points to the end of this cell.
+The 6th, 7th and 8th offset values indicate other metadata regions whose purpose is unknown. The last two offsets are not present in earlier versions of `FileWrapper__`, and is probably related to the handling of certain special types of objects.
 
 ### Cell 2
 
-Cell 2 is always tagged as `miMATRIX` of `0 bytes`. It's probably reserved.
+Cell 2 is always tagged as `miMATRIX` of `0 bytes` since `FileWrapper__` v2. This is probably done to maintain backward compatibility with `FileWrapper__` v1.
 
 ### Field Content Cells
 
@@ -168,13 +166,13 @@ There are always three more cells at the end of the array, which appear after al
 
 #### Default Property Values
 
-`Cell[-1]` contains a list of default property values assigned within the class. It is written in as a cell array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. Each cell is written in place as a struct. The fields of each struct are the property names, and the field contents correspond to the default property values.
+This cell was introduced in `FileWrapper__` v2. `Cell[-1]` contains a list of default property values assigned within the class. It is written in as a cell array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. Each cell is written in place as a struct. The fields of each struct are the property names, and the field contents correspond to the default property values.
 
-`Cell[-3]` is similar to `Cell[-1]`, but its purpose is unknown.
+`Cell[-3]`, introduced since v4, is similar to `Cell[-1]`, but its purpose is unknown.
 
 #### Class Alias Metadata
 
-`Cell[-2]` is a `mxINT32` array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. The first integer is always zero. It contains the indices to the current alias of each class. The index points to a string in the list of MCOS property and class names in Cell 1. A value of 0 indicates that no other aliases are present. The alias of a class can be accessed through the `class_alias` attribute of `MatlabOpaque`. More information about class aliasing can be found [here](https://in.mathworks.com/help/matlab/matlab_oop/class-aliasing.html).
+`Cell[-2]` introduced since v3, is a `mxINT32` array of `(num_classes + 1, 1)` dimensions, in order of `class_id`. The first integer is always zero. It contains the indices to the current alias of each class. The index points to a string in the list of MCOS property and class names in Cell 1. A value of 0 indicates that no other aliases are present. The alias of a class can be accessed through the `class_alias` attribute of `MatlabOpaque`. More information about class aliasing can be found [here](https://in.mathworks.com/help/matlab/matlab_oop/class-aliasing.html).
 
 ## Data Element 2: Character Array
 

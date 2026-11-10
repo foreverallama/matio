@@ -40,3 +40,8 @@ Issues = "https://github.com/foreverallama/matio"
 include = ["matio*"]
 
 [tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:Encountered unknown metadata in MAT-file subsystem:matio.utils.matclass.MatReadWarning",
+]

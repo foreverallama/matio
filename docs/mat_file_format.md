@@ -70,6 +70,8 @@ This subelement identifies the type system of the `mxOPAQUE_CLASS` data element 
 
 This subelement identifies the class which the object array belongs to. The class name is stored as an array of signed, 8-bit values.
 
+Note: In case of subclasses that derive from a superclass that itself derives from `matlab.mixin.Heterogenous`, the class name here is the name of the superclass.
+
 ### Object Metadata
 
 The structure of the object metadata depends on the type of object. For `MCOS` objects, these could be either `uint32` or `struct` arrays (as far as I know). Regardless, the actual contents of the object is indicated by an **object reference** which is a `miUINT32` array. This can be read as a data subelement, and usually contains the following:
@@ -79,7 +81,9 @@ The structure of the object metadata depends on the type of object. For `MCOS` o
 | Object Reference | 4 bytes |
 | Dimensions Array | numberOfDimensions * 4 bytes |
 | Object ID | numObjectsInArray * 4 bytes |
-| Class ID | 4 bytes |
+| Class ID* | 4 bytes |
+
+\* This may not be present in old MAT-files generated before MATLAB 2011a.
 
 #### Reference Value
 
@@ -95,7 +99,9 @@ This contains a list of integers which serves as a unique identifiers for the ob
 
 #### Class ID
 
-This contains a number which servers as a unique identifier for the class type of an object. All objects in a MAT-file are associated with a class ID to identify the class they belong to. Class IDs are numbered starting from `1`.
+This contains a number which servers as a unique identifier for the class type of an object. All objects in a MAT-file are associated with a class ID to identify the class they belong to. Class IDs are numbered starting from `1`. This field may not be present in MAT-files generated before MATLAB 2011a.
+
+Note: In case of subclasses that derive from a superclass that itself derives from `matlab.mixin.Heterogenous`, the class ID points to the name of the superclass.
 
 ## Subsystem Data
 
