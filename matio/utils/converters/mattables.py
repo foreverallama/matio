@@ -391,6 +391,17 @@ def get_column_data(col):
         props["codes"] = props["codes"].reshape(-1, 1)
         return MatlabOpaque(properties=props, classname="categorical")
 
+    if isinstance(col.dtype, pd.api.extensions.ExtensionDtype) and col.hasnans:
+        if pd.api.types.is_bool_dtype(col.dtype) or pd.api.types.is_integer_dtype(
+            col.dtype
+        ):
+            warnings.warn(
+                f"table_to_mat: Column '{col.name}' with missing values is saved as "
+                "double with NaN, since MATLAB has no missing value for this type.",
+                MatConvertWarning,
+            )
+            return col.to_numpy(dtype=np.float64, na_value=np.nan).reshape(-1, 1)
+
     if isinstance(col.dtype, pd.DatetimeTZDtype):
         warnings.warn(
             f"table_to_mat: Column '{col.name}' with timezone '{col.dt.tz}' is converted to UTC. "
