@@ -1058,7 +1058,7 @@ class MatSubsystem:
         nobjects = np.prod(dims)
         object_ids = metadata[2 + ndims : 2 + ndims + nobjects, 0]
 
-        if self.version != 1:
+        if metadata.shape[0] > 2 + ndims + nobjects:
             class_id = metadata[-1, 0]
         elif object_ids.size > 0:
             # v1 references have no class ID, it is in the object metadata
