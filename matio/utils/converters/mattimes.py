@@ -41,7 +41,8 @@ def mat_to_datetime(props, datetime_unit="ns", **_kwargs):
 
     # MATLAB saves NaT as NaN
     nat = np.isnan(data.real)
-    data = np.where(nat, 0, data)
+    if nat.any():
+        data = np.where(nat, 0, data)
 
     ms_frac, ms_int_float = np.modf(data.real)
     if np.iscomplexobj(data):
