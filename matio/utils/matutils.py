@@ -54,11 +54,19 @@ def decode_char_arrays(arr, codec="utf-8", mdtype=0, char_axis=1):
         for char_data in flat:
             row = bytearray()
             for msb, lsb in zip(char_data[::2], char_data[1::2]):
-                if msb == 0:
+                # 0xFF is never part of UTF-8: other writers sign-extend Latin-1 bytes
+                if msb in (0, 0xFF):
                     row.append(lsb)
                 else:
                     row.extend((msb, lsb))
-            strings.append(row.decode(codec, errors="surrogatepass"))
+            try:
+                strings.append(row.decode(codec, errors="surrogatepass"))
+            except UnicodeDecodeError:
+                warnings.warn(
+                    "Char data that is not valid UTF-8 is read as Latin-1.",
+                    MatReadWarning,
+                )
+                strings.append(row.decode("latin-1"))
     else:
         byte_data = flat.tobytes()
         row_bytes = char_len * flat.dtype.itemsize

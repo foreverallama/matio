@@ -1,4 +1,5 @@
 import os
+import struct
 import sys
 import tempfile
 import threading
@@ -8,7 +9,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat, whosmat
-from matio.utils.matclass import MatWriteWarning
+from matio.utils.matclass import MatReadWarning, MatWriteWarning
 
 # Check for availability of extended precision types in numpy
 HAS_FLOAT128 = hasattr(np, "float128")
@@ -33,6 +34,33 @@ def skip_unsupported_v4(version, request):
     request_name = request.node.name.split("[")[0]
     if version == "v4" and request_name not in SUPPORTED_V4_TESTS:
         pytest.skip(f"MAT-file v4 does not support the test '{request_name}'")
+
+
+def latin1_chars_mat(codes):
+    """Bytes of a v5 MAT-file with one char variable stored as miUINT16"""
+
+    def element(mdtype, data):
+        return struct.pack("<II", mdtype, len(data)) + data + bytes(-len(data) % 8)
+
+    body = (
+        element(6, struct.pack("<II", 4, 0))  # array flags, mxCHAR_CLASS
+        + element(5, struct.pack("<ii", 1, len(codes)))
+        + element(1, b"s")
+        + element(4, struct.pack(f"<{len(codes)}H", *codes))
+    )
+    text = b"MATLAB 5.0 MAT-file".ljust(116, b" ")
+    return text + bytes(8) + b"\x00\x01IM" + element(14, body)
+
+
+def test_load_sign_extended_latin1_chars():
+    """Test char data with Latin-1 bytes sign-extended to 16 bits by non-MATLAB writers"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "chars.mat")
+        with open(file_path, "wb") as f:
+            f.write(latin1_chars_mat([ord("m"), 0xFFB3]))
+        with pytest.warns(MatReadWarning, match="Latin-1"):
+            mdict = load_from_mat(file_path)
+    np.testing.assert_array_equal(mdict["s"], np.array(["m\u00b3"]), strict=True)
 
 
 def test_load_nul_padded_variable_names():
