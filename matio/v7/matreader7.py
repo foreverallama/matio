@@ -342,6 +342,12 @@ class MatRead7:
             return obj[()].T
 
         type_system = guess_type_system(classname)
+        if (
+            isinstance(obj, h5py.Dataset)
+            and h5py.check_dtype(ref=obj.dtype) is not None
+        ):
+            # Handle objects are stored as references, also without the COM. prefix
+            type_system = "handle"
 
         # Check Enumeration Instances
         fields = obj.attrs.get(MAT_HDF_ATTRS.FIELDS, None)

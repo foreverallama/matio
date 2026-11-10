@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pytest
 
-from matio import load_from_mat
+from matio import load_from_mat, save_to_mat
 from matio.utils.matclass import MatlabOpaque, MatReadWarning
 
 files = [("test_type_systems_v7.mat", "v7"), ("test_type_systems_v73.mat", "v7.3")]
@@ -35,6 +35,28 @@ class TestLoadTypeSystems:
         assert handle_properties[0, 0].shape == (4520, 1)
         assert handle_properties[0, 0].dtype == np.uint8
 
+    def test_type_system_write(self, filename, version, tmp_path):
+        """Test writing java and handle objects back with their raw data"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        with pytest.warns(MatReadWarning):
+            mdict = load_from_mat(file_path, variable_names=["javatype", "handletype"])
+
+        save_to_mat(tmp_path / "type_systems.mat", mdict, version=version)
+        with pytest.warns(MatReadWarning):
+            mload = load_from_mat(tmp_path / "type_systems.mat")
+
+        for name in ("javatype", "handletype"):
+            assert mload[name].classname == mdict[name].classname
+            assert mload[name].type_system == mdict[name].type_system
+        np.testing.assert_array_equal(
+            mload["javatype"].properties, mdict["javatype"].properties, strict=True
+        )
+        handle_properties = mload["handletype"].properties
+        assert handle_properties.shape == (139, 1)
+        np.testing.assert_array_equal(
+            handle_properties[0, 0], mdict["handletype"].properties[0, 0], strict=True
+        )
+
 
 def test_java_property():
     """Test reading a Java object stored in a property of a classdef object"""
@@ -49,3 +71,22 @@ def test_java_property():
         mdict_v73["obj"].properties["a"], java_v7, strict=True
     )
     np.testing.assert_array_equal(mdict_v73["after"], np.array([[42.0]]), strict=True)
+
+
+def test_handle_object_without_com_prefix(tmp_path):
+    """Test reading a v7.3 handle object whose class name does not start with COM."""
+    file_path = os.path.join(
+        os.path.dirname(__file__), "data", "test_type_systems_v73.mat"
+    )
+    with pytest.warns(MatReadWarning):
+        handle = load_from_mat(file_path, variable_names=["handletype"])["handletype"]
+    # Older Simulink classes like Simulink.ConfigSet are handle objects as well
+    handle.classname = "Simulink.ConfigSet"
+
+    save_to_mat(tmp_path / "handle.mat", {"cs": handle}, version="v7.3")
+    with pytest.warns(MatReadWarning):
+        mload = load_from_mat(tmp_path / "handle.mat")
+
+    assert mload["cs"].classname == "Simulink.ConfigSet"
+    assert mload["cs"].type_system == "handle"
+    assert mload["cs"].properties.shape == (139, 1)
