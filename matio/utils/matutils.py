@@ -76,7 +76,14 @@ def encode_char_arrays(arr):
 
     arr = np.atleast_1d(arr)
     flat = arr.ravel(order="F")
-    encoded = np.array([s.encode("utf-16-le") for s in flat], dtype="S")
+    # MATLAB has no byte strings, ASCII bytes are written as char
+    encoded = np.array(
+        [
+            (s.decode("ascii") if isinstance(s, bytes) else s).encode("utf-16-le")
+            for s in flat
+        ],
+        dtype="S",
+    )
     if encoded.dtype.itemsize == 1:
         # NumPy uses S1 when all encoded strings are empty.
         out = np.empty((len(flat), 0), dtype=np.uint16)
