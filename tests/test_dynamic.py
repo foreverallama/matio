@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatlabOpaque, MatlabOpaqueProperty
+from matio.utils.matclass import MatlabOpaque, MatlabOpaqueProperty, PropertyType
 
 files = [("test_dynamic_v7.mat", "v7"), ("test_dynamic_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -89,3 +89,15 @@ class TestSaveMatlabDynamic:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_negative_integer_property(version, tmp_path):
+    """Test writing an inline integer property with a negative value"""
+    prop = MatlabOpaqueProperty(np.int32(-1), ptype=PropertyType.INTEGER_VALUE)
+    obj = MatlabOpaque(properties={"a": prop}, classname=f"{namespace}.BasicClass")
+    save_to_mat(tmp_path / "negative.mat", {"obj": obj}, version=version)
+
+    value = load_from_mat(tmp_path / "negative.mat")["obj"].properties["a"]
+    assert value.ptype == PropertyType.INTEGER_VALUE
+    np.testing.assert_array_equal(value, np.int32(-1), strict=True)
