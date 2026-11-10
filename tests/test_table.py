@@ -782,6 +782,23 @@ def test_period_index(tmp_path, version):
     assert loaded.index.name == "0"
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+@pytest.mark.parametrize("dtype", ["boolean", "Int64"])
+@pytest.mark.parametrize("kind", ["table", "timetable"])
+def test_nullable_column_with_na_is_double(tmp_path, version, dtype, kind):
+    frame = pd.DataFrame({"x": pd.array([1, None, 0], dtype=dtype)})
+    if kind == "timetable":
+        frame.index = pd.TimedeltaIndex(np.array([1, 2, 3], dtype="timedelta64[s]"))
+    with pytest.warns(MatConvertWarning, match="saved as double with NaN"):
+        save_to_mat(tmp_path / "t.mat", {"T": frame}, version=version)
+
+    loaded = load_from_mat(tmp_path / "t.mat")["T"]
+    assert isinstance(loaded.index, pd.TimedeltaIndex) == (kind == "timetable")
+    np.testing.assert_array_equal(
+        loaded["x"].to_numpy(), [1.0, np.nan, 0.0], strict=True
+    )
+
+
 struct_files = [
     ("test_table_struct_v7.mat", "v7"),
     ("test_table_struct_v73.mat", "v7.3"),
