@@ -32,6 +32,7 @@ The `matio` package attempts to convert some common MATLAB datatypes into a Pyth
 | `table`                           | `pandas.DataFrame`                          |
 | `timetable`                       | `pandas.DataFrame` with datetime or duration index      |
 | `containers.Map`                  | `MatlabContainerMap` instance subclassed from `collections.UserDict` |
+| `dictionary`                      | `MatlabDictionary` instance with `keys` and `values` arrays |
 | `categorical`                     | `pandas.Categorical`                        |
 | Enumeration Instance Arrays       | `MatlabEnumerationArray` instance where each element is `enum.Enum`    |
 | Object Scalar                     | `MatlabOpaque` instance with property map `dict` |
@@ -160,12 +161,14 @@ Objects of this class contains a single property `serialization`, which is defin
 Objects of this class contain a single property `data` which is defined as a `struct` array with the following fields:
 
 1. `Version`
-2. `IsKeyCombined`: bool, unknown indicator, presumably for optimization purposes
-3. `IsValueCombined`: bool, unknown indicator, presumably for optimization purposes
+2. `IsKeyCombined`: bool, `true` if `Key` is a single array of the key type, `false` if it is an N x 1 cell with one key per element
+3. `IsValueCombined`: bool, same as `IsKeyCombined` for `Value`
 4. `Key`
 5. `Value`
 
-Since keys of MATLAB dictionaries can be of any MATLAB datatype, `matio.load_from_mat` does not currently use a Pythonic representation and instead returns raw data for variables of this type.
+An unconfigured dictionary only saves `Version` and `Unconfigured`.
+
+Since keys of MATLAB dictionaries can be of any MATLAB datatype, `matio.load_from_mat` converts these objects into a `MatlabDictionary` instance with the attributes `keys` and `values`, which are arrays of equal length (`None` if unconfigured). `MatlabDictionary.to_dict()` returns a Python `dict` for keys that are hashable. Dictionaries with keys or values of other MATLAB classes saved one per element, like `categorical` or user-defined classes, are returned as `MatlabOpaque` with a warning.
 
 ## `categorical`
 

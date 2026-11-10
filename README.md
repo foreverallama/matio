@@ -114,6 +114,7 @@ This package uses wrapper classes to represent Matlab object data to help distin
 - `MatlabOpaqueArray`: A wrapper class subclassed from `numpy.ndarray` to represent object arrays. Each item in this array is a `MatlabOpaque` object.
 - `MatlabEnumerationArray`: A wrapper class subclassed from `numpy.ndarray` to represent enumeration instance arrays. Each item in this array is of type `enum.Enum`.
 - `MatlabContainerMap`: A wrapper class subclassed from `collections.UserDict` to represent `container.Map` objects. During save, dictionaries are converted to a `struct`. Wrap dictionaries around `MatlabContainerMap` to write to `container.Map` instead.
+- `MatlabDictionary`: A wrapper class to represent `dictionary` objects, with the attributes `keys` and `values` holding arrays of equal length.
 
 To save these types to a MAT-file, data must be wrapped around the relevant wrapper class. These can be imported from `matio.utils`. An example is shown below:
 

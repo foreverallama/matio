@@ -4,7 +4,7 @@ import warnings
 
 import numpy as np
 
-from matio.utils.matclass import MatlabContainerMap
+from matio.utils.matclass import MatlabContainerMap, MatlabDictionary
 
 MAT_DICT_VERSION = 1
 
@@ -42,65 +42,76 @@ def mat_to_containermap(props, **_kwargs):
     return MatlabContainerMap(result)
 
 
-# # def mat_to_dictionary(props, **_kwargs):
-# #     """Converts MATLAB dictionary to Python list of tuples"""
-# #     # List of tuples as Key-Value pairs can be any datatypes
+def mat_to_dictionary(props, **_kwargs):
+    """Converts MATLAB dictionary to MatlabDictionary"""
 
-# #     comps = props.get("data", None)
-# #     if comps is None:
-# #         return props
+    comps = props.get("data", None)
+    if comps is None:
+        return props
 
-# #     ver = int(comps[0, 0]["Version"].item())
-# #     if ver != MAT_DICT_VERSION:
-# #         warnings.warn(
-# #             f"mat_to_dictionary: Only v{MAT_DICT_VERSION} MATLAB dictionaries are supported. Got v{ver}",
-# #             UserWarning,
-# #         )
-# #         return props
+    ver = int(comps[0, 0]["Version"].item())
+    if ver != MAT_DICT_VERSION:
+        warnings.warn(
+            f"mat_to_dictionary: Only v{MAT_DICT_VERSION} MATLAB dictionaries are supported. Got v{ver}",
+            UserWarning,
+        )
+        return props
 
-# #     ks = comps[0, 0]["Key"]
-# #     vals = comps[0, 0]["Value"]
+    if "Unconfigured" in comps.dtype.names:
+        return MatlabDictionary()
 
-# #     return (ks, vals)
+    arrs = []
+    for name in ("Key", "Value"):
+        arr = comps[0, 0][name]
+        # If not combined, each element is saved as a 1x1 array in a cell.
+        # Only plain arrays concatenate without losing their MATLAB class
+        if not comps[0, 0][f"Is{name}Combined"].item():
+            if any(type(x) is not np.ndarray for x in arr.flat):
+                raise TypeError(f"{name} class is not supported")
+            arr = np.concatenate(arr.ravel())
+        # MATLAB saves N x 1, empty datetimes are read as 0 x 0
+        arrs.append(arr.reshape(-1, 1))
+
+    return MatlabDictionary(*arrs)
 
 
-# def dictionary_to_mat(props):
-#     """Converts a Python dictionary to MATLAB dictionary"""
-#     if not (isinstance(props, tuple) and len(props) == 2):
-#         raise TypeError("Expected tuple of (key, value)")
+def dictionary_to_mat(props):
+    """Converts MatlabDictionary to MATLAB dictionary"""
 
-#     keys, values = props
+    if props.keys is None:
+        data_arr = np.empty(
+            (1, 1), dtype=[("Version", object), ("Unconfigured", object)]
+        )
+        data_arr["Version"][0, 0] = np.uint64(MAT_DICT_VERSION)
+        data_arr["Unconfigured"][0, 0] = np.bool_(True)
+        return {"data": data_arr}
 
-#     def is_valid_array(obj):
-#         return (
-#             isinstance(obj, np.ndarray) or getattr(obj, "classname", None) == "string"
-#         )
+    dtype = [
+        ("Version", object),
+        ("IsKeyCombined", object),
+        ("IsValueCombined", object),
+        ("Key", object),
+        ("Value", object),
+    ]
+    data_arr = np.empty((1, 1), dtype=dtype)
 
-#     if not is_valid_array(keys) or not is_valid_array(values):
-#         raise TypeError(
-#             "Keys must be a numpy array or MatioOpaque with classname='string'"
-#         )
+    # MATLAB dictionaries hold text as string. Char arrays load as unconfigured
+    keys, values = (
+        x.astype(np.dtypes.StringDType()) if x.dtype.kind == "U" else x
+        for x in (props.keys, props.values)
+    )
 
-#     dtype = [
-#         ("Version", object),
-#         ("IsKeyCombined", object),
-#         ("IsValueCombined", object),
-#         ("Key", object),
-#         ("Value", object),
-#     ]
-#     data_arr = np.empty((1, 1), dtype=dtype)
+    data_arr["Key"][0, 0] = keys
+    data_arr["Value"][0, 0] = values
+    data_arr["Version"][0, 0] = np.uint64(MAT_DICT_VERSION)
+    data_arr["IsKeyCombined"][0, 0] = np.bool_(True)
+    data_arr["IsValueCombined"][0, 0] = np.bool_(True)
 
-#     data_arr["Key"][0, 0] = keys
-#     data_arr["Value"][0, 0] = values
-#     data_arr["Version"][0, 0] = np.uint64(MAT_DICT_VERSION)
-#     data_arr["IsKeyCombined"][0, 0] = np.bool_(True)
-#     data_arr["IsValueCombined"][0, 0] = np.bool_(True)
+    prop_map = {
+        "data": data_arr,
+    }
 
-#     prop_map = {
-#         "data": data_arr,
-#     }
-
-#     return prop_map
+    return prop_map
 
 
 def detect_dtype_uniformity(vals):
