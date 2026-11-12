@@ -235,7 +235,7 @@ def to_writeable(source, oned_as="col"):
         return np.atleast_2d(narr)
 
     if hasattr(source, "__array__"):
-        return np.asarray(source)
+        return to_writeable(np.asarray(source), oned_as=oned_as)
 
     if isinstance(source, Mapping):
         is_mapping = True
