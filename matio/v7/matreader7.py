@@ -42,10 +42,12 @@ def loadmat7(
     """Reads MAT-file version 7.3 (HDF5) files."""
 
     with h5py.File(file_path, "r") as f:
-        subsystem = read_subsystem(
-            f, byte_order, raw_data, add_table_attrs, datetime_unit
+        mat_reader = MatRead7(
+            f,
+            load_subsystem=lambda: read_subsystem(
+                f, byte_order, raw_data, add_table_attrs, datetime_unit
+            ),
         )
-        mat_reader = MatRead7(f, subsystem)
         matfile_dict = mat_reader.get_variables(variable_names)
 
     return matfile_dict
@@ -140,7 +142,7 @@ def whosmat7(file_path):
 class MatRead7:
     """Reads MAT-file version 7.3 (HDF5) files."""
 
-    def __init__(self, file_stream, subsystem=None):
+    def __init__(self, file_stream, subsystem=None, load_subsystem=None):
         """Initializes the MAT-file reader.
         Parameters
         ----------
@@ -151,6 +153,7 @@ class MatRead7:
         """
         self.h5stream = file_stream
         self.subsystem = subsystem
+        self.load_subsystem = load_subsystem
 
     def read_numeric(self, obj, is_empty=0):
         """Reads MATLAB numeric arrays from the v7.3 MAT-file."""
@@ -336,6 +339,11 @@ class MatRead7:
 
         if classname == MCOS_SUBSYSTEM_CLASS:
             return self.read_cell(obj)
+
+        if self.load_subsystem is not None:
+            # Read the subsystem only when the first object needs it
+            self.subsystem = self.load_subsystem()
+            self.load_subsystem = None
 
         if self.subsystem is None:
             # Opaque values inside the subsystem itself (Java properties) stay raw, as in v5
