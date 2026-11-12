@@ -758,6 +758,16 @@ class TestLoadMatlabTableOriginalNames:
 
 
 @pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_list_of_tables(tmp_path, version):
+    frames = [pd.DataFrame({"a": [1.0, 2.0]}), pd.DataFrame({"a": [3.0, 4.0]})]
+    save_to_mat(tmp_path / "tables.mat", {"runs": frames}, version=version)
+    loaded = load_from_mat(tmp_path / "tables.mat")["runs"]
+    assert loaded.shape == (2, 1)
+    for frame, back in zip(frames, loaded.flat):
+        pd.testing.assert_frame_equal(back, frame)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
 def test_period_column(tmp_path, version):
     frame = pd.DataFrame({"month": pd.period_range("2020-01", periods=2, freq="M")})
     with pytest.warns(MatConvertWarning, match="'month' with Period dtype"):
