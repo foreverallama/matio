@@ -144,7 +144,7 @@ cdef class VarHeader5:
     cdef readonly object name
     cdef readonly object classname
     cdef readonly object type_system
-    cdef readonly long payload_size
+    cdef readonly Py_ssize_t payload_size
     cdef readonly int mclass
     cdef readonly object dims
     cdef cnp.int32_t dims_ptr[_MAT_MAXDIMS]
@@ -560,7 +560,7 @@ cdef class VarReader5:
         return 0
 
     cpdef VarHeader5 read_header(self, int check_stream_limit,
-                                 long payload_size):
+                                 Py_ssize_t payload_size):
         ''' Return matrix header for current stream position
 
         Returns matrix headers at top level and sub levels
@@ -578,7 +578,7 @@ cdef class VarReader5:
             cnp.uint16_t mc
             int i
             Py_ssize_t header_start
-            long remaining_payload
+            Py_ssize_t remaining_payload
             VarHeader5 header
         header_start = self.cstream.tell()
         # Read and discard mdtype and byte_count
