@@ -1,6 +1,7 @@
 """Methods to handle MATLAB FileWrapper__ data"""
 
 import warnings
+from collections.abc import Mapping
 
 import numpy as np
 
@@ -811,13 +812,15 @@ class MatSubsystem:
         member_indices = {}
         for enum_member in enum_array.ravel(order="F"):
             if enum_member not in member_indices:
-                member_indices[enum_member] = len(values)
-                value_class = enum_to_opaque(classname, enum_member.value)
-                values.append(self.set_object_metadata(value_class))
+                member_indices[enum_member] = len(value_names_idx)
+                if isinstance(enum_member.value, Mapping):
+                    value_class = enum_to_opaque(classname, enum_member.value)
+                    values.append(self.set_object_metadata(value_class))
                 value_names_idx.append(self.set_mcos_name(enum_member.name))
             value_indices.append(member_indices[enum_member])
 
-        prop_name = next(iter(enum_array[0, 0].value))
+        # Enumerations without properties have no values, like in MATLAB
+        prop_name = next(iter(enum_array[0, 0].value)) if values else ""
         builtin_classname, _, _ = prop_name.rpartition(".")
         if builtin_classname:
             builtin_classname_idx = self.set_class_id(builtin_classname)
@@ -1011,9 +1014,10 @@ class MatSubsystem:
             value_idx.shape, order="F"
         )
         metadata[0, 0]["ValueIndices"] = value_idx
-        metadata[0, 0]["Values"] = np.array(enum_vals).reshape(
-            value_idx.shape, order="F"
-        )
+        if enum_vals:
+            metadata[0, 0]["Values"] = np.array(enum_vals).reshape(
+                value_idx.shape, order="F"
+            )
 
         return MatlabOpaque(
             metadata,

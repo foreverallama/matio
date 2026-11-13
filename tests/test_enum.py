@@ -1,12 +1,15 @@
 import os
 import tempfile
 import warnings
+from collections import UserDict
+from enum import Enum
 
 import numpy as np
 import pytest
 
 from matio import load_from_mat, save_to_mat
-from matio.utils.matclass import MatlabEnumerationArray, MatlabOpaque
+from matio.utils.converters.matenum import mat_to_enum
+from matio.utils.matclass import MatlabEnumerationArray, MatlabOpaque, OpaqueType
 
 files = [("test_enum_v7.mat", "v7"), ("test_enum_v73.mat", "v7.3")]
 namespace = "TestClasses"
@@ -100,6 +103,31 @@ class TestLoadMatlabEnum:
                 enum_obj.value["val"],
                 np.array([[expected_vals[idx]]], dtype=np.float64),
                 strict=True,
+            )
+            # Members can be looked up by their properties, as with a plain Enum
+            assert type(enum_obj)(enum_obj.value) is enum_obj
+            assert repr(enum_obj).endswith(f"{enum_obj.name}: {enum_obj.value!r}>")
+
+    def test_enum_noprops(self, filename, version):
+        """Test reading enum array without properties from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_noprops"])
+        mraw = load_from_mat(file_path, variable_names=["enum_noprops"], raw_data=True)
+        assert isinstance(mdict["enum_noprops"], MatlabEnumerationArray)
+        assert mdict["enum_noprops"].classname == f"{namespace}.EnumNoProps"
+        assert mdict["enum_noprops"].shape == (1, 3)
+        assert [e.name for e in mdict["enum_noprops"].ravel()] == ["Red", "Blue", "Red"]
+        assert isinstance(mraw["enum_noprops"], MatlabOpaque)
+
+    def test_enum_equal_props(self, filename, version):
+        """Test reading enum members with equal properties from MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_equal"])
+        members = mdict["enum_equal"].ravel()
+        assert [e.name for e in members] == ["Pending", "Deferred", "Complete"]
+        for member, val in zip(members, [1.0, 1.0, 2.0]):
+            np.testing.assert_array_equal(
+                member.value["val"], np.array([[val]]), strict=True
             )
 
     def test_load_enum_nested(self, filename, version):
@@ -278,6 +306,28 @@ class TestSaveMatlabEnum:
             e.name for e in mdict["enum_repeated"].ravel(order="F")
         ]
 
+    def test_enum_noprops(self, filename, version, tmp_path):
+        """Test writing enum array without properties to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_noprops"])
+        save_to_mat(tmp_path / "enum.mat", mdict, version=version)
+        mload = load_from_mat(tmp_path / "enum.mat")
+        assert mload["enum_noprops"].classname == mdict["enum_noprops"].classname
+        assert mload["enum_noprops"].shape == (1, 3)
+        assert [e.name for e in mload["enum_noprops"].ravel()] == ["Red", "Blue", "Red"]
+
+    def test_enum_equal_props(self, filename, version, tmp_path):
+        """Test writing enum members with equal properties to MAT-file"""
+        file_path = os.path.join(os.path.dirname(__file__), "data", filename)
+        mdict = load_from_mat(file_path, variable_names=["enum_equal"])
+        save_to_mat(tmp_path / "enum.mat", mdict, version=version)
+        mload = load_from_mat(tmp_path / "enum.mat")
+        assert [e.name for e in mload["enum_equal"].ravel()] == [
+            "Pending",
+            "Deferred",
+            "Complete",
+        ]
+
     def test_save_enum_nested(self, filename, version):
         """Test writing nested enum data to MAT-file"""
         file_path = os.path.join(os.path.dirname(__file__), "data", filename)
@@ -371,3 +421,42 @@ class TestSaveMatlabEnum:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_enum_member_named_value(version, tmp_path):
+    """Test writing an enum with a member called value and equal properties"""
+    values = [
+        MatlabOpaque(
+            properties={"Code": np.array([[1.0]])},
+            classname="Level",
+            type_system=OpaqueType.MCOS,
+        )
+        for _ in range(2)
+    ]
+    enum_array = mat_to_enum(values, ["value", "high"], "Level", (1, 2))
+    save_to_mat(tmp_path / "enum.mat", {"e": enum_array}, version=version)
+    mload = load_from_mat(tmp_path / "enum.mat")
+    assert [e.name for e in mload["e"].ravel()] == ["value", "high"]
+    assert [e.value["Code"].item() for e in mload["e"].ravel()] == [1.0, 1.0]
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_enum_mapping_values(version, tmp_path):
+    """Test writing an enum whose values are mappings other than dict"""
+    level = Enum(
+        "Level",
+        {
+            "low": UserDict({"Code": np.array([[1.0]])}),
+            "high": UserDict({"Code": np.array([[2.0]])}),
+        },
+    )
+    enum_array = MatlabEnumerationArray(
+        np.array([[level.low, level.high]], dtype=object),
+        type_system=OpaqueType.MCOS,
+        classname="Level",
+    )
+    save_to_mat(tmp_path / "enum.mat", {"e": enum_array}, version=version)
+    mload = load_from_mat(tmp_path / "enum.mat")
+    assert [e.name for e in mload["e"].ravel()] == ["low", "high"]
+    assert [e.value["Code"].item() for e in mload["e"].ravel()] == [1.0, 2.0]

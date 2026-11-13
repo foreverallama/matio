@@ -14,6 +14,12 @@ enum_repeated = [TestClasses.EnumClass.enum2, TestClasses.EnumClass.enum2, TestC
     TestClasses.EnumClass.enum3, TestClasses.EnumClass.enum2, TestClasses.EnumClass.enum1];
 data.enum_repeated = enum_repeated;
 
+enum_noprops = [TestClasses.EnumNoProps.Red, TestClasses.EnumNoProps.Blue, TestClasses.EnumNoProps.Red];
+data.enum_noprops = enum_noprops;
+
+enum_equal = [TestClasses.EnumEqualProps.Pending, TestClasses.EnumEqualProps.Deferred, TestClasses.EnumEqualProps.Complete];
+data.enum_equal = enum_equal;
+
 %% Enum Nested
 
 e1 = TestClasses.EnumClass.enum1;
