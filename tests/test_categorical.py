@@ -511,3 +511,24 @@ class TestSaveMatlabCategorical:
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_categorical_non_text_categories(tmp_path, version):
+    """MATLAB category names are text, pandas categories can be numbers, dates or intervals"""
+    path = tmp_path / "cat_categories.mat"
+    df = pd.DataFrame(
+        {
+            "num": pd.Categorical([1, 2, 1]),
+            "day": pd.Categorical(
+                pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-01"])
+            ),
+            "bin": pd.cut(pd.Series([5, 15, 25]), bins=[0, 10, 20, 40]).array,
+        }
+    )
+    save_to_mat(path, {"t": df}, version=version)
+    mload = load_from_mat(path)["t"]
+    assert list(mload["num"].cat.categories) == ["1", "2"]
+    assert list(mload["day"].cat.categories) == ["2024-01-01", "2024-01-02"]
+    assert list(mload["bin"].cat.categories) == ["(0, 10]", "(10, 20]", "(20, 40]"]
+    assert list(mload["bin"].astype(str)) == ["(0, 10]", "(10, 20]", "(20, 40]"]
