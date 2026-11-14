@@ -609,6 +609,25 @@ class TestSaveMatlabTableChar:
                 os.remove(temp_file_path)
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_pyarrow_string_column(tmp_path, version):
+    """pyarrow strings, e.g. from read_csv(dtype_backend="pyarrow"), are saved as strings"""
+    pa = pytest.importorskip("pyarrow")
+    path = tmp_path / "arrow_strings.mat"
+    df = pd.DataFrame(
+        {
+            "s": pd.Series(["x", None], dtype=pd.ArrowDtype(pa.string())),
+            "ref": pd.Series(["x", None], dtype="string"),
+        }
+    )
+    save_to_mat(path, {"t": df}, version=version)
+    loaded = load_from_mat(path)["t"]
+    # Same values and dtype as a column with the pandas string dtype
+    pd.testing.assert_series_equal(loaded["s"], loaded["ref"], check_names=False)
+    assert loaded["s"].iloc[0] == "x"
+    assert pd.isna(loaded["s"].iloc[1])
+
+
 tablev5_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
 
 
