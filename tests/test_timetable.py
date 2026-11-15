@@ -776,6 +776,28 @@ def test_row_times_sample_rate_datetime_unit():
     np.testing.assert_array_equal(times, expected, strict=True)
 
 
+def test_row_times_time_step_datetime_unit():
+    """TimeStep row times stay valid for a start time outside the ns range"""
+    fields = ("origin", "specifiedAsRate", "stepSize")
+    row_times = np.empty((1, 1), dtype=[(f, object) for f in fields])
+    row_times[0, 0] = (
+        np.array([["2500-01-01"]], dtype="datetime64[us]"),
+        np.array([[False]]),
+        np.array([[1001000]], dtype="timedelta64[ns]"),
+    )
+    times = get_row_times(row_times, 3)
+
+    expected = np.array(
+        [
+            "2500-01-01T00:00:00",
+            "2500-01-01T00:00:00.001001",
+            "2500-01-01T00:00:00.002002",
+        ],
+        dtype="datetime64[us]",
+    )
+    np.testing.assert_array_equal(times, expected, strict=True)
+
+
 categorical_files = [
     ("test_table_categorical_v7.mat", "v7"),
     ("test_table_categorical_v73.mat", "v7.3"),
