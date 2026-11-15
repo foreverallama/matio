@@ -865,6 +865,36 @@ def test_load_v73_skips_internal_groups():
             os.remove(temp_file_path)
 
 
+def test_v73_read_subsystem_only_for_objects(monkeypatch):
+    """Loading only numeric variables from v7.3 does not read the object data"""
+    from matio.v7 import matreader7
+
+    string_file = os.path.join(os.path.dirname(__file__), "data", "test_string_v73.mat")
+    mdict = load_from_mat(string_file, variable_names=["string_scalar"])
+    mdict["x"] = np.arange(3.0)
+
+    calls = []
+    read_subsystem = matreader7.read_subsystem
+
+    def counting_read_subsystem(*args, **kwargs):
+        calls.append(1)
+        return read_subsystem(*args, **kwargs)
+
+    monkeypatch.setattr(matreader7, "read_subsystem", counting_read_subsystem)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "mixed.mat")
+        save_to_mat(file_path, mdict, version="v7.3")
+        result = load_from_mat(file_path, variable_names=["x"])
+        assert calls == []
+        np.testing.assert_array_equal(result["x"], [[0.0], [1.0], [2.0]], strict=True)
+
+        result = load_from_mat(file_path)
+    assert calls == [1]
+    np.testing.assert_array_equal(
+        result["string_scalar"], mdict["string_scalar"], strict=True
+    )
+
+
 def test_save_compression_v73():
     """Test that v7.3 only compresses datasets above 10000 bytes, like MATLAB"""
     mdict = {
