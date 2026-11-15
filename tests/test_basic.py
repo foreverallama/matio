@@ -984,3 +984,23 @@ def test_save_nested_list_keeps_rows(version):
         result["matrix"], [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], strict=True
     )
     assert result["flat"].shape == (3, 1)
+
+
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_mixed_and_ragged_lists_as_cells(version):
+    """Numbers next to text and arrays of different widths are written as cells"""
+    mdict = {
+        "mixed": [4, 5, "six"],
+        "ragged": [np.zeros((2, 3)), np.ones((2, 5))],
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "lists.mat")
+        save_to_mat(file_path, mdict, version=version)
+        result = load_from_mat(file_path)
+    mixed = result["mixed"]
+    assert mixed.dtype == object and mixed.shape == (3, 1)
+    np.testing.assert_array_equal(mixed[0, 0], [[4]], strict=True)
+    np.testing.assert_array_equal(mixed[2, 0], ["six"], strict=True)
+    ragged = result["ragged"]
+    assert ragged.dtype == object and ragged.shape == (2, 1)
+    np.testing.assert_array_equal(ragged[1, 0], np.ones((2, 5)), strict=True)

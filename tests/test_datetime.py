@@ -243,6 +243,19 @@ def test_save_pandas_time_scalars(tmp_path, version):
     assert mload["td"][0, 0] == np.timedelta64(120, "s")
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_lists_of_time_values(tmp_path, version):
+    path = tmp_path / "time_lists.mat"
+    t = [np.datetime64("2024-01-01T10:00:00"), np.datetime64("2024-01-02T10:00:00")]
+    d = [np.timedelta64(5, "s"), np.timedelta64(7, "s")]
+    save_to_mat(path, {"t": t, "d": d, "s": {"t": t}}, version=version)
+    mload = load_from_mat(path)
+    expected = np.array(t, dtype="datetime64[ns]").reshape(2, 1)
+    np.testing.assert_array_equal(mload["t"], expected, strict=True)
+    np.testing.assert_array_equal(mload["s"][0, 0]["t"], expected, strict=True)
+    np.testing.assert_array_equal(mload["d"], np.array(d).reshape(2, 1), strict=True)
+
+
 @pytest.mark.parametrize("filename, version", precision_files)
 class TestLoadMatlabDatetimePrecision:
 

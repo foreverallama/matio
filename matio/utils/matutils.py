@@ -4,6 +4,7 @@ import warnings
 from collections.abc import Mapping
 
 import numpy as np
+import pandas as pd
 from scipy.sparse import issparse
 
 from matio.utils.matclass import (
@@ -234,7 +235,7 @@ def to_writeable(source, oned_as="col"):
         return np.atleast_2d(narr)
 
     if hasattr(source, "__array__"):
-        return np.asarray(source)
+        return to_writeable(np.asarray(source), oned_as=oned_as)
 
     if isinstance(source, Mapping):
         is_mapping = True
@@ -274,7 +275,31 @@ def to_writeable(source, oned_as="col"):
     try:
         narr = np.asanyarray(source)
     except ValueError:
-        narr = np.asanyarray(source, dtype=object)
+        narr = None
+    if (
+        (narr is None or narr.ndim > 2)
+        and isinstance(source, (list, tuple))
+        and any(isinstance(x, pd.DataFrame) for x in source)
+    ):
+        # NumPy stacks DataFrames of equal shape into one array of their values
+        narr = np.fromiter(source, dtype=object, count=len(source))
+    elif narr is None:
+        try:
+            narr = np.asanyarray(source, dtype=object)
+        except ValueError:
+            # NumPy cannot stack shapes like (2, 3) and (2, 4), so write a cell array
+            if not isinstance(source, (list, tuple)):
+                raise
+            narr = np.fromiter(source, dtype=object, count=len(source))
+    if (
+        narr.dtype.kind in "US"
+        and isinstance(source, (list, tuple))
+        and not set(map(type, source)) <= {str}
+    ):
+        cells = np.asanyarray(source, dtype=object)
+        # NumPy turns numbers next to text into text, keep them as numbers in cells
+        if not all(isinstance(x, (str, bytes, np.ndarray)) for x in cells.flat):
+            narr = cells
 
     if narr.dtype.type in (object, np.object_) and narr.shape == () and narr == source:
         raise TypeError(f"Could not convert {type(source)} to a writeable datatype")
@@ -282,6 +307,10 @@ def to_writeable(source, oned_as="col"):
     if narr.dtype.kind in ("U", "S"):
         # Backwards compatibility with scipy "chars_to_strings"
         return np.atleast_1d(narr)
+
+    if narr.dtype.kind in ("M", "m"):
+        # A list of datetime64 or timedelta64 values is one datetime or duration
+        return to_writeable(narr, oned_as)
 
     if narr.ndim == 1 and oned_as == "col":
         return narr.reshape(-1, 1)
