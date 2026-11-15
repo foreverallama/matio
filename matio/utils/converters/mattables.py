@@ -243,12 +243,13 @@ def get_row_times(row_times, num_rows):
             # Keep the unit of the step if it holds the start time
             start = start.astype(step.dtype)
 
-    # NumPy uses the finer unit of start and step, so neither is truncated
-    times = (start + step * np.arange(num_rows)).ravel()
-    if times.dtype.kind == "M":
-        # Keep the unit of the start time, set by datetime_unit
-        times = times.astype(start.dtype)
-    return times
+    offsets = step * np.arange(num_rows)
+    if start.dtype.kind == "M":
+        # Add in the unit of the start time, set by datetime_unit. A start outside
+        # the datetime64[ns] range would overflow if NumPy promoted it to ns
+        offsets = offsets.astype(f"timedelta64[{np.datetime_data(start.dtype)[0]}]")
+    # Otherwise NumPy uses the finer unit of start and step, so neither is truncated
+    return (start + offsets).ravel()
 
 
 def mat_to_timetable(props, add_table_attrs=False, **_kwargs):
