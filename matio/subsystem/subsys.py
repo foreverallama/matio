@@ -430,10 +430,26 @@ class MatSubsystem:
         """Returns how many objects reference each saved property"""
 
         counts = np.zeros(len(self.mcos_props_saved), dtype=np.int64)
-        object_ids = np.asarray(self.object_id_metadata).reshape(-1, 6)
-        for saveobj_id, normobj_id in object_ids[1:, 3:5]:
-            recs = self.get_object_property_idxs(saveobj_id, normobj_id)
-            np.add.at(counts, recs[recs[:, 1] == PropertyType.PROPERTY_VALUE, 2], 1)
+        object_ids = np.asarray(self.object_id_metadata).reshape(-1, 6)[1:]
+        saveobj_ids, normobj_ids = object_ids[:, 3], object_ids[:, 4]
+        # Like get_object_property_idxs, an object uses its saveobj record if it has one
+        for region, metadata, ids in (
+            ("saveobj", self.saveobj_metadata, saveobj_ids[saveobj_ids != 0]),
+            ("nobj", self.nobj_metadata, normobj_ids[saveobj_ids == 0]),
+        ):
+            if not len(ids):
+                continue
+            # Read each record once, weighted by the number of objects using it
+            records, freq = np.unique(ids, return_counts=True)
+            self.get_record_offset(region, metadata, int(records[-1]), 3, metadata[0])
+            starts = np.asarray(self._record_offsets[region])[records]
+            nprops = metadata[starts]
+            # Index of each (name, type, value) triple, records are laid out one after another
+            first = np.repeat(starts + 1 - 3 * (np.cumsum(nprops) - nprops), nprops)
+            first += 3 * np.arange(nprops.sum())
+            is_value = metadata[first + 1] == PropertyType.PROPERTY_VALUE
+            weights = np.repeat(freq, nprops)
+            np.add.at(counts, metadata[first + 2][is_value], weights[is_value])
         return counts
 
     def release_saved_properties(self, object_id):
