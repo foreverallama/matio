@@ -422,10 +422,7 @@ def table_to_mat(df):
     # All serialized data must be the exact same types (including shape) as expected by MATLAB
     # If not, it might still load correctly, but some class methods may fail
     extras = make_table_props()
-    extras["DimensionNames"][0, 0] = np.array(
-        [np.array([f"{d}_1" if d in varnames else d]) for d in ("Row", "Variables")],
-        dtype=object,
-    ).reshape((1, 2))
+    extras["DimensionNames"][0, 0] = dimension_names("Row", varnames)
     prop_map = {
         "data": data,
         "varnames": varnames,
@@ -473,6 +470,21 @@ def make_timetable_props():
     }
 
 
+def dimension_names(first, varnames):
+    """MATLAB rejects dimension names equal to a variable name, readtable appends "_1", "_2", ..."""
+
+    taken = set(varnames)
+    names = []
+    for name in (first, "Variables"):
+        unique, k = name, 0
+        while unique in taken:
+            k += 1
+            unique = f"{name}_{k}"
+        taken.add(unique)
+        names.append(np.array([unique]))
+    return np.array(names, dtype=object).reshape((1, 2))
+
+
 def timetable_to_mat(df):
     """Converts a pandas DataFrame to a MATLAB timetable"""
 
@@ -487,11 +499,7 @@ def timetable_to_mat(df):
 
     # MATLAB needs a text dimension name, pandas allows any hashable index name
     dim1 = str(df.index.name) if df.index.name is not None else "Time"
-    # MATLAB rejects dimension names equal to a variable name, readtable appends "_1"
-    dimnames = np.array(
-        [np.array([f"{d}_1" if d in varnames else d]) for d in (dim1, "Variables")],
-        dtype=object,
-    ).reshape((1, 2))
+    dimnames = dimension_names(dim1, varnames)
 
     if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:
         warnings.warn(

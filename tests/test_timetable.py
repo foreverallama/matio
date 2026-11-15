@@ -596,6 +596,19 @@ def test_save_dimension_names_unique(tmp_path, version):
     assert mload["tab"].attrs["DimensionNames"] == ["Row_1", "Variables_1"]
 
 
+@pytest.mark.parametrize("version", ["v7", "v7.3"])
+def test_save_dimension_names_skip_taken_suffix(tmp_path, version):
+    times = pd.date_range("2020-01-01", periods=3, freq="s")
+    tt = pd.DataFrame({"Time": times, "Time_1": [100.0, 200.0, 300.0]}).set_index(
+        "Time", drop=False
+    )
+    path = tmp_path / "dimnames_taken.mat"
+    save_to_mat(path, {"tt": tt}, version=version)
+    mload = load_from_mat(path)
+    assert mload["tt"].index.name == "Time_2"
+    assert list(mload["tt"]["Time_1"]) == [100.0, 200.0, 300.0]
+
+
 timetablev7_files = [("test_tablev5_v7.mat", "v7"), ("test_tablev5_v73.mat", "v7.3")]
 
 
