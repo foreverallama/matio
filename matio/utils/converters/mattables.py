@@ -380,8 +380,10 @@ def get_column_data(col):
         )
         col = col.dt.to_timestamp()
 
-    if isinstance(col.dtype, pd.StringDtype):
-        # Covers both "str" (NaN) and "string" (pd.NA) dtypes
+    if isinstance(col.dtype, pd.StringDtype) or (
+        isinstance(col.dtype, pd.ArrowDtype) and pd.api.types.is_string_dtype(col.dtype)
+    ):
+        # Covers "str" (NaN), "string" (pd.NA) and pyarrow string dtypes
         return col.to_numpy(
             dtype=np.dtypes.StringDType(na_object=np.nan), na_value=np.nan
         ).reshape(-1, 1)
