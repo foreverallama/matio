@@ -545,7 +545,8 @@ def timetable_to_mat(df):
 def categorical_to_mat(cat):
     """Converts a pandas Categorical to a MATLAB categorical"""
 
-    category_names = cat.categories.to_numpy(dtype=object).reshape(-1, 1)
+    # MATLAB category names are text, pandas also allows numbers, dates and intervals
+    category_names = cat.categories.astype(str).to_numpy(dtype=object).reshape(-1, 1)
     # 1-based indexing, as the smallest unsigned integer type that fits all categories
     codes = (cat.codes + 1).astype(np.min_scalar_type(len(cat.categories)))
     is_ordinal = np.bool_(cat.ordered)
